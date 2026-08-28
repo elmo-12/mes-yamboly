@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@import '@mes/ui/theme.css';
+
+/* Tailwind v4 debe escanear el código fuente del paquete de UI. */
+@source "../../../../packages/ui/src";

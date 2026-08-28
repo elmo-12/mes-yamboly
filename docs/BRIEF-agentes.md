@@ -1,0 +1,22 @@
+# Brief común para subagentes — MES Yamboly (implementación)
+
+Monorepo: `/Users/elmo/trabajo/yambo/mes-yamboly` (pnpm 11 + turbo). `apps/web` Next.js 15.3 App Router + React 19 + Tailwind v4 (`@import 'tailwindcss'` + `@theme`) · `apps/api` NestJS 11 + TypeORM + SQLite · `packages/ui` (@mes/ui, consumido como fuente vía transpilePackages) · `packages/types` (@mes/types, compilado a dist con `pnpm --filter @mes/types build`) · `packages/shared` (@mes/shared) · `packages/config`.
+Comandos: `pnpm dev` (web :3000, api :4000), `pnpm typecheck`, `pnpm build`. NO ejecutes `pnpm install` con otros flags; si agregas dependencia usa `pnpm --filter <pkg> add <dep>`.
+
+## Fuente de verdad
+1. Figma fileKey `WOfwZEmPx1Hcw7ehaIsnpx`. Node ids de frames: `docs/figma-frames.md`. Specs textuales con datos de ejemplo: `docs/figma-specs-modulos.md`. Tokens/tipografía/componentes MDS: `docs/mds-spec.md`. Kit MDS: `docs/figma-kit.md`. Datos Yamboly: `docs/figma-brief-previo.md`.
+2. Skill obligatoria para leer Figma: `figma-design-to-code` (leer `skill://figma/figma-design-to-code/SKILL.md` con `mcp__claude_ai_Figma__get_figma_skill`). Llamar `get_design_context` con `skillNames: "resource:figma-design-to-code"` y `fileKey: "WOfwZEmPx1Hcw7ehaIsnpx"`, `nodeId` con guion (`2156-3936`). Emitir gates G1 / G2-G4 / G5. Cuota Figma limitada: **máximo 20 llamadas Figma por agente**; si aparece error de cuota, continúa con `docs/figma-specs-modulos.md` + capturas en `/private/tmp/claude-501/-Users-elmo-trabajo-yambo/4b60a4e1-cfac-4e6e-a80d-2c3110176b93/scratchpad/*.png` y anótalo en tu informe.
+3. Idioma de la UI: español (Perú). Datos realistas de Yamboly (helados: L1 Paletas, L2 Conos, L3 Vasos, L4 Sándwich, L5 Bombones; turnos Mañana/Tarde/Noche; causas PM-01…PS-07; mermas MR-01…MR-04; personas Carlos Mendoza (jefe), Jorge Quispe (maquinista L2), Ana Ríos (supervisora), María Torres (mermas)). Nunca "Lorem", "Test 1".
+
+## Reglas de código
+- TypeScript estricto, sin `any`. Sin valores mágicos: colores/tipografía/radios/sombras siempre por tokens (`@mes/ui/theme.css` → clases Tailwind `bg-primary`, `text-text-secondary`, `rounded-md`, `shadow-modal`, `text-h2`, etc.).
+- Antes de crear un componente revisa `packages/ui/src` (primitives/patterns) y `apps/web/src/components`. Si algo falta en el DS y es reutilizable → créalo en `packages/ui` (con la misma convención) y avísalo en tu informe. Si es específico de un feature → `apps/web/src/features/<feature>/components`.
+- Reglas MDS codificadas: la página es el contenedor (tablas y contenido sin card); cards solo funcionales (KPI/Alert/Insight/Summary/LineCard); sombras solo en flotantes (dropdown/modal/drawer/popover); UN solo `Button variant="primary"` por pantalla (excepción: LineCard en Tiempo real); Danger siempre con modal de confirmación; Badge nunca clicable (usar Tag).
+- Vistas: nunca importan mocks ni hacen fetch directo. Flujo: componente → hook (`useQuery`/`useMutation` de `features/<f>/hooks`) → `features/<f>/api.ts` → `services/api/client.ts` (el adapter mock/api se resuelve por `NEXT_PUBLIC_DATA_SOURCE`).
+- Cada vista con estados: loading (skeleton), empty, no-results, error, success/toast, validación de formularios (react-hook-form + zod), confirmación, forbidden.
+- Archivos pequeños y por responsabilidad (una página = composición de secciones). Sin código muerto ni imports sin usar. `pnpm typecheck` en verde al terminar tu bloque.
+- Convención de rutas (apps/web/src/app): `(auth)/login`, `(app)/` = shell con sidebar: `page.tsx` Home, `tiempo-real`, `ordenes`, `ordenes/[id]`, `reportes`, `alertas`, `analitica`, `evidencia`, `configuracion`, `pasteurizacion`, `personal`, `perfil`; fuera del shell: `tv`, `encuesta/[token]`.
+- Endpoints (prefijo `/api/v1`): ver `docs/api-contracts.md` (lo genera A3). Colecciones `{ data, meta:{page,pageSize,total,totalPages} }`; errores `{ statusCode, code, message, details? }`.
+
+## Informe final del agente
+Devuelve: archivos creados/modificados (rutas), componentes nuevos del DS, decisiones, desviaciones respecto a Figma con motivo, llamadas Figma usadas, pendientes. Sin prosa larga.

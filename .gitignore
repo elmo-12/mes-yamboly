@@ -1,0 +1,12 @@
+node_modules
+.next
+dist
+.turbo
+*.sqlite
+*.sqlite-journal
+.env
+.env.local
+.DS_Store
+apps/api/data/exports/*.xlsx
+
+.next-qa

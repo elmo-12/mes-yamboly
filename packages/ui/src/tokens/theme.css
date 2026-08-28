@@ -1,0 +1,340 @@
+/* =============================================================================
+   MDS v2.3.1 — Tokens (White First, sin modo oscuro)
+   Nomenclatura 1:1 con Figma (grupo/rol -> --color-grupo-rol)
+   Fuente: docs/mds-spec.md §2 §3 §4 · Figma WOfwZEmPx1Hcw7ehaIsnpx
+   ========================================================================== */
+
+@theme {
+  /* ---------- FUENTE ---------------------------------------------------- */
+  --font-sans:
+    var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* ---------- COLOR · superficies --------------------------------------- */
+  --color-background-main: #ffffff;
+  --color-background-subtle: #f9fafb;
+
+  /* ---------- COLOR · divisores y bordes -------------------------------- */
+  --color-divider: #f3f4f6;
+  --color-divider-soft: #f9fafb;
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+  --color-border-focus: #2563eb;
+
+  /* ---------- COLOR · texto --------------------------------------------- */
+  --color-text-primary: #111827;
+  --color-text-secondary: #6b7280;
+  --color-text-inverse: #ffffff;
+  --color-text-disabled: #9ca3af;
+  --color-text-link: #2563eb;
+
+  /* ---------- COLOR · marca --------------------------------------------- */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-pressed: #1e40af; /* Figma repite hover; corregido en código */
+  --color-primary-subtle: #eff6ff;
+  --color-primary-subtle-border: #93c5fd; /* borde de Tag Selected (falta en MDS) */
+  --color-primary-subtle-fill: #dbeafe; /* primary/subtle-border 42:71 · chips y heatmap */
+  --color-primary-foreground: #ffffff;
+
+  /* ---------- COLOR · semánticos ---------------------------------------- */
+  --color-success: #16a34a;
+  --color-success-text: #15803d;
+  --color-success-subtle: #f0fdf4;
+  --color-success-foreground: #ffffff;
+
+  --color-warning: #f59e0b;
+  --color-warning-text: #b45309;
+  --color-warning-subtle: #fffbeb;
+  --color-warning-foreground: #ffffff;
+
+  --color-error: #dc2626;
+  --color-error-text: #b91c1c;
+  --color-error-subtle: #fef2f2;
+  --color-error-foreground: #ffffff;
+
+  --color-info: #2563eb;
+  --color-info-text: #1d4ed8;
+  --color-info-subtle: #eff6ff;
+  --color-info-foreground: #ffffff;
+
+  --color-accent: #7c3aed;
+  --color-accent-text: #6d28d9;
+  --color-accent-subtle: #f5f3ff;
+  --color-accent-foreground: #ffffff;
+
+  --color-neutral: #374151;
+  --color-neutral-text: #374151;
+  --color-neutral-subtle: #f3f4f6;
+
+  --color-disabled-bg: #f3f4f6;
+  --color-disabled-fg: #9ca3af;
+
+  /* ---------- COLOR · Modo TV (pantalla de planta, fuera del shell) ------ */
+  --color-tv-background: #111827;
+  --color-tv-surface: #1f2937;
+  --color-tv-border: #374151;
+  --color-tv-text: #f9fafb;
+  --color-tv-text-muted: #9ca3af;
+
+  /* Estados de línea del Modo TV (Figma 2163:8523) — aditivo V2.
+     `*-subtle` = fondo de la píldora · `*-text` = texto de la píldora ·
+     base = relleno de la barra de avance. */
+  --color-tv-ok: #22c55e;
+  --color-tv-ok-subtle: #14532d;
+  --color-tv-ok-text: #86efac;
+  --color-tv-warn: #f59e0b;
+  --color-tv-warn-subtle: #78350f;
+  --color-tv-warn-text: #fcd34d;
+  --color-tv-iot: #7c3aed;
+  --color-tv-iot-subtle: #4c1d95;
+  --color-tv-iot-text: #ddd6fe;
+  --color-tv-stop: #dc2626;
+  --color-tv-stop-subtle: #7f1d1d;
+  --color-tv-stop-text: #fca5a5;
+  --color-tv-idle: #6b7280;
+  --color-tv-idle-subtle: #374151;
+  --color-tv-idle-text: #d1d5db;
+
+  /* ---------- COLOR · overlay ------------------------------------------- */
+  --color-overlay: rgb(17 24 39 / 0.5);
+
+  /* ---------- TIPOGRAFÍA · escala MDS exacta ---------------------------- */
+  --text-display: 40px;
+  --text-display--line-height: 48px;
+  --text-display--letter-spacing: -0.8px;
+  --text-display--font-weight: 700;
+
+  --text-h1: 32px;
+  --text-h1--line-height: 40px;
+  --text-h1--letter-spacing: -0.64px;
+  --text-h1--font-weight: 600;
+
+  --text-h2: 24px;
+  --text-h2--line-height: 32px;
+  --text-h2--letter-spacing: -0.24px;
+  --text-h2--font-weight: 600;
+
+  --text-h3: 20px;
+  --text-h3--line-height: 28px;
+  --text-h3--letter-spacing: -0.2px;
+  --text-h3--font-weight: 600;
+
+  --text-h4: 16px;
+  --text-h4--line-height: 24px;
+  --text-h4--letter-spacing: 0px;
+  --text-h4--font-weight: 600;
+
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body-lg--font-weight: 400;
+
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-body--font-weight: 400;
+
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--font-weight: 500;
+
+  --text-body-sm: 12px;
+  --text-body-sm--line-height: 16px;
+  --text-body-sm--font-weight: 400;
+
+  --text-label: 14px;
+  --text-label--line-height: 20px;
+  --text-label--font-weight: 500;
+
+  --text-badge: 12px;
+  --text-badge--line-height: 16px;
+  --text-badge--font-weight: 500;
+
+  --text-caption: 11px;
+  --text-caption--line-height: 16px;
+  --text-caption--letter-spacing: 0.11px;
+  --text-caption--font-weight: 500;
+
+  --text-overline: 11px;
+  --text-overline--line-height: 16px;
+  --text-overline--letter-spacing: 0.55px;
+  --text-overline--font-weight: 600;
+
+  /* Excepciones medidas en el componente Button de Figma */
+  --text-btn-sm: 13px;
+  --text-btn-sm--line-height: 20px;
+  --text-btn-sm--font-weight: 500;
+
+  --text-btn-lg: 15px;
+  --text-btn-lg--line-height: 20px;
+  --text-btn-lg--font-weight: 500;
+
+  /* Valor de KPI card (MES-local 2150:75) */
+  --text-metric: 28px;
+  --text-metric--line-height: 34px;
+  --text-metric--font-weight: 600;
+
+  /* Número de Summary card y de los mini KPI de cierre de orden (22/600) */
+  --text-metric-sm: 22px;
+  --text-metric-sm--line-height: 28px;
+  --text-metric-sm--font-weight: 600;
+
+  /* Escala del Modo TV (Figma 2163:8523) — aditivo V2, solo `/tv`. */
+  --text-tv-clock: 44px;
+  --text-tv-clock--line-height: 52px;
+  --text-tv-clock--font-weight: 600;
+
+  --text-tv-line: 32px;
+  --text-tv-line--line-height: 40px;
+  --text-tv-line--font-weight: 600;
+
+  --text-tv-metric: 28px;
+  --text-tv-metric--line-height: 36px;
+  --text-tv-metric--font-weight: 600;
+
+  --text-tv-value: 26px;
+  --text-tv-value--line-height: 34px;
+  --text-tv-value--font-weight: 600;
+
+  --text-tv-lead: 18px;
+  --text-tv-lead--line-height: 26px;
+  --text-tv-lead--font-weight: 400;
+
+  --text-tv-state: 18px;
+  --text-tv-state--line-height: 24px;
+  --text-tv-state--font-weight: 600;
+
+  --text-tv-note: 15px;
+  --text-tv-note--line-height: 22px;
+  --text-tv-note--font-weight: 400;
+
+  --text-tv-sub: 14px;
+  --text-tv-sub--line-height: 20px;
+  --text-tv-sub--font-weight: 400;
+
+  /* ---------- RADIOS ---------------------------------------------------- */
+  --radius-xs: 4px;
+  --radius-chip: 6px; /* checkbox md, alert chip de Line card */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* ---------- SOMBRAS · solo capas flotantes ---------------------------- */
+  --shadow-subtle: 0 1px 2px 0 rgb(17 24 39 / 0.05);
+  --shadow-dropdown:
+    0 4px 12px -2px rgb(17 24 39 / 0.1), 0 2px 4px -2px rgb(17 24 39 / 0.06);
+  --shadow-modal:
+    0 12px 32px -8px rgb(17 24 39 / 0.16), 0 4px 8px -4px rgb(17 24 39 / 0.08);
+  --shadow-drawer: -8px 0 24px -6px rgb(17 24 39 / 0.12);
+  --shadow-drawer-left: 8px 0 24px -6px rgb(17 24 39 / 0.12);
+  --shadow-floatingnav:
+    0 8px 24px -6px rgb(17 24 39 / 0.14), 0 2px 6px -2px rgb(17 24 39 / 0.06);
+  --shadow-focus: 0 0 0 4px rgb(37 99 235 / 0.22);
+  --shadow-focus-error: 0 0 0 4px rgb(220 38 38 / 0.22);
+  --shadow-thumb: 0 1px 2px 0 rgb(17 24 39 / 0.15);
+
+  /* ---------- SPACING semántico ----------------------------------------- */
+  --spacing-sidebar: 260px;
+  --spacing-sidebar-collapsed: 72px;
+  --spacing-topbar: 64px;
+  --spacing-page-x: 64px;
+  --spacing-section: 48px;
+  --spacing-section-min: 32px;
+  --spacing-section-max: 64px;
+  --spacing-ctrl-sm: 36px;
+  --spacing-ctrl-md: 40px;
+  --spacing-ctrl-lg: 48px;
+  --spacing-row-comfortable: 56px;
+  --spacing-row-standard: 44px;
+  --spacing-row-compact: 32px;
+  --spacing-content: 1312px;
+  --spacing-app: 1180px;
+  --spacing-app-inner: 1116px;
+  --spacing-page-header: 76px;
+  --spacing-list-pane: 360px;
+  --spacing-drawer: 480px;
+  --spacing-line-card: 356px;
+  --spacing-kpi-card: 200px;
+  --spacing-alert-card: 280px;
+  --spacing-summary-card: 160px;
+
+  /* ---------- Z-INDEX (usar con z-(--z-modal)) -------------------------- */
+  /* Dropdown/Select/Popover por encima de Modal y Drawer: se abren *desde*
+     ellos (Select del drawer "Editar parada", Figma 2163:14623). Corregido de
+     50 → 75 tras verlo renderizar por debajo del drawer. */
+  --z-dropdown: 75;
+  --z-sticky: 40;
+  --z-overlay: 60;
+  --z-modal: 70;
+  --z-toast: 80;
+  --z-tooltip: 90;
+
+  /* ---------- MOTION ---------------------------------------------------- */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-base: 150ms;
+  --duration-medium: 200ms;
+  --duration-slow: 250ms;
+
+  /* ---------- ICONOS ---------------------------------------------------- */
+  --spacing-icon-xs: 12px;
+  --spacing-icon-chip: 14px;
+  --spacing-icon-sm: 16px;
+  --spacing-icon-nav: 18px;
+  --spacing-icon-md: 20px;
+  --spacing-icon-lg: 24px;
+}
+
+/* =============================================================================
+   BASE
+   ========================================================================== */
+@layer base {
+  :root {
+    /* Densidad deliberada (MDS §4.4) — standard por defecto */
+    --row-h: 44px;
+    --row-divider: var(--color-divider);
+  }
+
+  [data-density='comfortable'] {
+    --row-h: 56px;
+    --row-divider: var(--color-divider);
+  }
+  [data-density='standard'] {
+    --row-h: 44px;
+    --row-divider: var(--color-divider);
+  }
+  [data-density='compact'] {
+    --row-h: 32px;
+    --row-divider: var(--color-divider-soft);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-background-main);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus);
+  }
+
+  ::placeholder {
+    color: var(--color-text-disabled);
+  }
+
+  /* Cifras alineadas para tablas y KPI */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

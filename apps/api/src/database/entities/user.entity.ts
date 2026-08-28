@@ -1,0 +1,46 @@
+import { Column, Entity, PrimaryColumn } from 'typeorm';
+import type { Role } from '@mes/types';
+
+@Entity('usuario')
+export class User {
+  @PrimaryColumn('text')
+  id!: string;
+
+  @Column('text')
+  nombre!: string;
+
+  @Column('text', { unique: true })
+  email!: string;
+
+  @Column('text', { unique: true })
+  dni!: string;
+
+  @Column('text')
+  rol!: Role;
+
+  @Column('text')
+  cargo!: string;
+
+  @Column('text')
+  sedeId!: string;
+
+  @Column('text', { nullable: true })
+  lineaId?: string | null;
+
+  @Column('text')
+  iniciales!: string;
+
+  @Column('text', { nullable: true })
+  avatarUrl?: string | null;
+
+  @Column('boolean', { default: true })
+  activo!: boolean;
+
+  /** Marca del último inicio de sesión; se sella en `POST /auth/login`. */
+  @Column('text', { nullable: true })
+  ultimoAcceso?: string | null;
+
+  /** Hash bcrypt — nunca se expone en las respuestas. */
+  @Column('text')
+  passwordHash!: string;
+}

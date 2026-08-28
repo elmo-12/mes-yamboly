@@ -1,0 +1,5 @@
+{
+  "extends": "@mes/config/tsconfig.base.json",
+  "compilerOptions": { "jsx": "preserve", "noEmit": true, "baseUrl": ".", "paths": { "@/*": ["src/*"] } },
+  "include": ["src"]
+}
