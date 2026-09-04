@@ -17,15 +17,13 @@ export class RealtimeController {
 
   @Get('lineas')
   @ApiOperation({ summary: 'Estado calculado de cada línea del turno' })
-  @ApiQuery({ name: 'sedeId', required: false })
   @ApiQuery({ name: 'lineaId', required: false })
   @ApiQuery({ name: 'estado', required: false, description: 'produciendo|parada|sin_orden|alerta|sugerida' })
   lineas(
-    @Query('sedeId') sedeId?: string,
     @Query('lineaId') lineaId?: string | string[],
     @Query('estado') estado?: string | string[],
   ): Promise<TiempoRealResumen> {
-    return this.realtime.resumen(sedeId ?? 'SED-LIMA', toList(lineaId), toList(estado));
+    return this.realtime.resumen(toList(lineaId), toList(estado));
   }
 
   @Get('lineas/:id/timeline')

@@ -4,13 +4,11 @@ import {
   CausaMerma,
   CausaParada,
   Linea,
-  Maquina,
   Merma,
   OrdenFabricacion,
   Parada,
   Producto,
   Sabor,
-  Sede,
   Turno,
   VelocidadEstandar,
 } from '../../database/entities';
@@ -21,12 +19,10 @@ import { CatalogsService } from './catalogs.service';
   imports: [
     TypeOrmModule.forFeature([
       Turno,
-      Sede,
       Linea,
       Sabor,
       Producto,
       VelocidadEstandar,
-      Maquina,
       CausaParada,
       CausaMerma,
       Parada,

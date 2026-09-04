@@ -14,7 +14,7 @@ export interface DesactivarUsuarioModalProps {
 }
 
 /**
- * `Configuración / Sedes y usuarios` — Modal Kind=Danger para pasar un
+ * `Configuración / Usuarios` — Modal Kind=Danger para pasar un
  * usuario a `activo: false`. Reactivar es una acción de bajo riesgo y
  * reversible con un clic, así que no necesita confirmación ni modal propio.
  */

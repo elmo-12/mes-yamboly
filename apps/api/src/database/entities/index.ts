@@ -4,14 +4,12 @@
  * RegistroTiempo, EvaluacionCalidad, EncuestaRespuesta, VerificacionFuncional,
  * RegistroEp, ExportJob) sin tocar el resto del archivo.
  */
-export * from './sede.entity';
 export * from './user.entity';
 export * from './turno.entity';
 export * from './linea.entity';
 export * from './sabor.entity';
 export * from './producto.entity';
 export * from './velocidad-estandar.entity';
-export * from './maquina.entity';
 export * from './causa-parada.entity';
 export * from './causa-merma.entity';
 export * from './orden-fabricacion.entity';

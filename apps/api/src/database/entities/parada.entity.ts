@@ -14,9 +14,6 @@ export class Parada {
   @Column('text')
   lineaId!: string;
 
-  @Column('text')
-  maquinaId!: string;
-
   /** Causa específica (`PM-01-03`). */
   @Column('text')
   causaId!: string;

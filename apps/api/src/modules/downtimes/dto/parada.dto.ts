@@ -30,11 +30,6 @@ export class CreateParadaDto {
   @IsNotEmpty({ message: 'Selecciona una línea' })
   lineaId!: string;
 
-  @ApiProperty({ example: 'MAQ-04' })
-  @IsString()
-  @IsNotEmpty({ message: 'Selecciona una máquina' })
-  maquinaId!: string;
-
   @ApiPropertyOptional({ example: 'CPA-PN-02', description: 'Se deduce de la causa si se omite' })
   @IsOptional()
   @IsString()
@@ -163,11 +158,6 @@ export class ConfirmarDeteccionDto {
   @IsString()
   @IsNotEmpty({ message: 'Selecciona una causa' })
   causaId!: string;
-
-  @ApiProperty({ example: 'MAQ-06' })
-  @IsString()
-  @IsNotEmpty({ message: 'Selecciona una máquina' })
-  maquinaId!: string;
 
   @ApiProperty({ minLength: 10, example: 'Se retiró el material atascado y se limpió la mordaza' })
   @IsString()

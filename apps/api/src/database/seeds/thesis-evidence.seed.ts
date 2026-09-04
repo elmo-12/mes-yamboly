@@ -204,7 +204,7 @@ export class ThesisEvidenceSeeder implements Seeder {
           duracionMin: 8 + (i % 5) * 3,
           causaEspecifica: !falla,
           tieneOrden: true,
-          tieneMaquina: true,
+          tieneLinea: true,
           tieneResponsable: true,
           overrideCompleto: null,
           overridePreciso: null,

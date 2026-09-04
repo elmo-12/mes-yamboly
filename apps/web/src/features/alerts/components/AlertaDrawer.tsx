@@ -35,7 +35,7 @@ import {
   SEVERIDAD_BADGE,
   esperaConfirmacion,
   formatVentana,
-  lineaMaquina,
+  etiquetaLinea,
   toneFactor,
   ventanaCerrada,
 } from './alerta-format';
@@ -139,7 +139,7 @@ function CuerpoAlerta({ alerta, onClose }: { alerta: Alerta; onClose: () => void
         className="text-body-sm"
         items={[
           { label: 'Tipo', value: TIPO_ALERTA_LABEL[alerta.tipo] },
-          { label: 'Línea / Máquina', value: lineaMaquina(alerta) },
+          { label: 'Línea', value: etiquetaLinea(alerta) },
           { label: 'Ventana', value: formatVentana(alerta.ventanaInicio, alerta.ventanaFin) },
           { label: 'Probabilidad', value: `${alerta.probabilidad} %` },
           { label: 'Generada', value: formatDateTime(alerta.generadaEn) },

@@ -88,7 +88,6 @@ export function FinalizarParadaModal({ contexto, abierto, onOpenChange }: Finali
             items={[
               contexto.etiqueta,
               contexto.ordenCodigo ?? 'Sin orden activa',
-              parada?.maquinaNombre ?? '',
               parada?.responsableNombre ?? '',
             ]}
           />

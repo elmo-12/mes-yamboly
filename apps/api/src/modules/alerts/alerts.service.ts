@@ -64,7 +64,7 @@ export class AlertsService {
       .filter(
         (a) =>
           !busqueda ||
-          normalizar(`${a.prediccion} ${a.lineaNombre} ${a.maquinaNombre ?? ''}`).includes(busqueda),
+          normalizar(`${a.prediccion} ${a.lineaNombre}`).includes(busqueda),
       );
 
     return paginate(filas.map(aAlertaDto), query.page, query.pageSize);

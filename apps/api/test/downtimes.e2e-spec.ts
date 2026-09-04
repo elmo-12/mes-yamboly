@@ -18,14 +18,13 @@ describe('paradas y detecciones IoT (e2e)', () => {
   const auth = () => ({ Authorization: `Bearer ${token}` });
 
   it('crea una parada (201) y la deja abierta', async () => {
-    /* ORD-0814 corre en la Llenadora M2; MAQ-19 es su dosificadora. */
+    /* ORD-0814 corre en la Llenadora M2. */
     const { body } = await request(app.getHttpServer())
       .post('/api/v1/paradas')
       .set(auth())
       .send({
         ordenId: 'ORD-0814',
         lineaId: 'LIN-LLEN-M2',
-        maquinaId: 'MAQ-19',
         causaId: 'CPA-PN-04-02',
         inicio: '2026-08-28T14:10:00',
         accionTomada: 'Se retiró el material atascado y se limpió la mordaza',
@@ -65,7 +64,6 @@ describe('paradas y detecciones IoT (e2e)', () => {
       .send({
         ordenId: 'ORD-0814',
         lineaId: 'LIN-LLEN-M2',
-        maquinaId: 'MAQ-19',
         causaId: 'CPA-PN-04-02',
         inicio: '2026-08-28T15:00:00',
         accionTomada: 'corto',
@@ -81,16 +79,16 @@ describe('paradas y detecciones IoT (e2e)', () => {
    * merma — ver el caso homónimo en `realtime.e2e-spec.ts`), así que la rama
    * de `numeroSolicitud` de `DowntimesService.crear` ya no es alcanzable
    * desde datos reales. Se reutiliza el slot del test para cubrir la otra
-   * validación de negocio de la misma línea (máquina inexistente).
+   * validación de negocio de la misma línea (línea inexistente: la parada se
+   * registra hasta la línea, ya no existe el nivel máquina).
    */
-  it('rechaza una máquina inexistente con 422', async () => {
+  it('rechaza una línea inexistente con 422', async () => {
     const { body } = await request(app.getHttpServer())
       .post('/api/v1/paradas')
       .set(auth())
       .send({
         ordenId: 'ORD-0814',
-        lineaId: 'LIN-LLEN-M2',
-        maquinaId: 'MAQ-NO-EXISTE',
+        lineaId: 'LIN-NO-EXISTE',
         causaId: 'CPA-PN-04-02',
         inicio: '2026-08-28T15:00:00',
         accionTomada: 'Se reemplazó la faja y se verificó tensión de rodillos',
@@ -99,7 +97,7 @@ describe('paradas y detecciones IoT (e2e)', () => {
       .expect(422);
 
     expect(body.code).toBe('VALIDATION_ERROR');
-    expect(body.details).toHaveProperty('maquinaId');
+    expect(body.details).toHaveProperty('lineaId');
   });
 
   it('rechaza una causa inexistente con 422', async () => {
@@ -109,7 +107,6 @@ describe('paradas y detecciones IoT (e2e)', () => {
       .send({
         ordenId: 'ORD-0814',
         lineaId: 'LIN-LLEN-M2',
-        maquinaId: 'MAQ-19',
         causaId: 'CPA-NO-EXISTE',
         inicio: '2026-08-28T15:00:00',
         accionTomada: 'Se corrigió la condición y se reinició la línea',

@@ -10,41 +10,38 @@ import type {
   CausaParadaNodo,
   EstadoCatalogo,
   Linea as LineaDto,
-  Maquina as MaquinaDto,
+  LineaListItem,
   Producto as ProductoDto,
   Sabor as SaborDto,
-  Sede as SedeDto,
   TipoMermaCodigo,
   TipoProcesoLinea,
   TurnoDef,
   VelocidadEstandar as VelocidadEstandarDto,
   VelocidadEstandarListItem,
 } from '@mes/types';
+import { SEDE_UNICA_ID } from '@mes/types';
 import {
   ConflictoException,
   NoEncontradoException,
   ValidationException,
 } from '../../common/exceptions/business.exception';
-import { normalizar, redondear, toList } from '../../common/utils/query';
+import { normalizar, redondear } from '../../common/utils/query';
 import {
   CausaMerma,
   CausaParada,
   Linea,
-  Maquina,
   Merma,
   OrdenFabricacion,
   Parada,
   Producto,
   Sabor,
-  Sede,
   Turno,
   VelocidadEstandar,
 } from '../../database/entities';
 import type { CreateCausaMermaDto, UpdateCausaMermaDto } from './dto/causa-merma.dto';
 import type { CreateCausaParadaDto, UpdateCausaParadaDto } from './dto/causa-parada.dto';
-import type { CreateMaquinaDto, UpdateMaquinaDto } from './dto/maquina.dto';
+import type { CreateLineaDto, UpdateLineaDto } from './dto/linea.dto';
 import type { CreateProductoDto, ProductoQueryDto, UpdateProductoDto } from './dto/producto.dto';
-import type { CreateSedeDto, UpdateSedeDto } from './dto/sede.dto';
 import type {
   CreateVelocidadEstandarDto,
   UpdateVelocidadEstandarDto,
@@ -77,13 +74,11 @@ export function unidadesPorMinuto(velocidadUnidHora: number): number {
 export class CatalogsService {
   constructor(
     @InjectRepository(Turno) private readonly turnos: Repository<Turno>,
-    @InjectRepository(Sede) private readonly sedes: Repository<Sede>,
     @InjectRepository(Linea) private readonly lineas: Repository<Linea>,
     @InjectRepository(Sabor) private readonly sabores: Repository<Sabor>,
     @InjectRepository(Producto) private readonly productos: Repository<Producto>,
     @InjectRepository(VelocidadEstandar)
     private readonly velocidades: Repository<VelocidadEstandar>,
-    @InjectRepository(Maquina) private readonly maquinas: Repository<Maquina>,
     @InjectRepository(CausaParada) private readonly causasParada: Repository<CausaParada>,
     @InjectRepository(CausaMerma) private readonly causasMerma: Repository<CausaMerma>,
     @InjectRepository(Parada) private readonly paradas: Repository<Parada>,
@@ -100,51 +95,6 @@ export class CatalogsService {
   }
 
   /* ---------------------------------------------------------------- */
-  /* Sedes                                                             */
-  /* ---------------------------------------------------------------- */
-
-  listarSedes(): Promise<SedeDto[]> {
-    return this.sedes.find({ order: { id: 'ASC' } });
-  }
-
-  async crearSede(dto: CreateSedeDto): Promise<SedeDto> {
-    const duplicada = await this.sedes.findOne({ where: { codigo: dto.codigo } });
-    if (duplicada) {
-      throw new ConflictoException('Ya existe una sede con ese código', { codigo: dto.codigo });
-    }
-    /* Misma convención que el maestro real: `SED-AREQUIPA`, `SED-LIMA`. */
-    const slug = normalizar(dto.nombre)
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-    const id = `SED-${slug || dto.codigo}`;
-    if (await this.sedes.findOne({ where: { id } })) {
-      throw new ConflictoException('Ya existe una sede con ese nombre', { nombre: dto.nombre });
-    }
-    const sede = this.sedes.create({
-      id,
-      codigo: dto.codigo,
-      nombre: dto.nombre,
-      ciudad: dto.ciudad,
-      activa: dto.activa ?? true,
-    });
-    return this.sedes.save(sede);
-  }
-
-  async actualizarSede(id: string, dto: UpdateSedeDto): Promise<SedeDto> {
-    const sede = await this.sedes.findOne({ where: { id } });
-    if (!sede) throw new NoEncontradoException('Sede');
-    if (dto.codigo && dto.codigo !== sede.codigo) {
-      const duplicada = await this.sedes.findOne({ where: { codigo: dto.codigo } });
-      if (duplicada) {
-        throw new ConflictoException('Ya existe una sede con ese código', { codigo: dto.codigo });
-      }
-    }
-    Object.assign(sede, dto);
-    return this.sedes.save(sede);
-  }
-
-  /* ---------------------------------------------------------------- */
   /* Sabores                                                           */
   /* ---------------------------------------------------------------- */
 
@@ -154,19 +104,125 @@ export class CatalogsService {
   }
 
   /* ---------------------------------------------------------------- */
-  /* Líneas                                                            */
+  /* Líneas (mantenedor: la línea es la máquina física)                */
   /* ---------------------------------------------------------------- */
 
+  /** Ventana de referencia del contador `paradas30d` de cada línea. */
+  private static readonly DIAS_VENTANA_PARADAS = 30;
+
+  /**
+   * Paradas por línea en los últimos 30 días. Con datos de demostración
+   * congelados la referencia no es el reloj del servidor sino la parada más
+   * reciente del conjunto, para que el contador nunca salga en cero.
+   */
+  private async paradasPorLinea30d(): Promise<Map<string, number>> {
+    const paradas = await this.paradas.find({ select: { lineaId: true, inicio: true } });
+    const conteo = new Map<string, number>();
+    if (paradas.length === 0) return conteo;
+    const ultima = paradas.reduce((max, p) => (p.inicio > max ? p.inicio : max), paradas[0].inicio);
+    const desde = new Date(ultima);
+    desde.setDate(desde.getDate() - CatalogsService.DIAS_VENTANA_PARADAS);
+    const limite = desde.toISOString().slice(0, 19);
+    for (const p of paradas) {
+      if (p.inicio >= limite) conteo.set(p.lineaId, (conteo.get(p.lineaId) ?? 0) + 1);
+    }
+    return conteo;
+  }
+
+  private async enriquecerLineas(lineas: Linea[]): Promise<LineaListItem[]> {
+    const [pares, paradas30d] = await Promise.all([
+      this.velocidades.find({ where: { estado: 'activo' }, select: { lineaId: true } }),
+      this.paradasPorLinea30d(),
+    ]);
+    const conVelocidad = new Map<string, number>();
+    for (const par of pares) {
+      conVelocidad.set(par.lineaId, (conVelocidad.get(par.lineaId) ?? 0) + 1);
+    }
+    return lineas.map((l) => ({
+      ...this.aLineaDto(l),
+      productosConVelocidad: conVelocidad.get(l.id) ?? 0,
+      paradas30d: paradas30d.get(l.id) ?? 0,
+    }));
+  }
+
+  /** Proyección pública de la línea: la columna interna `sedeId` no se expone. */
+  private aLineaDto(linea: Linea): LineaDto {
+    return {
+      id: linea.id,
+      codigo: linea.codigo,
+      nombre: linea.nombre,
+      nombreCorto: linea.nombreCorto,
+      tipoProceso: linea.tipoProceso,
+      estado: linea.estado,
+      capacidadUnidadesMin: linea.capacidadUnidadesMin,
+    };
+  }
+
   async listarLineas(
-    sedeId?: string,
     tipoProceso?: TipoProcesoLinea,
     estado?: EstadoCatalogo,
-  ): Promise<LineaDto[]> {
+  ): Promise<LineaListItem[]> {
     const filas = await this.lineas.find({ order: { id: 'ASC' } });
-    return filas
-      .filter((l) => (sedeId ? l.sedeId === sedeId : true))
-      .filter((l) => (tipoProceso ? l.tipoProceso === tipoProceso : true))
-      .filter((l) => (estado ? l.estado === estado : true));
+    return this.enriquecerLineas(
+      filas
+        .filter((l) => (tipoProceso ? l.tipoProceso === tipoProceso : true))
+        .filter((l) => (estado ? l.estado === estado : true)),
+    );
+  }
+
+  async crearLinea(dto: CreateLineaDto): Promise<LineaDto> {
+    const duplicada = await this.lineas.findOne({ where: { codigo: dto.codigo } });
+    if (duplicada) {
+      throw new ConflictoException('Ya existe una línea con ese código', { codigo: dto.codigo });
+    }
+    const linea = this.lineas.create({
+      id: `LIN-${dto.codigo}`,
+      codigo: dto.codigo,
+      nombre: dto.nombre,
+      nombreCorto: dto.nombreCorto,
+      tipoProceso: dto.tipoProceso,
+      sedeId: SEDE_UNICA_ID,
+      estado: dto.estado ?? 'activo',
+      capacidadUnidadesMin: dto.capacidadUnidadesMin ?? 0,
+    });
+    return this.aLineaDto(await this.lineas.save(linea));
+  }
+
+  async actualizarLinea(id: string, dto: UpdateLineaDto): Promise<LineaDto> {
+    const linea = await this.lineas.findOne({ where: { id } });
+    if (!linea) throw new NoEncontradoException('Línea');
+    if (dto.codigo && dto.codigo !== linea.codigo) {
+      const duplicada = await this.lineas.findOne({ where: { codigo: dto.codigo } });
+      if (duplicada) {
+        throw new ConflictoException('Ya existe una línea con ese código', { codigo: dto.codigo });
+      }
+    }
+    Object.assign(linea, dto);
+    return this.aLineaDto(await this.lineas.save(linea));
+  }
+
+  /**
+   * Baja lógica: la línea pasa a `inactivo` y conserva su histórico
+   * (`conservados` = órdenes + paradas de la línea).
+   */
+  async darDeBajaLinea(id: string): Promise<BajaLogicaResponse> {
+    const linea = await this.lineas.findOne({ where: { id } });
+    if (!linea) throw new NoEncontradoException('Línea');
+    const [ordenes, paradas] = await Promise.all([
+      this.ordenes.count({ where: { lineaId: id } }),
+      this.paradas.count({ where: { lineaId: id } }),
+    ]);
+    const conservados = ordenes + paradas;
+    linea.estado = 'inactivo';
+    await this.lineas.save(linea);
+    return {
+      id: linea.id,
+      codigo: linea.codigo,
+      estado: 'inactivo',
+      conservados,
+      etiquetaConservados: 'órdenes y paradas',
+      mensaje: `Hay ${conservados} órdenes y paradas registradas en esta línea; se conservarán con el código ${linea.codigo}.`,
+    };
   }
 
   /* ---------------------------------------------------------------- */
@@ -372,66 +428,6 @@ export class CatalogsService {
       conservados,
       etiquetaConservados: 'órdenes',
       mensaje: `Hay ${conservados} órdenes que congelaron esta velocidad; se conservarán con su valor.`,
-    };
-  }
-
-  /* ---------------------------------------------------------------- */
-  /* Máquinas (equipos de la línea)                                    */
-  /* ---------------------------------------------------------------- */
-
-  async listarMaquinas(lineaId?: string, estado?: string | string[]): Promise<MaquinaDto[]> {
-    const estados = toList(estado);
-    const filas = await this.maquinas.find({ order: { id: 'ASC' } });
-    return filas
-      .filter((m) => (lineaId ? m.lineaId === lineaId : true))
-      .filter((m) => (estados.length > 0 ? estados.includes(m.estado) : true));
-  }
-
-  async crearMaquina(dto: CreateMaquinaDto): Promise<MaquinaDto> {
-    const existente = await this.maquinas.findOne({ where: { codigo: dto.codigo } });
-    if (existente) {
-      throw new ConflictoException('Ya existe una máquina con ese código', { codigo: dto.codigo });
-    }
-    const total = await this.maquinas.count();
-    const maquina = this.maquinas.create({
-      id: `MAQ-${String(total + 1).padStart(2, '0')}`,
-      codigo: dto.codigo,
-      nombre: dto.nombre,
-      tipo: dto.tipo,
-      lineaId: dto.lineaId,
-      estado: dto.estado ?? 'operativa',
-      paradas30d: 0,
-    });
-    return this.maquinas.save(maquina);
-  }
-
-  async actualizarMaquina(id: string, dto: UpdateMaquinaDto): Promise<MaquinaDto> {
-    const maquina = await this.maquinas.findOne({ where: { id } });
-    if (!maquina) throw new NoEncontradoException('Máquina');
-    if (dto.codigo && dto.codigo !== maquina.codigo) {
-      const duplicada = await this.maquinas.findOne({ where: { codigo: dto.codigo } });
-      if (duplicada) {
-        throw new ConflictoException('Ya existe una máquina con ese código', { codigo: dto.codigo });
-      }
-    }
-    Object.assign(maquina, dto);
-    return this.maquinas.save(maquina);
-  }
-
-  /** Baja lógica: la máquina pasa a `baja` y conserva sus paradas históricas. */
-  async darDeBajaMaquina(id: string): Promise<BajaLogicaResponse> {
-    const maquina = await this.maquinas.findOne({ where: { id } });
-    if (!maquina) throw new NoEncontradoException('Máquina');
-    const conservados = await this.paradas.count({ where: { maquinaId: id } });
-    maquina.estado = 'baja';
-    await this.maquinas.save(maquina);
-    return {
-      id: maquina.id,
-      codigo: maquina.codigo,
-      estado: 'baja',
-      conservados,
-      etiquetaConservados: 'paradas',
-      mensaje: `Hay ${conservados} paradas registradas en esta máquina; se conservarán con el código ${maquina.codigo}.`,
     };
   }
 

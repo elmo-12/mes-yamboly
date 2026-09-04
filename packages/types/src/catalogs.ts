@@ -15,8 +15,8 @@ import type { EstadoCatalogo, TipoProcesoLinea, Turno, TurnoInfo } from './commo
  * @example
  * {
  *   id: 'LIN-LLEN-M2', codigo: 'LLEN-M2', nombre: 'Llenadora M2',
- *   nombreCorto: 'LLEN M2', tipoProceso: 'llenadora', sedeId: 'SED-LIMA',
- *   estado: 'activo', capacidadUnidadesMin: 133.3
+ *   nombreCorto: 'LLEN M2', tipoProceso: 'llenadora',
+ *   estado: 'activo', capacidadUnidadesMin: 133.3, paradas30d: 4
  * }
  */
 export interface Linea {
@@ -28,7 +28,6 @@ export interface Linea {
   /** Etiqueta compacta para LineCard y modo TV: `LLEN M2`. */
   nombreCorto: string;
   tipoProceso: TipoProcesoLinea;
-  sedeId: string;
   estado: EstadoCatalogo;
   /**
    * Unidades por minuto nominales de la línea: máximo `velocidadUnidMin`
@@ -37,7 +36,15 @@ export interface Linea {
   capacidadUnidadesMin: number;
 }
 
-/** Alta/edición de línea (mantenedor futuro; hoy solo lectura en la UI). */
+/** Fila del mantenedor de líneas con los contadores ya resueltos. */
+export interface LineaListItem extends Linea {
+  /** Nº de pares producto × línea activos del mantenedor de velocidades. */
+  productosConVelocidad: number;
+  /** Nº de paradas registradas en los últimos 30 días. */
+  paradas30d: number;
+}
+
+/** Alta/edición de línea (`POST /lineas`, `PATCH /lineas/:id`). */
 export const lineaSchema = z.object({
   codigo: z
     .string()
@@ -47,11 +54,14 @@ export const lineaSchema = z.object({
   tipoProceso: z.enum(TIPOS_PROCESO_LINEA, {
     errorMap: () => ({ message: 'Selecciona el tipo de proceso' }),
   }),
-  sedeId: z.string().min(1, 'Selecciona una sede'),
   estado: z.enum(ESTADOS_CATALOGO).default('activo'),
   capacidadUnidadesMin: z.coerce.number().min(0, 'Debe ser 0 o mayor').default(0),
 });
 export type LineaInput = z.infer<typeof lineaSchema>;
+
+/** Edición parcial (`PATCH /lineas/:id`). */
+export const updateLineaSchema = lineaSchema.partial();
+export type UpdateLineaInput = z.infer<typeof updateLineaSchema>;
 
 /* ------------------------------------------------------------------ */
 /* Sabores                                                             */
@@ -216,51 +226,6 @@ export type VelocidadEstandarInput = z.infer<typeof velocidadEstandarSchema>;
 /** Edición parcial (`PATCH /velocidades-estandar/:id`). */
 export const updateVelocidadEstandarSchema = velocidadEstandarSchema.partial();
 export type UpdateVelocidadEstandarInput = z.infer<typeof updateVelocidadEstandarSchema>;
-
-/* ------------------------------------------------------------------ */
-/* Máquinas (equipos de la línea)                                      */
-/* ------------------------------------------------------------------ */
-
-export const ESTADOS_MAQUINA = ['operativa', 'mantenimiento', 'baja'] as const;
-export type EstadoMaquina = (typeof ESTADOS_MAQUINA)[number];
-
-/**
- * Equipo que forma parte de una línea (envolvedora, codificadora, descargador,
- * pinzas, faja, productora, túnel de frío, dosificadora…), 2–4 por línea.
- * Obligatoria en el wizard de parada.
- *
- * @example
- * { id: 'MAQ-LLENM2-01', codigo: 'MQ-LLENM2-01', nombre: 'Envolvedora',
- *   tipo: 'Envolvedora', lineaId: 'LIN-LLEN-M2', estado: 'operativa', paradas30d: 4 }
- */
-export interface Maquina {
-  id: string;
-  /** `MQ-LLENM2-01` */
-  codigo: string;
-  nombre: string;
-  /** `Envolvedora`, `Dosificadora`, `Túnel de frío`, … */
-  tipo: string;
-  lineaId: string;
-  estado: EstadoMaquina;
-  /** Nº de paradas registradas en los últimos 30 días. */
-  paradas30d: number;
-}
-
-export const maquinaSchema = z.object({
-  codigo: z
-    .string()
-    .min(1, 'El código es obligatorio')
-    .regex(/^MQ-[A-Z0-9]{2,6}-\d{2}$/, 'Formato esperado MQ-LLENM2-01'),
-  nombre: z.string().min(3, 'El nombre es obligatorio'),
-  tipo: z.string().min(3, 'El tipo es obligatorio'),
-  lineaId: z.string().min(1, 'Selecciona una línea'),
-  estado: z.enum(ESTADOS_MAQUINA).default('operativa'),
-});
-export type MaquinaInput = z.infer<typeof maquinaSchema>;
-
-/** Edición parcial (`PATCH /maquinas/:id`). */
-export const updateMaquinaSchema = maquinaSchema.partial();
-export type UpdateMaquinaInput = z.infer<typeof updateMaquinaSchema>;
 
 /* ------------------------------------------------------------------ */
 /* Árbol de causas (base compartida parada / merma)                    */

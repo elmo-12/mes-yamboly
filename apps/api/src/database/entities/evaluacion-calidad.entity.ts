@@ -46,7 +46,7 @@ export class EvaluacionCalidad {
   tieneOrden!: boolean;
 
   @Column('boolean', { default: true })
-  tieneMaquina!: boolean;
+  tieneLinea!: boolean;
 
   @Column('boolean', { default: true })
   tieneResponsable!: boolean;

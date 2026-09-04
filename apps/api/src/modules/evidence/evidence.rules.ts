@@ -23,7 +23,7 @@ export function esPreciso(e: EvaluacionCalidad): boolean {
 
 /** Trazable: el registro apunta a una orden, una máquina y un responsable. */
 export function esTrazable(e: EvaluacionCalidad): boolean {
-  return e.overrideTrazable ?? (e.tieneOrden && e.tieneMaquina && e.tieneResponsable);
+  return e.overrideTrazable ?? (e.tieneOrden && e.tieneLinea && e.tieneResponsable);
 }
 
 /** Válido: cumple los tres criterios anteriores. */

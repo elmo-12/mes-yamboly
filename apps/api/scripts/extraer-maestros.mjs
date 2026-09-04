@@ -43,7 +43,6 @@ const OUT_DIR = join(
 // Tablas que se leen del dump.
 const TABLAS_ENTIDAD = [
   'lineas',
-  'sedes',
   'sabores',
   'productos',
   'producto_lineas',
@@ -312,7 +311,6 @@ for (const t of TABLAS_ENTIDAD) {
 
 // Mapas de acceso directo por id canonico (postgres id de la fila sobreviviente).
 const lineasPorId = new Map(entidades.lineas.filas.map((f) => [f.id, f]));
-const sedesPorId = new Map(entidades.sedes.filas.map((f) => [f.id, f]));
 const saboresPorId = new Map(entidades.sabores.filas.map((f) => [f.id, f]));
 const productosPorId = new Map(entidades.productos.filas.map((f) => [f.id, f]));
 const productoLineasPorId = new Map(
@@ -364,7 +362,6 @@ const lineasJson = entidades.lineas.filas
       nombreCorto: f.nombre_corto,
       tipoProceso: tipoProceso ?? 'llenadora',
       idLegado: Number(f.id),
-      sedeId: 'SED-LIMA',
       estado: 'activo',
     };
   })
@@ -375,38 +372,9 @@ const lineaIdsValidos = new Set(lineasJson.map((l) => l.id));
 const lineaLegadoAJson = new Map(lineasJson.map((l) => [String(l.idLegado), l]));
 
 // ---------------------------------------------------------------------------
-// 2) SEDES
+// 2) (sin sedes) — la aplicacion opera una unica sede (Lima), asi que el dump
+//    de sedes ya no se extrae ni se siembra.
 // ---------------------------------------------------------------------------
-
-/**
- * Codigo corto (3-4 letras) generado deterministicamente a partir del nombre:
- * el dump no trae un campo "codigo" propio para sedes, asi que se usan las
- * primeras 4 letras del nombre (3 si el nombre tiene menos de 4 letras).
- */
-function codigoSede(nombre) {
-  const soloLetras = normalizarMayusSinTildes(nombre).replace(/[^A-Z]/g, '');
-  const largo = soloLetras.length >= 4 ? 4 : 3;
-  return soloLetras.slice(0, largo);
-}
-
-const sedesJson = entidades.sedes.filas
-  .map((f) => {
-    const nombreTitulo = tituloDesde(f.nombre);
-    return {
-      id: `SED-${f.nombre}`,
-      codigo: codigoSede(f.nombre),
-      nombre: nombreTitulo,
-      ciudad: nombreTitulo,
-      activa: true,
-    };
-  })
-  .sort((a, b) => comparadorEs(a.nombre, b.nombre));
-
-if (!sedesJson.some((s) => s.id === 'SED-LIMA')) {
-  reporte.anomalias.push(
-    'No se encontro la sede "LIMA" en el dump; lineas.json referencia sedeId="SED-LIMA" a ciegas.',
-  );
-}
 
 // ---------------------------------------------------------------------------
 // 3) SABORES
@@ -1130,7 +1098,6 @@ function escribirJson(nombreArchivo, datos) {
 
 console.log('\nEscribiendo JSON en', OUT_DIR);
 escribirJson('lineas.json', lineasJson);
-escribirJson('sedes.json', sedesJson);
 escribirJson('sabores.json', saboresJsonLimpio);
 escribirJson('velocidades-estandar.json', velocidadesEstandarJson);
 escribirJson('productos.json', productosJson);
@@ -1146,7 +1113,6 @@ console.log('INFORME DE EXTRACCION');
 console.log('='.repeat(80));
 
 console.log(`\nlineas.json: ${lineasJson.length} lineas`);
-console.log(`sedes.json: ${sedesJson.length} sedes`);
 console.log(`sabores.json: ${saboresJsonLimpio.length} sabores`);
 console.log(`velocidades-estandar.json: ${velocidadesEstandarJson.length} pares producto x linea`);
 console.log(`productos.json: ${productosJson.length} productos`);

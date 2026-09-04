@@ -20,7 +20,7 @@ export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   /**
-   * Directorio de personas. Lo consumen tanto Configuración → Sedes y usuarios
+   * Directorio de personas. Lo consumen tanto Configuración → Usuarios
    * (jefe) como los selectores de captura de paradas/mermas/órdenes, que usa
    * cualquier rol autenticado: por eso el GET no lleva restricción de rol.
    */

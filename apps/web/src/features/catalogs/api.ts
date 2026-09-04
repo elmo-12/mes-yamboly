@@ -11,10 +11,9 @@ import type {
   Colaborador,
   CrearUsuarioInput,
   EstadoCatalogo,
-  EstadoMaquina,
   Linea,
-  Maquina,
-  MaquinaInput,
+  LineaInput,
+  LineaListItem,
   NivelCausa,
   NivelCausaMerma,
   Producto,
@@ -22,8 +21,6 @@ import type {
   RestablecerPasswordInput,
   Role,
   Sabor,
-  Sede,
-  SedeInput,
   TipoMermaCodigo,
   TipoProcesoLinea,
   TurnoDef,
@@ -49,7 +46,6 @@ export interface SaborFiltros {
 }
 
 export interface LineaFiltros {
-  sedeId?: string;
   tipoProceso?: TipoProcesoLinea;
   estado?: EstadoCatalogo;
 }
@@ -68,11 +64,6 @@ export interface VelocidadEstandarFiltros {
   estado?: EstadoCatalogo;
 }
 
-export interface MaquinaFiltros {
-  lineaId?: string;
-  estado?: EstadoMaquina[];
-}
-
 export interface CausaParadaFiltros {
   nivel?: NivelCausa;
   lineaId?: string;
@@ -86,7 +77,6 @@ export interface CausaMermaFiltros {
 
 export interface UsuarioFiltros {
   rol?: Role[];
-  sedeId?: string;
   lineaId?: string;
   /** `true` sólo activos, `false` sólo inactivos, `undefined` todos. */
   activo?: boolean;
@@ -101,17 +91,16 @@ export const catalogsApi = {
   /* ----------------------------- Turnos ----------------------------- */
   turnos: () => api.get<Lista<TurnoDef>>('/turnos'),
 
-  /* ------------------------------ Sedes ----------------------------- */
-  sedes: () => api.get<Lista<Sede>>('/sedes'),
-  crearSede: (input: SedeInput) => api.post<Sede>('/sedes', input),
-  actualizarSede: (id: string, input: Partial<SedeInput>) =>
-    api.patch<Sede>(`/sedes/${id}`, input),
-
   /* ----------------------------- Sabores ---------------------------- */
   sabores: (filtros: SaborFiltros = {}) => api.get<Lista<Sabor>>('/sabores', { ...filtros }),
 
   /* ------------------------------ Líneas ---------------------------- */
-  lineas: (filtros: LineaFiltros = {}) => api.get<Lista<Linea>>('/lineas', { ...filtros }),
+  /** La línea es la máquina física: `GET /lineas` es el mantenedor de las 9. */
+  lineas: (filtros: LineaFiltros = {}) => api.get<Lista<LineaListItem>>('/lineas', { ...filtros }),
+  crearLinea: (input: LineaInput) => api.post<Linea>('/lineas', input),
+  actualizarLinea: (id: string, input: Partial<LineaInput>) =>
+    api.patch<Linea>(`/lineas/${id}`, input),
+  bajaLinea: (id: string) => api.del<BajaLogicaResponse>(`/lineas/${id}`),
 
   /* ---------------------------- Productos --------------------------- */
   productos: (filtros: ProductoFiltros = {}) =>
@@ -130,13 +119,6 @@ export const catalogsApi = {
     api.patch<VelocidadEstandar>(`/velocidades-estandar/${id}`, input),
   bajaVelocidadEstandar: (id: string) =>
     api.del<BajaLogicaResponse>(`/velocidades-estandar/${id}`),
-
-  /* ----------------------------- Máquinas --------------------------- */
-  maquinas: (filtros: MaquinaFiltros = {}) => api.get<Lista<Maquina>>('/maquinas', { ...filtros }),
-  crearMaquina: (input: MaquinaInput) => api.post<Maquina>('/maquinas', input),
-  actualizarMaquina: (id: string, input: Partial<MaquinaInput>) =>
-    api.patch<Maquina>(`/maquinas/${id}`, input),
-  bajaMaquina: (id: string) => api.del<BajaLogicaResponse>(`/maquinas/${id}`),
 
   /* -------------------------- Causas de parada ---------------------- */
   causasParadaArbol: (filtros: CausaParadaFiltros = {}) =>

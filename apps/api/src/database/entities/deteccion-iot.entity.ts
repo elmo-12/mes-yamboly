@@ -13,9 +13,6 @@ export class DeteccionIoT {
   @Column('text')
   lineaCodigo!: string;
 
-  @Column('text', { nullable: true })
-  maquinaId?: string | null;
-
   @Column('text')
   detectadaEn!: string;
 

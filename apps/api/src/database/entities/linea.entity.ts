@@ -22,7 +22,12 @@ export class Linea {
   @Column('text', { default: 'llenadora' })
   tipoProceso!: TipoProcesoLinea;
 
-  @Column('text')
+  /**
+   * Columna interna heredada: la aplicación opera una **única sede** (Lima).
+   * No se expone en la API pública ni se filtra por ella; el valor es siempre
+   * `SEDE_UNICA_ID`.
+   */
+  @Column('text', { default: 'SED-LIMA' })
   sedeId!: string;
 
   @Column('text', { default: 'activo' })

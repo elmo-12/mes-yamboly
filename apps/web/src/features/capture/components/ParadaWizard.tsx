@@ -20,7 +20,7 @@ import {
   toast,
 } from '@mes/ui';
 import { createParadaSchema, type CreateParadaInput } from '@mes/types';
-import { useCausasParada, useMaquinas } from '@/features/catalogs/hooks';
+import { useCausasParada } from '@/features/catalogs/hooks';
 import { useCrearParada } from '@/features/downtimes/hooks';
 import { useSession } from '@/hooks/use-session';
 import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
@@ -34,7 +34,7 @@ const PASOS = [{ label: 'Causa' }, { label: 'Detalle' }, { label: 'Confirmar' }]
 
 const CAMPOS_PASO: Record<number, (keyof CreateParadaInput)[]> = {
   0: ['tipoCausaId', 'inicio'],
-  1: ['maquinaId', 'causaId', 'accionTomada', 'numeroSolicitud'],
+  1: ['causaId', 'accionTomada', 'numeroSolicitud'],
 };
 
 /** Paso al que hay que volver cuando el 422 del servidor señala un campo. */
@@ -62,7 +62,6 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
   const tri = useTriTimer(abierto);
   const { user } = useSession();
   const { data: arbol } = useCausasParada(contexto.lineaId);
-  const { data: maquinas } = useMaquinas(contexto.lineaId);
   const crear = useCrearParada();
 
   /* El tablero refresca cada 5 s y `contexto` cambia de identidad: se lee por
@@ -77,7 +76,6 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
     return {
       ordenId: ctx.ordenId ?? '',
       lineaId: ctx.lineaId,
-      maquinaId: '',
       tipoCausaId: '',
       causaId: '',
       inicio: ctx.deteccionHora ?? horaActual(),
@@ -110,7 +108,6 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
   const tipoActual = tipos.find((t) => t.id === valores.tipoCausaId);
   const especificas = React.useMemo(() => causasEspecificasDe(tipoActual), [tipoActual]);
   const causaActual = especificas.find((c) => c.id === valores.causaId);
-  const maquinaActual = maquinas?.data.find((m) => m.id === valores.maquinaId);
 
   /* El catálogo marca qué causas exigen N.º de solicitud del CMMS; sin esto el
      campo se enviaba vacío y el backend devolvía 422 en el último paso. */
@@ -261,22 +258,7 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
                   `Inicio ${valores.inicio}`,
                 ]}
               />
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Controller
-                  control={form.control}
-                  name="maquinaId"
-                  render={({ field }) => (
-                    <Select
-                      label="Máquina"
-                      hint="Equipo asociado a la línea"
-                      placeholder="Selecciona la máquina"
-                      destructive={Boolean(errores.maquinaId)}
-                      options={(maquinas?.data ?? []).map((m) => ({ value: m.id, label: m.nombre }))}
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    />
-                  )}
-                />
+              <div className="grid grid-cols-1 gap-4">
                 <Controller
                   control={form.control}
                   name="causaId"
@@ -359,7 +341,6 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
                         .filter(Boolean)
                         .join(' · '),
                     },
-                    { label: 'Máquina', value: maquinaActual?.nombre ?? '—' },
                     { label: 'Inicio', value: `${valores.inicio} (turno ${contexto.turnoLabel})` },
                     { label: 'Acción tomada', value: valores.accionTomada },
                     {

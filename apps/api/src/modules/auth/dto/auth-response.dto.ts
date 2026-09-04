@@ -8,7 +8,6 @@ export class UserDto {
   @ApiProperty({ example: '41285630' }) dni!: string;
   @ApiProperty({ enum: ROLES, example: 'jefe' }) rol!: Role;
   @ApiProperty({ example: 'Jefe de producción' }) cargo!: string;
-  @ApiProperty({ example: 'SED-LIMA' }) sedeId!: string;
   @ApiProperty({ required: false, example: 'LIN-LLEN-M2' }) lineaId?: string;
   @ApiProperty({ example: 'CM' }) iniciales!: string;
   @ApiProperty({ required: false }) avatarUrl?: string;

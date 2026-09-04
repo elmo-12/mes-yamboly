@@ -272,7 +272,7 @@ export function useResumenMaquinista(lineaId: string | undefined, limiteRegistro
         fechaIso: p.inicio,
         hora: formatTime(p.inicio),
         tipo: 'Parada',
-        detalle: `${p.tipoCausaCodigo} ${p.tipoCausaNombre} · ${formatDurationMin(p.duracionMin)} · ${p.maquinaNombre}`,
+        detalle: `${p.tipoCausaCodigo} ${p.tipoCausaNombre} · ${formatDurationMin(p.duracionMin)}`,
         estadoLabel: p.fin ? 'Cerrado' : 'En curso',
         estadoColor: p.fin ? 'neutral' : 'critical',
       });

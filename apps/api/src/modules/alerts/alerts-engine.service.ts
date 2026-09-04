@@ -17,8 +17,6 @@ export interface SenalLinea {
   lineaId: string;
   lineaCodigo: string;
   lineaNombre: string;
-  maquinaId?: string;
-  maquinaNombre?: string;
   turno: string;
   /** Velocidad real en u/min del último registro. */
   velocidadReal: number;
@@ -90,8 +88,6 @@ export class AlertsEngineService {
         tipo: disparo.tipo,
         lineaId: senal.lineaId,
         lineaCodigo: senal.lineaCodigo,
-        maquinaId: senal.maquinaId,
-        maquinaNombre: senal.maquinaNombre,
         turno: senal.turno,
         eventos7d: senal.eventos7d,
         eventos30d: senal.eventos30d,
@@ -112,8 +108,6 @@ export class AlertsEngineService {
           lineaId: senal.lineaId,
           lineaCodigo: senal.lineaCodigo,
           lineaNombre: senal.lineaNombre,
-          maquinaId: senal.maquinaId ?? null,
-          maquinaNombre: senal.maquinaNombre ?? null,
           prediccion: disparo.texto,
           probabilidad,
           ventanaInicio: ahoraIso(ahora),

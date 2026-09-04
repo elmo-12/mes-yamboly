@@ -10,8 +10,6 @@ export function aAlertaDto(alerta: Alerta): AlertaDto {
     lineaId: alerta.lineaId,
     lineaCodigo: alerta.lineaCodigo,
     lineaNombre: alerta.lineaNombre,
-    maquinaId: alerta.maquinaId ?? undefined,
-    maquinaNombre: alerta.maquinaNombre ?? undefined,
     prediccion: alerta.prediccion,
     probabilidad: alerta.probabilidad,
     ventanaInicio: alerta.ventanaInicio,

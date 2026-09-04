@@ -29,19 +29,17 @@ Tipos compartidos: `@mes/types` (`packages/types/src`). Mocks msw equivalentes: 
 Desde la rama `feat/maestros-reales` los catálogos de planta ya no son datos de ejemplo: son el maestro real de Yamboly, extraído de un **dump de Postgres (formato custom `pg_dump`, sistema Strapi v5) del sistema anterior**.
 
 - **Script de extracción**: `apps/api/scripts/extraer-maestros.mjs` — lee el dump con `pg_restore -a -t <tabla> -f -` (requiere el binario `pg_restore` de **libpq**, p. ej. `/opt/homebrew/opt/libpq/bin/pg_restore` en macOS/Homebrew) y escribe JSON commiteable en `apps/api/src/database/seeds/data/real/*.json`. Es una tarea de un solo uso: los JSON generados **no se regeneran en runtime**, se versionan y los consume el seeder al arrancar la API.
-- **Tablas leídas**: `lineas`, `sedes`, `sabores`, `productos`, `producto_lineas` (+ tablas de enlace `_lnk`), `tipo_paradas`, `categoria_generals`, `categoria_especificas`, `merma_tipo_produccions`, `merma_clasificacions`, `merma_causas`.
-- **Máquinas (equipos de línea)** son la única entidad **curada a mano** (no viene de una tabla del dump): 33 registros en `apps/api/src/database/seeds/data/catalogs.ts` (`maquinas`), 2–4 equipos reales por línea (envolvedora, codificadora, dosificadora, túnel de frío, tapadora, faja transportadora, descargador, pinzas…).
+- **Tablas leídas**: `lineas`, `sabores`, `productos`, `producto_lineas` (+ tablas de enlace `_lnk`), `tipo_paradas`, `categoria_generals`, `categoria_especificas`, `merma_tipo_produccions`, `merma_clasificacions`, `merma_causas`.
+- **No existe el nivel máquina/equipo**: la línea *es* la máquina física de planta, y la parada se registra hasta la línea. El script conserva la lógica de extracción de sedes desactivada: la aplicación opera una **única sede** (Lima), que no se expone en la API pública.
 
 ### Conteos del maestro real
 
 | Catálogo | Cantidad |
 | --- | --- |
-| Sedes | 9 |
 | Líneas | 9 (4 llenadoras · 2 extrusoras · 3 moldeadoras) |
 | Sabores | 41 |
 | Productos | 201 |
 | Velocidades estándar (pares producto × línea) | 333 |
-| Máquinas (equipos de línea) | 33 |
 | Causas de parada | 83 (5 tipos → 26 generales → 52 específicas) |
 | Causas de merma | 56 (5 tipos → 11 clasificaciones → 40 causas) |
 | Turnos | 2 (`D` Día · `N` Noche) |
@@ -55,12 +53,10 @@ Desde la rama `feat/maestros-reales` los catálogos de planta ya no son datos de
 | Velocidad estándar | `VE-<secuencial 4 dígitos>` | `VE-0001` |
 | Causa de parada | `CPA-<codigo>` (`codigo` = `TT-GG`, `TT-GG-X` o `TT-GG-EE`) | `CPA-PP-01-01` |
 | Causa de merma | `CME-<codigo>` (`codigo` = `MT-NN`, `MT-NN-X` o `MT-NN-EE`) | `CME-MP-01-01` |
-| Máquina | `MAQ-<secuencial 2 dígitos>` | `MAQ-01` |
-| Sede | `SED-<CIUDAD>` | `SED-LIMA` |
 | Sabor | `SAB-<codigo 7 dígitos>` | `SAB-2110124` |
 | Usuario | `USR-<secuencial 2 dígitos>` | `USR-01` |
 
-> Los códigos legibles (`codigo`) siguen el patrón corto del maestro real: líneas `LLEN-M2` / `EXTR-2` / `MOLD-A3`, causas de parada y de merma `PN-02-01` / `MP-01-01` (los tipos raíz usan prefijos `PP`, `PN`, `PS` para parada y `MP` para merma, según el maestro original), máquinas `MQ-LLENM2-01`, sedes `LIMA`/`AREQ`/`CUZC` (3–4 letras mayúsculas).
+> Los códigos legibles (`codigo`) siguen el patrón corto del maestro real: líneas `LLEN-M2` / `EXTR-2` / `MOLD-A3`, causas de parada y de merma `PN-02-01` / `MP-01-01` (los tipos raíz usan prefijos `PP`, `PN`, `PS` para parada y `MP` para merma, según el maestro original).
 
 ---
 
@@ -115,14 +111,6 @@ interface BajaLogicaResponse {
 | --- | --- | --- | --- | --- |
 | `/turnos` | GET | — | `{ data: TurnoDef[] }` — `D` Día 06:00–18:00 y `N` Noche 18:00–06:00 | 401 |
 
-### Sedes
-
-| Endpoint | Método | Query / Body | Response | Errores |
-| --- | --- | --- | --- | --- |
-| `/sedes` | GET | — | `{ data: Sede[] }` — 9 sedes reales | 401 |
-| `/sedes` | POST | `CreateSede { codigo, nombre, ciudad, activa? }` — `codigo` 3–4 letras mayúsculas | `Sede` (201) | 403 solo `jefe` · 409 código duplicado · 422 |
-| `/sedes/:id` | PATCH | `Partial<CreateSede>` | `Sede` | 403 solo `jefe` · 404 · 409 |
-
 ### Sabores
 
 | Endpoint | Método | Query / Body | Response | Errores |
@@ -133,9 +121,12 @@ interface BajaLogicaResponse {
 
 | Endpoint | Método | Query / Body | Response | Errores |
 | --- | --- | --- | --- | --- |
-| `/lineas` | GET | `sedeId?`, `tipoProceso?` (`llenadora\|extrusora\|moldeadora`), `estado?` | `{ data: Linea[] }` — 9 líneas reales (máquinas físicas): 4 llenadoras (`LLEN-M2`, `LLEN-M1`, `LLEN-A1`, `LLEN-A2`), 2 extrusoras (`EXTR-2`, `EXTR-3`), 3 moldeadoras (`MOLD-A2`, `MOLD-A3`, `MOLD-A4`) | 401 |
+| `/lineas` | GET | `tipoProceso?` (`llenadora\|extrusora\|moldeadora`), `estado?` | `{ data: LineaListItem[] }` — 9 líneas reales (máquinas físicas): 4 llenadoras (`LLEN-M2`, `LLEN-M1`, `LLEN-A1`, `LLEN-A2`), 2 extrusoras (`EXTR-2`, `EXTR-3`), 3 moldeadoras (`MOLD-A2`, `MOLD-A3`, `MOLD-A4`); cada fila añade `productosConVelocidad` y `paradas30d` | 401 |
+| `/lineas` | POST | `CreateLinea { codigo, nombre, nombreCorto, tipoProceso, estado?, capacidadUnidadesMin? }` — `codigo` formato `LLEN-M2` / `EXTR-2` / `MOLD-A3` | `Linea` (201) | 403 (`jefe`/`supervisor`) · 409 código duplicado · 422 |
+| `/lineas/:id` | PATCH | `Partial<CreateLinea>` — edita código, nombre, nombre corto, tipo de proceso, estado o capacidad | `Linea` | 403 · 404 · 409 |
+| `/lineas/:id` | DELETE | — | `BajaLogicaResponse` (`estado: 'inactivo'`, `etiquetaConservados: 'órdenes y paradas'`) — la línea pasa a `inactivo` y conserva su histórico | 403 (`jefe`/`supervisor`) · 404 |
 
-No hay mantenedor CRUD de líneas todavía (alta/edición futura; hoy solo lectura en la UI).
+La línea **es** la máquina física de planta: no existe un nivel de equipo por debajo y la parada se registra hasta aquí. `Linea` no expone `sedeId` (la aplicación opera una única sede, Lima).
 
 ### Productos
 
@@ -156,17 +147,6 @@ La velocidad estándar vive en el par `producto × línea` (`VelocidadEstandar`,
 | `/velocidades-estandar` | POST | `CreateVelocidadEstandar { productoId, lineaId, velocidadUnidHora (1–60 000), mermaEstandarPct?, cipMin?, arranqueMin?, estado? }` — `velocidadUnidMin` **no se envía**, la API la deriva | `VelocidadEstandar` (201) | 403 (`jefe`/`supervisor`) · 409 el par ya existe · 422 producto o línea inexistente |
 | `/velocidades-estandar/:id` | PATCH | `Partial<CreateVelocidadEstandar>` — recalcula `velocidadUnidMin` si cambia `velocidadUnidHora` | `VelocidadEstandar` | 403 · 404 · 409 |
 | `/velocidades-estandar/:id` | DELETE | — | `BajaLogicaResponse` (`etiquetaConservados: 'órdenes'`) — el par pasa a `inactivo`; las órdenes que lo congelaron conservan su valor | 403 (solo `jefe`) · 404 |
-
-### Máquinas (equipos de línea)
-
-Equipo físico dentro de una línea (envolvedora, codificadora, dosificadora, túnel de frío, tapadora, faja transportadora, descargador, pinzas…), 2–4 por línea. **Obligatoria** en el wizard de registro de parada (`maquinaId`).
-
-| Endpoint | Método | Query / Body | Response | Errores |
-| --- | --- | --- | --- | --- |
-| `/maquinas` | GET | `lineaId?`, `estado?` (`operativa\|mantenimiento\|baja`) | `{ data: Maquina[] }` — 33 equipos reales, con `paradas30d` | 401 |
-| `/maquinas` | POST | `CreateMaquina { codigo, nombre, tipo, lineaId, estado? }` — `codigo` formato `MQ-<línea>-<nn>` | `Maquina` (201) | 403 (`jefe`/`supervisor`) · 409 código duplicado · 422 |
-| `/maquinas/:id` | PATCH | `Partial<CreateMaquina>` — edita código, nombre, tipo, línea o estado (mantenedor completo, no solo estado) | `Maquina` | 403 · 404 · 409 |
-| `/maquinas/:id` | DELETE | — | `BajaLogicaResponse` (`estado: 'baja'`, `etiquetaConservados: 'paradas'`) — la máquina pasa a `baja` y conserva sus paradas históricas | 403 (`jefe`/`supervisor`) · 404 |
 
 ### Causas de parada
 
@@ -194,8 +174,8 @@ Mismo patrón de árbol de 3 niveles que las causas de parada, pero con nomencla
 
 | Endpoint | Método | Query / Body | Response | Errores |
 | --- | --- | --- | --- | --- |
-| `/usuarios` | GET | `rol[]`, `sedeId?`, `lineaId?` (incluye además a los usuarios sin línea: jefe, supervisores, calidad), `activo?` (`true` solo activos, `false` solo inactivos) | `{ data: User[] }` — directorio de personas para los selectores de captura (responsable, maquinista, supervisor). **Sin restricción de rol**: lo consumen tanto Configuración como los wizards | 401 |
-| `/usuarios` | POST | `CreateUsuario { nombre, email, dni (8 dígitos), rol, cargo, sedeId, lineaId?, password (≥8) }` | `User` (201, hash bcrypt, iniciales derivadas del nombre) | 403 (solo `jefe`) · 409 correo o DNI duplicado · 422 |
+| `/usuarios` | GET | `rol[]`, `lineaId?` (incluye además a los usuarios sin línea: jefe, supervisores, calidad), `activo?` (`true` solo activos, `false` solo inactivos) | `{ data: User[] }` — directorio de personas para los selectores de captura (responsable, maquinista, supervisor). **Sin restricción de rol**: lo consumen tanto Configuración como los wizards | 401 |
+| `/usuarios` | POST | `CreateUsuario { nombre, email, dni (8 dígitos), rol, cargo, lineaId?, password (≥8) }` | `User` (201, hash bcrypt, iniciales derivadas del nombre) | 403 (solo `jefe`) · 409 correo o DNI duplicado · 422 |
 | `/usuarios/:id` | PATCH | `Partial<CreateUsuario>` sin `password` (un `password` en el body se descarta por `whitelist`; usar el endpoint de abajo) | `User` | 403 · 404 · 409 correo o DNI duplicado |
 | `/usuarios/:id/estado` | POST | `{ activo: boolean }` | `User` (200) | 403 · 404 · **422 `BUSINESS_RULE`** si el `jefe` intenta desactivar su propia cuenta |
 | `/usuarios/:id/restablecer-password` | POST | `{ password: string (≥8) }` | `User` (200, sin `passwordHash`) | 403 (solo `jefe`) · 404 |
@@ -231,11 +211,11 @@ Al crear la orden, la API resuelve el **par activo** producto × línea (`Lookup
 | Endpoint | Método | Query / Body | Response | Errores |
 | --- | --- | --- | --- | --- |
 | `/paradas` | GET | `ordenId?`, `lineaId[]`, `causaId[]` (matchea tanto la causa hoja como su tipo raíz), `desde`, `hasta`, `abiertas=true`, `page`, `pageSize` | `Paginated<ParadaListItem>` | 401 |
-| `/paradas` | POST | `CreateParada { ordenId, lineaId, maquinaId, tipoCausaId?, causaId, inicio, accionTomada (≥10 car.), numeroSolicitud?, evidenciaUrl?, afectaOee?, responsableId, origen?, deteccionId?, tiempoRegistroSeg? }` — `maquinaId` **obligatoria** (equipo de la línea); `tipoCausaId` se deduce del árbol si se omite | `ParadaListItem` (201) | 422 `accionTomada` obligatoria (mín. 10 caracteres) · 422 `maquinaId`/`causaId` inexistente · 422 `numeroSolicitud` si la causa lo exige (`requiereSolicitud`) |
+| `/paradas` | POST | `CreateParada { ordenId, lineaId, tipoCausaId?, causaId, inicio, accionTomada (≥10 car.), numeroSolicitud?, evidenciaUrl?, afectaOee?, responsableId, origen?, deteccionId?, tiempoRegistroSeg? }` — la parada se registra hasta la **línea** (no hay nivel máquina); `tipoCausaId` se deduce del árbol si se omite | `ParadaListItem` (201) | 422 `accionTomada` obligatoria (mín. 10 caracteres) · 422 `lineaId`/`causaId` inexistente · 422 `numeroSolicitud` si la causa lo exige (`requiereSolicitud`) |
 | `/paradas/:id` | PATCH | `UpdateParada` (+ `fin?: string \| null`, `motivoEdicion?`) | `ParadaListItem`; el cambio de causa, máquina y hora de fin se escriben en la bitácora. `fin` recalcula `duracionMin`; `fin: null` reabre la parada (spec 05.F) | 404 · 422 |
 | `/paradas/:id/finalizar` | POST | `FinalizeParada { fin, comentarioCierre? }` | `ParadaListItem` con `duracionMin` | 404 · 409 ya finalizada |
 | `/detecciones-iot` | GET | `estado=sugerida\|confirmada\|descartada` | `{ data: DeteccionIoT[] }` | 401 |
-| `/detecciones-iot/:id/confirmar` | POST | `{ causaId, maquinaId, accionTomada, tiempoRegistroSeg? }` | `{ deteccion, parada }` (201) — crea una parada `origen: 'iot'` vinculada a la orden en curso de la línea | 404 · 409 ya procesada · 422 sin orden en curso en la línea |
+| `/detecciones-iot/:id/confirmar` | POST | `{ causaId, accionTomada, tiempoRegistroSeg? }` | `{ deteccion, parada }` (201) — crea una parada `origen: 'iot'` vinculada a la orden en curso de la línea | 404 · 409 ya procesada · 422 sin orden en curso en la línea |
 | `/detecciones-iot/:id/descartar` | POST | — | `DeteccionIoT` (`estado: 'descartada'`) | 404 |
 
 `tiempoRegistroSeg` alimenta el KPI **TRI**: cada parada, merma, orden o velocidad creada emite el evento `TRI_REGISTRO_EVENT` y añade una fila al Anexo 02 (postest).
@@ -274,7 +254,7 @@ Las causas de merma son un árbol de 3 niveles (**tipo de producción → clasif
 
 | Endpoint | Método | Query / Body | Response | Errores |
 | --- | --- | --- | --- | --- |
-| `/tiempo-real/lineas` | GET | `sedeId?` (**def. `SED-LIMA`**), `lineaId[]`, `estado[]` (`produciendo\|parada\|sin_orden\|alerta\|sugerida`) | `TiempoRealResumen { actualizadoEn, turno, turnoLabel, turnoRango, sedeId, lineas: LineaEstado[] }` — una fila por cada línea de la sede (9 en `SED-LIMA`) | 401 |
+| `/tiempo-real/lineas` | GET | `lineaId[]`, `estado[]` (`produciendo\|parada\|sin_orden\|alerta\|sugerida`) | `TiempoRealResumen { actualizadoEn, diaOperativo, turno, turnoLabel, turnoRango, lineas: LineaEstado[] }` — una fila por línea (9) | 401 |
 | `/tiempo-real/lineas/:id/timeline` | GET | — | `LineaTimeline { lineaId, lineaCodigo, lineaNombre, ordenCodigo?, eventos: TimelineEvento[] }` | 404 |
 | `/tiempo-real/tv` | GET | — | `TvResumen { actualizadoEn, turnoLabel, filas: TvRow[] }` — 9 filas, una por línea | 401 |
 | `/tiempo-real/stream` | GET (SSE) | `token?` | `text/event-stream`, eventos `estado` con `RealtimeStreamEvent` cada 5 s. `EventSource` no admite cabeceras: **sólo esta ruta** acepta el JWT por query (`?token=…`); cualquier otra lo ignora | 401 |

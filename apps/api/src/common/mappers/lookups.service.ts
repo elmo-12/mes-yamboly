@@ -5,7 +5,6 @@ import {
   CausaMerma,
   CausaParada,
   Linea,
-  Maquina,
   OrdenFabricacion,
   Producto,
   Sabor,
@@ -23,7 +22,6 @@ export interface Lookups {
   lineas: Map<string, Linea>;
   productos: Map<string, Producto>;
   sabores: Map<string, Sabor>;
-  maquinas: Map<string, Maquina>;
   causasParada: Map<string, CausaParada>;
   causasMerma: Map<string, CausaMerma>;
   usuarios: Map<string, User>;
@@ -46,7 +44,6 @@ export class LookupsService {
     @InjectRepository(Linea) private readonly lineas: Repository<Linea>,
     @InjectRepository(Producto) private readonly productos: Repository<Producto>,
     @InjectRepository(Sabor) private readonly sabores: Repository<Sabor>,
-    @InjectRepository(Maquina) private readonly maquinas: Repository<Maquina>,
     @InjectRepository(CausaParada) private readonly causasParada: Repository<CausaParada>,
     @InjectRepository(CausaMerma) private readonly causasMerma: Repository<CausaMerma>,
     @InjectRepository(User) private readonly usuarios: Repository<User>,
@@ -60,7 +57,6 @@ export class LookupsService {
       lineas,
       productos,
       sabores,
-      maquinas,
       causasParada,
       causasMerma,
       usuarios,
@@ -70,7 +66,6 @@ export class LookupsService {
       this.lineas.find(),
       this.productos.find(),
       this.sabores.find(),
-      this.maquinas.find(),
       this.causasParada.find(),
       this.causasMerma.find(),
       this.usuarios.find(),
@@ -82,7 +77,6 @@ export class LookupsService {
       lineas: indexar(lineas),
       productos: indexar(productos),
       sabores: indexar(sabores),
-      maquinas: indexar(maquinas),
       causasParada: indexar(causasParada),
       causasMerma: indexar(causasMerma),
       usuarios: indexar(usuarios),

@@ -17,10 +17,9 @@ import type {
   CausaParada,
   CausaParadaNodo,
   Linea,
-  Maquina,
+  LineaListItem,
   Producto,
   Sabor,
-  Sede,
   TurnoDef,
   VelocidadEstandar,
   VelocidadEstandarListItem,
@@ -40,9 +39,8 @@ import {
   CreateCausaParadaDto,
   UpdateCausaParadaDto,
 } from './dto/causa-parada.dto';
-import { CreateMaquinaDto, MaquinaQueryDto, UpdateMaquinaDto } from './dto/maquina.dto';
+import { CreateLineaDto, UpdateLineaDto } from './dto/linea.dto';
 import { CreateProductoDto, ProductoQueryDto, UpdateProductoDto } from './dto/producto.dto';
-import { CreateSedeDto, UpdateSedeDto } from './dto/sede.dto';
 import {
   CreateVelocidadEstandarDto,
   UpdateVelocidadEstandarDto,
@@ -64,34 +62,6 @@ export class CatalogsController {
     return { data: await this.catalogs.listarTurnos() };
   }
 
-  /* ------------------------------ Sedes ------------------------------- */
-
-  @Get('sedes')
-  @ApiOperation({ summary: 'Sedes de la planta (9 reales)' })
-  @ApiResponse({ status: 200, description: '{ data: Sede[] }' })
-  async sedes(): Promise<{ data: Sede[] }> {
-    return { data: await this.catalogs.listarSedes() };
-  }
-
-  @Post('sedes')
-  @Roles('jefe')
-  @ApiOperation({ summary: 'Registra una sede' })
-  @ApiResponse({ status: 201, description: 'Sede creada' })
-  @ApiResponse({ status: 409, description: 'Código duplicado', type: ApiErrorDto })
-  @ApiResponse({ status: 422, description: 'Datos inválidos', type: ApiErrorDto })
-  crearSede(@Body() dto: CreateSedeDto): Promise<Sede> {
-    return this.catalogs.crearSede(dto);
-  }
-
-  @Patch('sedes/:id')
-  @Roles('jefe')
-  @ApiOperation({ summary: 'Actualiza una sede' })
-  @ApiResponse({ status: 404, description: 'No encontrada', type: ApiErrorDto })
-  @ApiResponse({ status: 409, description: 'Código duplicado', type: ApiErrorDto })
-  actualizarSede(@Param('id') id: string, @Body() dto: UpdateSedeDto): Promise<Sede> {
-    return this.catalogs.actualizarSede(id, dto);
-  }
-
   /* ------------------------------ Sabores ----------------------------- */
 
   @Get('sabores')
@@ -104,12 +74,39 @@ export class CatalogsController {
   /* ------------------------------ Líneas ------------------------------ */
 
   @Get('lineas')
-  @ApiOperation({ summary: 'Las 9 líneas reales (llenadoras, extrusoras, moldeadoras)' })
-  @ApiResponse({ status: 200, description: '{ data: Linea[] }' })
-  async lineas(@Query() query: LineaQueryDto): Promise<{ data: Linea[] }> {
-    return {
-      data: await this.catalogs.listarLineas(query.sedeId, query.tipoProceso, query.estado),
-    };
+  @ApiOperation({ summary: 'Líneas de planta (la línea es la máquina física)' })
+  @ApiResponse({ status: 200, description: '{ data: LineaListItem[] }' })
+  async lineas(@Query() query: LineaQueryDto): Promise<{ data: LineaListItem[] }> {
+    return { data: await this.catalogs.listarLineas(query.tipoProceso, query.estado) };
+  }
+
+  @Post('lineas')
+  @Roles('jefe', 'supervisor')
+  @ApiOperation({ summary: 'Registra una línea' })
+  @ApiResponse({ status: 201, description: 'Línea creada' })
+  @ApiResponse({ status: 409, description: 'Código duplicado', type: ApiErrorDto })
+  @ApiResponse({ status: 422, description: 'Datos inválidos', type: ApiErrorDto })
+  crearLinea(@Body() dto: CreateLineaDto): Promise<Linea> {
+    return this.catalogs.crearLinea(dto);
+  }
+
+  @Patch('lineas/:id')
+  @Roles('jefe', 'supervisor')
+  @ApiOperation({ summary: 'Edita código, nombre, tipo de proceso, estado o capacidad' })
+  @ApiResponse({ status: 404, description: 'No encontrada', type: ApiErrorDto })
+  @ApiResponse({ status: 409, description: 'Código duplicado', type: ApiErrorDto })
+  actualizarLinea(@Param('id') id: string, @Body() dto: UpdateLineaDto): Promise<Linea> {
+    return this.catalogs.actualizarLinea(id, dto);
+  }
+
+  @Delete('lineas/:id')
+  @Roles('jefe', 'supervisor')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Baja lógica: la línea pasa a inactiva y conserva órdenes y paradas' })
+  @ApiResponse({ status: 200, type: BajaLogicaResponseDto })
+  @ApiResponse({ status: 404, description: 'No encontrada', type: ApiErrorDto })
+  bajaLinea(@Param('id') id: string): Promise<BajaLogicaResponseDto> {
+    return this.catalogs.darDeBajaLinea(id);
   }
 
   /* ----------------------------- Productos ---------------------------- */
@@ -193,43 +190,6 @@ export class CatalogsController {
   @ApiResponse({ status: 404, description: 'No encontrada', type: ApiErrorDto })
   bajaVelocidadEstandar(@Param('id') id: string): Promise<BajaLogicaResponseDto> {
     return this.catalogs.darDeBajaVelocidadEstandar(id);
-  }
-
-  /* ------------------------------ Máquinas ---------------------------- */
-
-  @Get('maquinas')
-  @ApiOperation({ summary: 'Equipos de la línea (2–4 por línea)' })
-  @ApiResponse({ status: 200, description: '{ data: Maquina[] }' })
-  async maquinas(@Query() query: MaquinaQueryDto): Promise<{ data: Maquina[] }> {
-    return { data: await this.catalogs.listarMaquinas(query.lineaId, query.estado) };
-  }
-
-  @Post('maquinas')
-  @Roles('jefe', 'supervisor')
-  @ApiOperation({ summary: 'Registra una máquina' })
-  @ApiResponse({ status: 201, description: 'Máquina creada' })
-  @ApiResponse({ status: 409, description: 'Código duplicado', type: ApiErrorDto })
-  crearMaquina(@Body() dto: CreateMaquinaDto): Promise<Maquina> {
-    return this.catalogs.crearMaquina(dto);
-  }
-
-  @Patch('maquinas/:id')
-  @Roles('jefe', 'supervisor')
-  @ApiOperation({ summary: 'Edita código, nombre, tipo, línea o estado de una máquina' })
-  @ApiResponse({ status: 404, description: 'No encontrada', type: ApiErrorDto })
-  @ApiResponse({ status: 409, description: 'Código duplicado', type: ApiErrorDto })
-  actualizarMaquina(@Param('id') id: string, @Body() dto: UpdateMaquinaDto): Promise<Maquina> {
-    return this.catalogs.actualizarMaquina(id, dto);
-  }
-
-  @Delete('maquinas/:id')
-  @Roles('jefe', 'supervisor')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Baja lógica: la máquina pasa a `baja` y conserva sus paradas' })
-  @ApiResponse({ status: 200, type: BajaLogicaResponseDto })
-  @ApiResponse({ status: 404, description: 'No encontrada', type: ApiErrorDto })
-  bajaMaquina(@Param('id') id: string): Promise<BajaLogicaResponseDto> {
-    return this.catalogs.darDeBajaMaquina(id);
   }
 
   /* --------------------------- Causas de parada ----------------------- */

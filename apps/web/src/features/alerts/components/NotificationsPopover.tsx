@@ -133,7 +133,7 @@ export function mapAlertaANotificacion(alerta: Alerta, horaRelativa: string): No
   return {
     id: alerta.id,
     titulo: alerta.prediccion,
-    detalle: [alerta.lineaNombre, alerta.maquinaNombre].filter(Boolean).join(' · '),
+    detalle: alerta.lineaNombre,
     meta: `Probabilidad ${alerta.probabilidad} % · ${horaRelativa}`,
     severidad: alerta.severidad,
     leida: alerta.estado !== 'activa',

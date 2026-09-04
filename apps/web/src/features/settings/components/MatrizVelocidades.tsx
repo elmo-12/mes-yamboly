@@ -9,8 +9,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   Icon,
-  SectionTitle,
-  Skeleton,
   TBody,
   THead,
   TH,
@@ -54,25 +52,28 @@ function minutos(valor: number | null): string {
 }
 
 export interface MatrizVelocidadesProps {
-  /** Producto seleccionado en la tabla superior: la fila de la matriz. */
+  /** Producto cuyas velocidades se muestran: la fila de la matriz. */
   producto: Producto;
   /** Las 9 líneas reales (columnas), sin filtrar. */
   lineas: readonly Linea[];
   /** Pares del producto (`useVelocidadesEstandar`), ya filtrados por `productoId`. */
   pares: readonly VelocidadEstandarListItem[];
-  cargando?: boolean;
 }
 
 /**
- * `Configuración / Productos y velocidades` — matriz **producto × 9 líneas**.
+ * `Configuración / Productos y velocidades` — matriz **producto × 9 líneas**,
+ * cuerpo de `VelocidadesModal` (Figma 2165:11984 actualizado a modal).
  *
  * Las columnas son las líneas agrupadas por `tipoProceso` (llenadoras,
- * extrusoras, moldeadoras) y la única fila es el producto seleccionado en la
- * tabla superior: así el par que falta se lee de un vistazo y se crea desde la
- * propia celda vacía (`VelocidadEstandarModal` con la línea precargada).
- * La tabla desborda a lo ancho con su propio scroll, sin arrastrar al body.
+ * extrusoras, moldeadoras) y la única fila es el producto del modal: así el
+ * par que falta se lee de un vistazo y se crea desde la propia celda vacía
+ * (`VelocidadEstandarModal` con la línea precargada). El título, el resumen
+ * «N de 9 líneas con par activo» y los estados de carga/vacío/error viven en
+ * `VelocidadesModal`, que es quien decide cuándo montar esta matriz. La tabla
+ * desborda a lo ancho con su propio scroll horizontal (`Table`), sin
+ * arrastrar el modal.
  */
-export function MatrizVelocidades({ producto, lineas, pares, cargando = false }: MatrizVelocidadesProps) {
+export function MatrizVelocidades({ producto, lineas, pares }: MatrizVelocidadesProps) {
   const [editar, setEditar] = React.useState<{ lineaId?: string; par?: VelocidadEstandarListItem }>();
   const [eliminar, setEliminar] = React.useState<VelocidadEstandarListItem>();
 
@@ -81,79 +82,64 @@ export function MatrizVelocidades({ producto, lineas, pares, cargando = false }:
     () => new Map(pares.map((p) => [p.lineaId, p])),
     [pares],
   );
-  const activos = pares.filter((p) => p.estado === 'activo').length;
 
   return (
-    <section className="flex flex-col gap-4">
-      <SectionTitle
-        title="Velocidades estándar por línea"
-        description={`${producto.codigo} · ${producto.nombre} — ${formatNumber(activos)} de ${formatNumber(
-          lineas.length,
-        )} líneas con par activo · la velocidad en u/min es la que congela la orden y consume el OEE`}
-      />
-
-      {cargando ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-      ) : (
-        <TooltipProvider>
-          <Table density="dense">
-            <THead>
-              <tr>
-                <TH rowSpan={2} className="w-[220px] align-bottom">
-                  Producto
+    <>
+      <TooltipProvider>
+        <Table density="dense">
+          <THead>
+            <tr>
+              <TH rowSpan={2} className="w-[180px] align-bottom">
+                Producto
+              </TH>
+              {grupos.map((g) => (
+                <TH key={g.tipoProceso} colSpan={g.lineas.length} className="text-center">
+                  {`${GRUPO_LABEL[g.tipoProceso]} · ${formatNumber(g.lineas.length)}`}
                 </TH>
-                {grupos.map((g) => (
-                  <TH key={g.tipoProceso} colSpan={g.lineas.length} className="text-center">
-                    {`${GRUPO_LABEL[g.tipoProceso]} · ${formatNumber(g.lineas.length)}`}
+              ))}
+            </tr>
+            <tr>
+              {grupos.flatMap((g) =>
+                g.lineas.map((l) => (
+                  <TH key={l.id} className="min-w-[164px]">
+                    {l.codigo}
                   </TH>
-                ))}
-              </tr>
-              <tr>
-                {grupos.flatMap((g) =>
-                  g.lineas.map((l) => (
-                    <TH key={l.id} className="min-w-[164px]">
-                      {l.codigo}
-                    </TH>
-                  )),
-                )}
-              </tr>
-            </THead>
-            <TBody>
-              <TRow plain className="align-top">
-                <TCell className="py-3">
-                  <span className="block font-medium tabular">{producto.codigo}</span>
-                  <span className="block text-caption text-text-secondary">{producto.nombre}</span>
-                </TCell>
-                {grupos.flatMap((g) =>
-                  g.lineas.map((linea) => {
-                    const par = porLinea.get(linea.id);
-                    return (
-                      <TCell key={linea.id} className="py-2">
-                        {par ? (
-                          <CeldaPar
-                            linea={linea}
-                            par={par}
-                            onEditar={() => setEditar({ par })}
-                            onEliminar={() => setEliminar(par)}
-                          />
-                        ) : (
-                          <CeldaVacia
-                            linea={linea}
-                            onAgregar={() => setEditar({ lineaId: linea.id })}
-                          />
-                        )}
-                      </TCell>
-                    );
-                  }),
-                )}
-              </TRow>
-            </TBody>
-          </Table>
-        </TooltipProvider>
-      )}
+                )),
+              )}
+            </tr>
+          </THead>
+          <TBody>
+            <TRow plain className="align-top">
+              <TCell className="py-3">
+                <span className="block font-medium tabular">{producto.codigo}</span>
+                <span className="block text-caption text-text-secondary">{producto.nombre}</span>
+              </TCell>
+              {grupos.flatMap((g) =>
+                g.lineas.map((linea) => {
+                  const par = porLinea.get(linea.id);
+                  return (
+                    <TCell key={linea.id} className="py-2">
+                      {par ? (
+                        <CeldaPar
+                          linea={linea}
+                          par={par}
+                          onEditar={() => setEditar({ par })}
+                          onEliminar={() => setEliminar(par)}
+                        />
+                      ) : (
+                        <CeldaVacia
+                          linea={linea}
+                          onAgregar={() => setEditar({ lineaId: linea.id })}
+                        />
+                      )}
+                    </TCell>
+                  );
+                }),
+              )}
+            </TRow>
+          </TBody>
+        </Table>
+      </TooltipProvider>
 
       {editar && (
         <VelocidadEstandarModal
@@ -178,7 +164,7 @@ export function MatrizVelocidades({ producto, lineas, pares, cargando = false }:
           onEliminada={() => setEliminar(undefined)}
         />
       )}
-    </section>
+    </>
   );
 }
 

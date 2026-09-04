@@ -3,8 +3,8 @@ import request from 'supertest';
 import { crearApp, CREDENCIALES, login } from './app.factory';
 
 /**
- * CRUD de mantenedores sobre el maestro real de Yamboly: 9 sedes, 9 líneas,
- * 41 sabores, 201 productos, 333 pares producto × línea, 33 máquinas,
+ * CRUD de mantenedores sobre el maestro real de Yamboly: 9 líneas,
+ * 41 sabores, 201 productos, 333 pares producto × línea,
  * 83 causas de parada y 56 causas de merma (ver `catalogs.ts`).
  */
 describe('catálogos — mantenedores (e2e)', () => {
@@ -42,11 +42,6 @@ describe('catálogos — mantenedores (e2e)', () => {
         {},
       );
       expect(porTipo).toMatchObject({ llenadora: 4, extrusora: 2, moldeadora: 3 });
-    });
-
-    it('lista las 9 sedes reales', async () => {
-      const { body } = await request(server()).get('/api/v1/sedes').set(jefe()).expect(200);
-      expect(body.data).toHaveLength(9);
     });
 
     it('lista los 2 turnos reales D (Día) y N (Noche)', async () => {
@@ -122,61 +117,16 @@ describe('catálogos — mantenedores (e2e)', () => {
       expect(huerfanas).toHaveLength(0);
     });
 
-    it('lista las 33 máquinas (equipos de línea)', async () => {
-      const { body } = await request(server()).get('/api/v1/maquinas').set(jefe()).expect(200);
-      expect(body.data).toHaveLength(33);
-    });
-  });
-
-  /* ------------------------------------------------------------------ */
-  /* Sedes                                                              */
-  /* ------------------------------------------------------------------ */
-
-  describe('sedes', () => {
-    it('el jefe crea una sede', async () => {
-      const { body } = await request(server())
-        .post('/api/v1/sedes')
-        .set(jefe())
-        .send({ codigo: 'CUZC', nombre: 'Cusco', ciudad: 'Cusco' })
-        .expect(201);
-      expect(body).toMatchObject({ id: 'SED-CUSCO', codigo: 'CUZC', nombre: 'Cusco' });
-    });
-
-    it('409 al repetir el código de una sede existente', async () => {
-      const { body } = await request(server())
-        .post('/api/v1/sedes')
-        .set(jefe())
-        .send({ codigo: 'LIMA', nombre: 'Lima Norte', ciudad: 'Lima' })
-        .expect(409);
-      expect(body.code).toBe('CONFLICT');
-    });
-
-    it('422 con código de sede inválido', async () => {
-      const { body } = await request(server())
-        .post('/api/v1/sedes')
-        .set(jefe())
-        .send({ codigo: 'cz', nombre: 'Cajazul', ciudad: 'Cajamarca' })
-        .expect(422);
-      expect(body.code).toBe('VALIDATION_ERROR');
-      expect(body.details).toHaveProperty('codigo');
-    });
-
-    it('el jefe edita una sede', async () => {
-      const { body } = await request(server())
-        .patch('/api/v1/sedes/SED-CUSCO')
-        .set(jefe())
-        .send({ ciudad: 'Cusco (centro histórico)' })
-        .expect(200);
-      expect(body.ciudad).toBe('Cusco (centro histórico)');
-    });
-
-    it('403 si un supervisor intenta crear una sede', async () => {
-      const { body } = await request(server())
-        .post('/api/v1/sedes')
-        .set(supervisor())
-        .send({ codigo: 'PUNO', nombre: 'Puno', ciudad: 'Puno' })
-        .expect(403);
-      expect(body.code).toBe('FORBIDDEN');
+    it('cada línea trae sus contadores de productos y de paradas 30 d', async () => {
+      const { body } = await request(server()).get('/api/v1/lineas').set(jefe()).expect(200);
+      const filas = body.data as Array<Record<string, unknown>>;
+      for (const l of filas) {
+        expect(typeof l.productosConVelocidad).toBe('number');
+        expect(typeof l.paradas30d).toBe('number');
+        /* La sede no forma parte del contrato público: solo hay una (Lima). */
+        expect(l).not.toHaveProperty('sedeId');
+      }
+      expect(filas.some((l) => (l.productosConVelocidad as number) > 0)).toBe(true);
     });
   });
 
@@ -455,49 +405,86 @@ describe('catálogos — mantenedores (e2e)', () => {
   });
 
   /* ------------------------------------------------------------------ */
-  /* Máquinas (equipos de línea)                                       */
+  /* Líneas (la línea es la máquina física)                             */
   /* ------------------------------------------------------------------ */
 
-  describe('máquinas', () => {
-    it('el jefe edita código, nombre, tipo y línea de una máquina', async () => {
+  describe('líneas', () => {
+    it('el jefe crea una línea', async () => {
       const { body } = await request(server())
-        .patch('/api/v1/maquinas/MAQ-33')
+        .post('/api/v1/lineas')
         .set(jefe())
         .send({
-          nombre: 'Túnel de frío MOLD A4 (renovado)',
-          tipo: 'Túnel de frío',
-          lineaId: 'LIN-MOLD-A3',
+          codigo: 'LLEN-A9',
+          nombre: 'Llenadora A9',
+          nombreCorto: 'LLEN A9',
+          tipoProceso: 'llenadora',
+          capacidadUnidadesMin: 120,
         })
-        .expect(200);
+        .expect(201);
       expect(body).toMatchObject({
-        id: 'MAQ-33',
-        nombre: 'Túnel de frío MOLD A4 (renovado)',
-        lineaId: 'LIN-MOLD-A3',
+        id: 'LIN-LLEN-A9',
+        codigo: 'LLEN-A9',
+        nombre: 'Llenadora A9',
+        tipoProceso: 'llenadora',
       });
+      expect(body).not.toHaveProperty('sedeId');
     });
 
-    it('422 con código de máquina que no cumple ^MQ-[A-Z0-9]{2,6}-\\d{2}$', async () => {
+    it('409 al repetir el código de una línea existente', async () => {
       const { body } = await request(server())
-        .patch('/api/v1/maquinas/MAQ-33')
+        .post('/api/v1/lineas')
         .set(jefe())
-        .send({ codigo: 'INVALIDO' })
+        .send({
+          codigo: 'EXTR-2',
+          nombre: 'Extrusora 2 duplicada',
+          nombreCorto: 'EXTR 2D',
+          tipoProceso: 'extrusora',
+        })
+        .expect(409);
+      expect(body.code).toBe('CONFLICT');
+    });
+
+    it('422 con código de línea que no cumple ^[A-Z]{3,4}-[A-Z]?\\d{1,2}$', async () => {
+      const { body } = await request(server())
+        .post('/api/v1/lineas')
+        .set(jefe())
+        .send({
+          codigo: 'invalido',
+          nombre: 'Línea inválida',
+          nombreCorto: 'INV',
+          tipoProceso: 'llenadora',
+        })
         .expect(422);
+      expect(body.code).toBe('VALIDATION_ERROR');
       expect(body.details).toHaveProperty('codigo');
     });
 
-    it('DELETE da de baja la máquina y conserva sus paradas', async () => {
+    it('el supervisor edita nombre, nombre corto y capacidad de una línea', async () => {
       const { body } = await request(server())
-        .delete('/api/v1/maquinas/MAQ-08')
-        .set(jefe())
+        .patch('/api/v1/lineas/LIN-LLEN-A9')
+        .set(supervisor())
+        .send({ nombre: 'Llenadora A9 (renovada)', nombreCorto: 'LLEN A9R', capacidadUnidadesMin: 140 })
         .expect(200);
-      expect(body).toMatchObject({ id: 'MAQ-08', estado: 'baja' });
-      expect(body.conservados).toBeGreaterThan(0);
-      expect(body.etiquetaConservados).toBe('paradas');
+      expect(body).toMatchObject({
+        id: 'LIN-LLEN-A9',
+        nombre: 'Llenadora A9 (renovada)',
+        capacidadUnidadesMin: 140,
+      });
     });
 
-    it('403 si un maquinista intenta editar una máquina', async () => {
+    it('DELETE da de baja la línea y conserva sus órdenes y paradas', async () => {
       const { body } = await request(server())
-        .patch('/api/v1/maquinas/MAQ-01')
+        .delete('/api/v1/lineas/LIN-LLEN-A1')
+        .set(jefe())
+        .expect(200);
+      expect(body).toMatchObject({ id: 'LIN-LLEN-A1', estado: 'inactivo' });
+      expect(body.conservados).toBeGreaterThan(0);
+      expect(body.etiquetaConservados).toBe('órdenes y paradas');
+    });
+
+    it('403 si un maquinista intenta editar una línea', async () => {
+      const { body } = await request(server())
+        .patch('/api/v1/lineas/LIN-EXTR-2')
         .set(maquinista())
         .send({ nombre: 'Sin permiso' })
         .expect(403);

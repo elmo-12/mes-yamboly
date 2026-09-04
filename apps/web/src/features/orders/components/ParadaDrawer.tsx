@@ -43,7 +43,6 @@ export function ParadaDrawer({ open, onOpenChange, orden, parada }: ParadaDrawer
   const form = useForm<ParadaFormValues>({
     resolver: zodResolver(paradaFormSchema),
     defaultValues: {
-      maquinaId: '',
       horaInicio: '',
       horaFin: '',
       tipoCausaId: '',
@@ -62,7 +61,6 @@ export function ParadaDrawer({ open, onOpenChange, orden, parada }: ParadaDrawer
       parada
         ? valoresDeParada(parada)
         : {
-            maquinaId: '',
             horaInicio: '',
             horaFin: '',
             tipoCausaId: '',
@@ -88,7 +86,6 @@ export function ParadaDrawer({ open, onOpenChange, orden, parada }: ParadaDrawer
       try {
         if (parada) {
           const input: UpdateParadaInput = {
-            maquinaId: valores.maquinaId,
             tipoCausaId: valores.tipoCausaId,
             causaId: valores.causaId,
             inicio,
@@ -106,7 +103,6 @@ export function ParadaDrawer({ open, onOpenChange, orden, parada }: ParadaDrawer
           const input: CreateParadaInput = {
             ordenId: orden.id,
             lineaId: orden.lineaId,
-            maquinaId: valores.maquinaId,
             tipoCausaId: valores.tipoCausaId,
             causaId: valores.causaId,
             inicio,
@@ -181,7 +177,6 @@ export function ParadaDrawer({ open, onOpenChange, orden, parada }: ParadaDrawer
           <ParadaForm
             form={form}
             formId={FORM_ID}
-            lineaId={orden.lineaId}
             causas={causas?.data}
             onSubmit={onSubmit}
           />

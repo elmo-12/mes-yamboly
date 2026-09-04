@@ -21,7 +21,7 @@ import {
 import type { Alerta } from '@mes/types';
 import { formatPct } from '@mes/shared';
 import { useAlertas, useConfirmarLote } from '../hooks';
-import { esperaConfirmacion, formatVentana, lineaMaquina } from './alerta-format';
+import { esperaConfirmacion, etiquetaLinea, formatVentana } from './alerta-format';
 
 export interface ConfirmarLoteModalProps {
   open: boolean;
@@ -148,7 +148,7 @@ export function ConfirmarLoteModal({ open, onOpenChange }: ConfirmarLoteModalPro
                         <TCell>
                           <span className="font-medium text-text-primary">{alerta.prediccion}</span>
                           <span className="block text-caption text-text-secondary">
-                            {lineaMaquina(alerta)}
+                            {etiquetaLinea(alerta)}
                           </span>
                         </TCell>
                         <TCell muted>{formatVentana(alerta.ventanaInicio, alerta.ventanaFin)}</TCell>

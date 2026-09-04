@@ -55,7 +55,6 @@ export class RealtimeService {
   ) {}
 
   async resumen(
-    sedeId = 'SED-LIMA',
     lineaIds: string[] = [],
     estados: string[] = [],
   ): Promise<TiempoRealResumen> {
@@ -63,9 +62,7 @@ export class RealtimeService {
     const ahora = new Date();
     const turno = turnoPorFecha(ahora);
 
-    let lineas = [...lookups.lineas.values()]
-      .filter((l) => l.sedeId === sedeId)
-      .sort((a, b) => a.id.localeCompare(b.id));
+    let lineas = [...lookups.lineas.values()].sort((a, b) => a.id.localeCompare(b.id));
     if (lineaIds.length > 0) lineas = lineas.filter((l) => lineaIds.includes(l.id));
 
     const dia = await this.diaOperativoActual();
@@ -81,7 +78,6 @@ export class RealtimeService {
       turno,
       turnoLabel: turnoInfo(turno).label,
       turnoRango: turnoRango(turno),
-      sedeId,
       lineas:
         estados.length > 0 ? estadoLineas.filter((l) => estados.includes(l.estado)) : estadoLineas,
     };
@@ -357,7 +353,6 @@ export class RealtimeService {
       deteccion: ctx.deteccion
         ? {
             ...ctx.deteccion,
-            maquinaId: ctx.deteccion.maquinaId ?? undefined,
             paradaId: ctx.deteccion.paradaId ?? undefined,
           }
         : undefined,

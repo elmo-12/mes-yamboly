@@ -5,8 +5,8 @@ import type {
   CausaParada,
   DeteccionIoT,
   ExportJob,
+  Linea,
   LineaEstado,
-  Maquina,
   Merma,
   OrdenFabricacion,
   Parada,
@@ -14,7 +14,6 @@ import type {
   RegistroTRI,
   RegistroVelocidad,
   Sabor,
-  Sede,
   Umbrales,
   User,
   VelocidadEstandar,
@@ -44,15 +43,14 @@ export interface MockStore {
   alertas: Alerta[];
   detecciones: DeteccionIoT[];
   bitacora: AuditEvent[];
-  maquinas: Maquina[];
   /** Editable desde Configuración → Productos y velocidades (spec 10). */
   productos: Producto[];
   /** Pares producto × línea: la velocidad estándar vive aquí, no en el producto. */
   velocidadesEstandar: VelocidadEstandar[];
   /** Catálogo de sabores del maestro real (solo lectura por ahora). */
   sabores: Sabor[];
-  /** Sedes editables desde Configuración → Sedes y usuarios. */
-  sedes: Sede[];
+  /** Líneas editables desde Configuración → Líneas (la línea es la máquina física). */
+  lineas: Linea[];
   /** Usuarios editables (alta, edición, estado y restablecer contraseña). */
   usuarios: UsuarioSeed[];
   causasParada: CausaParada[];
@@ -90,11 +88,10 @@ function crearStore(): MockStore {
     alertas: clonar(data.alertas),
     detecciones: clonar(data.detecciones),
     bitacora: clonar(data.bitacora),
-    maquinas: clonar(data.maquinas),
     productos: clonar(data.productos),
     velocidadesEstandar: clonar(data.velocidadesEstandar),
     sabores: clonar(data.sabores),
-    sedes: clonar(data.sedes),
+    lineas: clonar(data.lineas),
     usuarios: clonar(data.usuarios),
     causasParada: clonar(data.causasParada),
     causasMerma: clonar(data.causasMerma),

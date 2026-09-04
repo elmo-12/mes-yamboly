@@ -1,8 +1,8 @@
 import type { EstadoLinea, LineaTimeline, TiempoRealResumen, TvResumen } from '@mes/types';
 import { api, buildUrl, tokenActual } from '@/services/api/client';
 
+/** Yamboly opera una única planta: `/tiempo-real/*` ya no recibe `sedeId`. */
 export interface TiempoRealFiltros {
-  sedeId?: string;
   lineaId?: string[];
   estado?: EstadoLinea[];
 }

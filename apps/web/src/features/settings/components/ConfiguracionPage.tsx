@@ -9,21 +9,31 @@ import { PageSkeleton } from '@/components/PageSkeleton';
 import { useRequireRole } from '@/hooks/use-require-role';
 import { CausasMermaTab } from './CausasMermaTab';
 import { CausasParadaTab } from './CausasParadaTab';
-import { MaquinasTab } from './MaquinasTab';
+import { LineasTab } from './LineasTab';
 import { ProductosVelocidadesTab } from './ProductosVelocidadesTab';
-import { SedesUsuariosTab } from './SedesUsuariosTab';
 import { UmbralesTab } from './UmbralesTab';
+import { UsuariosTab } from './UsuariosTab';
 
 const TABS = [
   { id: 'causas-parada', label: 'Causas de parada' },
   { id: 'causas-merma', label: 'Causas de merma' },
-  { id: 'maquinas', label: 'Máquinas' },
+  { id: 'lineas', label: 'Líneas' },
   { id: 'productos', label: 'Productos y velocidades' },
   { id: 'umbrales', label: 'Umbrales de alerta' },
-  { id: 'sedes', label: 'Sedes y usuarios' },
+  { id: 'usuarios', label: 'Usuarios' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
+
+/**
+ * Compatibilidad de enlaces guardados: la pestaña «Máquinas» pasó a «Líneas»
+ * (la línea es la máquina física) y «Sedes y usuarios» a «Usuarios» (la app
+ * opera una única sede).
+ */
+const ALIAS_TAB: Record<string, TabId> = {
+  maquinas: 'lineas',
+  sedes: 'usuarios',
+};
 
 /** Configuración es catálogo maestro: solo jefatura y supervisión (RNF14). */
 const ROLES = ['jefe', 'supervisor'] as const;
@@ -36,7 +46,10 @@ export function ConfiguracionPage() {
   const params = useSearchParams();
 
   const tabParam = params.get('tab');
-  const tab: TabId = TABS.some((t) => t.id === tabParam) ? (tabParam as TabId) : 'causas-parada';
+  const tabResuelto = tabParam ? (ALIAS_TAB[tabParam] ?? tabParam) : null;
+  const tab: TabId = TABS.some((t) => t.id === tabResuelto)
+    ? (tabResuelto as TabId)
+    : 'causas-parada';
 
   const cambiarTab = React.useCallback(
     (valor: string) => {
@@ -56,7 +69,7 @@ export function ConfiguracionPage() {
     <>
       <AppPageHeader
         title="Configuración"
-        subtitle="Catálogos maestros · codificación uniforme de causas, máquinas, productos, sedes y usuarios"
+        subtitle="Catálogos maestros · codificación uniforme de causas, líneas, productos y usuarios"
       />
 
       <Tabs value={tab} onValueChange={cambiarTab}>
@@ -74,8 +87,8 @@ export function ConfiguracionPage() {
         <TabsContent value="causas-merma">
           <CausasMermaTab />
         </TabsContent>
-        <TabsContent value="maquinas">
-          <MaquinasTab />
+        <TabsContent value="lineas">
+          <LineasTab />
         </TabsContent>
         <TabsContent value="productos">
           <ProductosVelocidadesTab />
@@ -83,8 +96,8 @@ export function ConfiguracionPage() {
         <TabsContent value="umbrales">
           <UmbralesTab />
         </TabsContent>
-        <TabsContent value="sedes">
-          <SedesUsuariosTab />
+        <TabsContent value="usuarios">
+          <UsuariosTab />
         </TabsContent>
       </Tabs>
     </>

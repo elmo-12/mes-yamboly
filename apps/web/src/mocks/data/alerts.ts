@@ -12,8 +12,6 @@ interface AlertaSemilla {
   lineaId: string;
   lineaCodigo: string;
   lineaNombre: string;
-  maquinaId?: string;
-  maquinaNombre?: string;
   prediccion: string;
   probabilidad: number;
   estado: EstadoAlerta;
@@ -28,29 +26,26 @@ interface AlertaSemilla {
 const SEMILLAS: AlertaSemilla[] = [
   {
     tipo: 'parada_prevista', severidad: 'alta', lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1',
-    maquinaId: 'MAQ-10', maquinaNombre: 'Tapadora LLEN A1',
     prediccion: 'Parada PN-02 en LLEN-A1 en 40 min', probabilidad: 78, estado: 'activa', acierto: null,
     ventana: ['14:40', '15:20'], dias: 0,
     factores: [
-      { texto: 'Tapadora LLEN A1 con 3 paradas PN-02 en 7 días', contribucion: 42 },
+      { texto: 'LLEN-A1 con 3 paradas PN-02 en 7 días', contribucion: 42 },
       { texto: 'Velocidad −6 % en la última hora', contribucion: 33 },
       { texto: 'Cambio de producto hace 25 min', contribucion: 25 },
     ],
   },
   {
     tipo: 'parada_prevista', severidad: 'critica', lineaId: 'LIN-MOLD-A3', lineaCodigo: 'MOLD-A3', lineaNombre: 'Moldeadora A3',
-    maquinaId: 'MAQ-28', maquinaNombre: 'Pinzas extractoras MOLD A3',
     prediccion: 'Parada PN-02 en curso en MOLD-A3 · riesgo de superar 30 min', probabilidad: 91, estado: 'activa', acierto: null,
     ventana: ['13:47', '14:30'], dias: 0,
     factores: [
       { texto: 'Parada activa PN-02 desde las 13:47', contribucion: 55 },
-      { texto: 'Pinzas extractoras con 9 paradas en 30 días', contribucion: 28 },
-      { texto: 'Sin repuesto de pinzas en almacén', contribucion: 17 },
+      { texto: 'MOLD-A3 con 9 paradas en 30 días', contribucion: 28 },
+      { texto: 'Sin repuesto del conjunto extractor en almacén', contribucion: 17 },
     ],
   },
   {
     tipo: 'velocidad_baja', severidad: 'media', lineaId: 'LIN-LLEN-M2', lineaCodigo: 'LLEN-M2', lineaNombre: 'Llenadora M2',
-    maquinaId: 'MAQ-19', maquinaNombre: 'Dosificadora LLEN M2',
     prediccion: 'Velocidad 6 % bajo estándar en LLEN-M2', probabilidad: 72, estado: 'activa', acierto: null,
     ventana: ['13:20', '15:00'], dias: 0,
     factores: [
@@ -65,7 +60,7 @@ const SEMILLAS: AlertaSemilla[] = [
     ventana: ['14:00', '18:00'], dias: 0,
     factores: [
       { texto: 'Arranques con sabor Lucuma elevan la merma EP 1,8 pp', contribucion: 45 },
-      { texto: 'Envolvedora EXTR 2 con microparadas recurrentes', contribucion: 32 },
+      { texto: 'EXTR-2 con microparadas recurrentes', contribucion: 32 },
       { texto: 'Merma acumulada del día 2,1 %', contribucion: 23 },
     ],
   },
@@ -81,7 +76,6 @@ const SEMILLAS: AlertaSemilla[] = [
   },
   {
     tipo: 'parada_prevista', severidad: 'media', lineaId: 'LIN-MOLD-A4', lineaCodigo: 'MOLD-A4', lineaNombre: 'Moldeadora A4',
-    maquinaId: 'MAQ-30', maquinaNombre: 'Moldeadora MOLD A4',
     prediccion: 'Parada PN-04 por falta de insumo en MOLD-A4', probabilidad: 70, estado: 'activa', acierto: null,
     ventana: ['15:30', '16:30'], dias: 0,
     factores: [
@@ -93,15 +87,14 @@ const SEMILLAS: AlertaSemilla[] = [
   /* Atendidas hoy (9) --------------------------------------------- */
   {
     tipo: 'parada_prevista', severidad: 'alta', lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1',
-    maquinaId: 'MAQ-10', maquinaNombre: 'Tapadora LLEN A1',
     prediccion: 'Parada PN-02 en LLEN-A1 antes de las 11:30', probabilidad: 81, estado: 'atendida', acierto: true,
     ventana: ['11:00', '11:40'], dias: 0,
     factores: [
-      { texto: 'Vibración del cabezal de tapado por encima del umbral', contribucion: 52 },
-      { texto: 'Tapadora con 6 paradas en 30 días', contribucion: 29 },
+      { texto: 'Vibración por encima del umbral en la línea', contribucion: 52 },
+      { texto: 'LLEN-A1 con 6 paradas en 30 días', contribucion: 29 },
       { texto: 'Velocidad descendente en los últimos 20 min', contribucion: 19 },
     ],
-    accionTomada: 'Se detuvo la línea de forma preventiva y se cambió el retén de la tapadora',
+    accionTomada: 'Se detuvo la línea de forma preventiva y se cambió el retén del cabezal de tapado',
     observacion: 'La parada ocurrió a las 11:18 tal como se predijo',
   },
   {
@@ -109,11 +102,11 @@ const SEMILLAS: AlertaSemilla[] = [
     prediccion: 'Velocidad 8 % bajo estándar en EXTR-2', probabilidad: 75, estado: 'atendida', acierto: true,
     ventana: ['09:00', '10:00'], dias: 0,
     factores: [
-      { texto: 'Extrusora por debajo del set point', contribucion: 46 },
+      { texto: 'EXTR-2 por debajo del set point', contribucion: 46 },
       { texto: 'Ajuste de sellado en curso', contribucion: 33 },
       { texto: 'Mezcla fría en tolva', contribucion: 21 },
     ],
-    accionTomada: 'Se recalibró la extrusora y se elevó la temperatura de la mezcla',
+    accionTomada: 'Se recalibró EXTR-2 y se elevó la temperatura de la mezcla',
   },
   {
     tipo: 'merma_prevista', severidad: 'media', lineaId: 'LIN-LLEN-M2', lineaCodigo: 'LLEN-M2', lineaNombre: 'Llenadora M2',
@@ -133,18 +126,17 @@ const SEMILLAS: AlertaSemilla[] = [
     ventana: ['06:00', '14:00'], dias: 0,
     factores: [
       { texto: 'Desempeño 82 % en el turno anterior', contribucion: 44 },
-      { texto: 'Envolvedora MOLD A4 con microparadas recurrentes', contribucion: 34 },
+      { texto: 'MOLD-A4 con microparadas recurrentes', contribucion: 34 },
       { texto: 'Dotación incompleta al inicio del turno', contribucion: 22 },
     ],
     accionTomada: 'Se reasignó un operario desde la Llenadora M2 para cubrir el puesto',
   },
   {
     tipo: 'parada_prevista', severidad: 'media', lineaId: 'LIN-LLEN-M2', lineaCodigo: 'LLEN-M2', lineaNombre: 'Llenadora M2',
-    maquinaId: 'MAQ-22', maquinaNombre: 'Faja transportadora LLEN M2',
     prediccion: 'Parada PN-04 por desviación de calibración en LLEN-M2', probabilidad: 70, estado: 'atendida', acierto: null,
     ventana: ['07:30', '08:30'], dias: 0,
     factores: [
-      { texto: 'Temperatura de la faja de descarga 2 °C sobre el objetivo', contribucion: 51 },
+      { texto: 'Temperatura de descarga 2 °C sobre el objetivo', contribucion: 51 },
       { texto: 'Puerta de cámara abierta más de 4 min', contribucion: 27 },
       { texto: 'Compresor con arranques frecuentes', contribucion: 22 },
     ],
@@ -155,11 +147,11 @@ const SEMILLAS: AlertaSemilla[] = [
     prediccion: 'Velocidad 7 % bajo estándar en MOLD-A3', probabilidad: 76, estado: 'atendida', acierto: true,
     ventana: ['09:30', '11:00'], dias: 0,
     factores: [
-      { texto: 'Moldeadora MOLD A3 con ciclo lento', contribucion: 45 },
+      { texto: 'MOLD-A3 con ciclo lento', contribucion: 45 },
       { texto: 'Ajuste de sellado pendiente', contribucion: 32 },
       { texto: 'Merma de producto en molde elevada', contribucion: 23 },
     ],
-    accionTomada: 'Se ajustó el ciclo de la moldeadora',
+    accionTomada: 'Se ajustó el ciclo de MOLD-A3',
   },
   {
     tipo: 'merma_prevista', severidad: 'alta', lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1',
@@ -174,15 +166,14 @@ const SEMILLAS: AlertaSemilla[] = [
   },
   {
     tipo: 'parada_prevista', severidad: 'alta', lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2',
-    maquinaId: 'MAQ-04', maquinaNombre: 'Túnel de frío EXTR 2',
     prediccion: 'Parada PN-02 por falla de mantto en EXTR-2', probabilidad: 84, estado: 'atendida', acierto: true,
     ventana: ['10:00', '11:00'], dias: 0,
     factores: [
-      { texto: 'Extrusora en mantenimiento correctivo', contribucion: 53 },
+      { texto: 'EXTR-2 en mantenimiento correctivo', contribucion: 53 },
       { texto: 'Alarmas de sobrecorriente repetidas', contribucion: 28 },
       { texto: 'Histórico de 12 paradas en 30 días', contribucion: 19 },
     ],
-    accionTomada: 'Mantenimiento cambió el rodamiento y dejó la máquina en observación',
+    accionTomada: 'Mantenimiento cambió el rodamiento y dejó la línea en observación',
   },
   {
     tipo: 'oee_bajo', severidad: 'media', lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2',
@@ -199,7 +190,6 @@ const SEMILLAS: AlertaSemilla[] = [
   /* Vencidas (2) --------------------------------------------------- */
   {
     tipo: 'parada_prevista', severidad: 'alta', lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1',
-    maquinaId: 'MAQ-08', maquinaNombre: 'Llenadora LLEN A1',
     prediccion: 'Parada PN-02 por falla operacional en LLEN-A1', probabilidad: 77, estado: 'vencida', acierto: null,
     ventana: ['12:00', '13:00'], dias: 0,
     factores: [
@@ -214,7 +204,7 @@ const SEMILLAS: AlertaSemilla[] = [
     ventana: ['10:30', '12:00'], dias: 0,
     factores: [
       { texto: 'Producto con temperatura fuera de rango', contribucion: 49 },
-      { texto: 'Pinzas extractoras con desalineación', contribucion: 30 },
+      { texto: 'Desalineación del conjunto extractor de MOLD-A3', contribucion: 30 },
       { texto: 'Histórico de rotura elevado los viernes', contribucion: 21 },
     ],
   },
@@ -279,8 +269,6 @@ function construir(semillas: AlertaSemilla[]): Alerta[] {
       lineaId: s.lineaId,
       lineaCodigo: s.lineaCodigo,
       lineaNombre: s.lineaNombre,
-      maquinaId: s.maquinaId,
-      maquinaNombre: s.maquinaNombre,
       prediccion: s.prediccion,
       probabilidad: s.probabilidad,
       ventanaInicio: iso(fecha, s.ventana[0]),

@@ -18,7 +18,7 @@ import { ROLE_LABEL, type Role } from '@mes/types';
 import { formatDateTime } from '@mes/shared';
 import { AppLink } from '@/components/AppLink';
 import { useDensidad } from '@/hooks/use-densidad';
-import { useLineas, useSedes } from '@/features/catalogs/hooks';
+import { useLineas } from '@/features/catalogs/hooks';
 import { useLogout, useMe } from '../hooks';
 
 const ROL_COLOR: Record<Role, BadgeColor> = {
@@ -33,20 +33,14 @@ const ROL_COLOR: Record<Role, BadgeColor> = {
 /**
  * `/perfil` — patrón Settings del MDS: la página es el contenedor, filas
  * label/valor con divisores (`DescriptionList`) y una sección por bloque.
- * Los datos vienen de `GET /auth/me`; sede y línea se resuelven con los
- * catálogos para mostrar el nombre en lugar del id.
+ * Los datos vienen de `GET /auth/me`; la línea se resuelve con el catálogo
+ * para mostrar el nombre en lugar del id.
  */
 export function PerfilPage() {
   const { data: user, isPending, error, refetch } = useMe();
-  const sedes = useSedes();
   const lineas = useLineas();
   const [densidad, setDensidad] = useDensidad();
   const logout = useLogout();
-
-  const nombreSede = React.useMemo(
-    () => sedes.data?.data.find((s) => s.id === user?.sedeId)?.nombre ?? user?.sedeId ?? '—',
-    [sedes.data, user],
-  );
 
   const nombreLinea = React.useMemo(() => {
     if (!user?.lineaId) return 'Todas las líneas';
@@ -99,7 +93,7 @@ export function PerfilPage() {
         <section className="flex flex-col gap-4">
           <SectionTitle
             title="Datos de la cuenta"
-            description="Los gestiona el Jefe de producción desde Configuración → Sedes y usuarios"
+            description="Los gestiona el Jefe de producción desde Configuración → Usuarios"
           />
           <DescriptionList
             labelWidth={220}
@@ -117,7 +111,6 @@ export function PerfilPage() {
               { label: 'DNI', value: user.dni },
               { label: 'Rol', value: <Badge color={ROL_COLOR[user.rol]}>{ROLE_LABEL[user.rol]}</Badge> },
               { label: 'Cargo', value: user.cargo },
-              { label: 'Sede', value: nombreSede },
               { label: 'Línea asignada', value: nombreLinea },
               {
                 label: 'Último acceso',

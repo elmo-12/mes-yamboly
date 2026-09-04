@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Drawer, DrawerContent, Icon, Input, Overline, Select, toast } from '@mes/ui';
 import { ROLES, ROLE_LABEL, actualizarUsuarioSchema, crearUsuarioSchema } from '@mes/types';
 import type { ActualizarUsuarioInput, CrearUsuarioInput, User } from '@mes/types';
-import { useActualizarUsuario, useCrearUsuario, useLineas, useSedes } from '@/features/catalogs/hooks';
+import { useActualizarUsuario, useCrearUsuario, useLineas } from '@/features/catalogs/hooks';
 import { ApiClientError } from '@/services/api/client';
 import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
 
@@ -21,7 +21,7 @@ export interface UsuarioDrawerProps {
 }
 
 /**
- * `Configuración / Sedes y usuarios` — drawer de alta y edición del
+ * `Configuración / Usuarios` — drawer de alta y edición del
  * directorio. En alta pide contraseña + confirmación; en edición no (para
  * eso está `RestablecerPasswordModal`) pero sí permite editar correo y DNI.
  * Son formularios lo bastante distintos (contratos `CrearUsuarioInput` vs
@@ -50,7 +50,6 @@ const DEFAULTS_ALTA: CrearUsuarioInput = {
   dni: '',
   rol: 'maquinista',
   cargo: '',
-  sedeId: '',
   lineaId: null,
   password: '',
   confirmacion: '',
@@ -64,13 +63,7 @@ function FormularioAlta({
   onOpenChange: (open: boolean) => void;
 }) {
   const crear = useCrearUsuario();
-  const { data: sedes } = useSedes();
   const { data: lineas } = useLineas();
-  /* Sólo sedes activas: una sede dada de baja no puede recibir usuarios nuevos. */
-  const sedesActivas = React.useMemo(
-    () => (sedes?.data ?? []).filter((s) => s.activa),
-    [sedes],
-  );
   const [verPassword, setVerPassword] = React.useState(false);
 
   const {
@@ -189,24 +182,6 @@ function FormularioAlta({
           />
           <Controller
             control={control}
-            name="sedeId"
-            render={({ field }) => (
-              <Select
-                label="Sede"
-                placeholder="Selecciona una sede"
-                options={sedesActivas.map((s) => ({
-                  value: s.id,
-                  label: `${s.codigo} · ${s.nombre}`,
-                }))}
-                value={field.value}
-                onValueChange={field.onChange}
-                destructive={Boolean(errors.sedeId)}
-                hint={errors.sedeId?.message}
-              />
-            )}
-          />
-          <Controller
-            control={control}
             name="lineaId"
             render={({ field }) => (
               <Select
@@ -259,7 +234,6 @@ function valoresEdicionDesde(usuario: User): ActualizarUsuarioInput {
     dni: usuario.dni,
     rol: usuario.rol,
     cargo: usuario.cargo,
-    sedeId: usuario.sedeId,
     lineaId: usuario.lineaId ?? null,
   };
 }
@@ -274,14 +248,7 @@ function FormularioEdicion({
   onOpenChange: (open: boolean) => void;
 }) {
   const actualizar = useActualizarUsuario();
-  const { data: sedes } = useSedes();
   const { data: lineas } = useLineas();
-  /* Sólo sedes activas, más la sede actual del usuario aunque se haya dado de
-   * baja, para no perder el valor guardado al abrir el formulario. */
-  const sedesActivas = React.useMemo(
-    () => (sedes?.data ?? []).filter((s) => s.activa || s.id === usuario.sedeId),
-    [sedes, usuario.sedeId],
-  );
 
   const {
     register,
@@ -390,23 +357,6 @@ function FormularioEdicion({
           />
           <Controller
             control={control}
-            name="sedeId"
-            render={({ field }) => (
-              <Select
-                label="Sede"
-                options={sedesActivas.map((s) => ({
-                  value: s.id,
-                  label: `${s.codigo} · ${s.nombre}`,
-                }))}
-                value={field.value ?? usuario.sedeId}
-                onValueChange={field.onChange}
-                destructive={Boolean(errors.sedeId)}
-                hint={errors.sedeId?.message}
-              />
-            )}
-          />
-          <Controller
-            control={control}
             name="lineaId"
             render={({ field }) => (
               <Select
@@ -435,7 +385,6 @@ const DEFAULTS_ALTA_EDICION: ActualizarUsuarioInput = {
   email: '',
   dni: '',
   cargo: '',
-  sedeId: '',
   lineaId: null,
 };
 

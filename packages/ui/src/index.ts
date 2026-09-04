@@ -89,7 +89,9 @@ export {
   LineCard,
   type LineCardProps,
   type LineState,
+  type LineMessageTone,
   type LineMetric,
+  type LineProgress,
   type LineSegment,
   type SegmentTone,
 } from './patterns/line-card';

@@ -9,8 +9,6 @@ export interface User {
   dni: string;
   rol: Role;
   cargo: string;
-  /** Id de {@link Sede}: `SED-LIMA`, `SED-AREQUIPA`, … */
-  sedeId: string;
   /** Línea asignada (maquinistas): `LIN-LLEN-M2`; `null` para el resto de roles. */
   lineaId?: string | null;
   iniciales: string;
@@ -50,7 +48,6 @@ const usuarioBaseShape = {
   dni: z.string().regex(/^\d{8}$/, 'El DNI debe tener 8 dígitos'),
   rol: z.enum(ROLES, { errorMap: () => ({ message: 'Selecciona un rol' }) }),
   cargo: z.string().min(2, 'El cargo es obligatorio'),
-  sedeId: z.string().min(1, 'Selecciona una sede'),
   lineaId: z.string().nullable().default(null),
 };
 
@@ -59,7 +56,7 @@ const usuarioBaseShape = {
  *
  * @example
  * { nombre: 'Ana Quispe', email: 'ana.quispe@yamboly.lat', dni: '45871203',
- *   rol: 'maquinista', cargo: 'Maquinista de línea', sedeId: 'SED-LIMA',
+ *   rol: 'maquinista', cargo: 'Maquinista de línea',
  *   lineaId: 'LIN-LLEN-M2', password: 'Yamboly2026', confirmacion: 'Yamboly2026' }
  */
 export const crearUsuarioSchema = z

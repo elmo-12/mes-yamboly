@@ -4,7 +4,6 @@ import { ESTADO_LINEA_LABEL } from '@mes/types';
 import {
   AHORA_ISO,
   lineaPorId,
-  SEDE_PRINCIPAL,
   TURNO_ACTUAL,
   TURNO_ACTUAL_LABEL,
   TURNO_ACTUAL_RANGO,
@@ -12,14 +11,13 @@ import {
 import { buscarCausaMerma, getStore } from '../store';
 import { API, ahoraIso, errores, listaQuery, preludio } from './_utils';
 
-function resumen(sedeId: string): TiempoRealResumen {
+function resumen(): TiempoRealResumen {
   return {
     actualizadoEn: ahoraIso(),
     diaOperativo: AHORA_ISO.slice(0, 10),
     turno: TURNO_ACTUAL,
     turnoLabel: TURNO_ACTUAL_LABEL,
     turnoRango: TURNO_ACTUAL_RANGO,
-    sedeId,
     lineas: getStore().lineaEstados,
   };
 }
@@ -119,10 +117,9 @@ export const realtimeHandlers = [
     const simulado = await preludio(request);
     if (simulado) return simulado;
     const url = new URL(request.url);
-    const sedeId = url.searchParams.get('sedeId') ?? SEDE_PRINCIPAL;
     const lineaIds = listaQuery(url, 'lineaId');
     const estados = listaQuery(url, 'estado');
-    const base = resumen(sedeId);
+    const base = resumen();
     let lineas = base.lineas;
     if (lineaIds.length > 0) lineas = lineas.filter((l) => lineaIds.includes(l.lineaId));
     if (estados.length > 0) lineas = lineas.filter((l) => estados.includes(l.estado));
@@ -168,7 +165,7 @@ export const realtimeHandlers = [
           const payload = JSON.stringify({
             tipo: 'estado',
             emitidoEn: ahoraIso(),
-            payload: resumen(SEDE_PRINCIPAL),
+            payload: resumen(),
           });
           controller.enqueue(encoder.encode(`event: estado\ndata: ${payload}\n\n`));
           enviados += 1;

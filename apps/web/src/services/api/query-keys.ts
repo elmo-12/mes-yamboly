@@ -16,13 +16,12 @@ export const queryKeys = {
   },
   /**
    * Catálogos maestros. Cada entidad expone una **raíz** sin argumentos
-   * (`sedes()`, `productos()`, …) que sirve para invalidar todas sus consultas,
+   * (`lineas()`, `productos()`, …) que sirve para invalidar todas sus consultas,
    * y una variante `…List(filtros)` con los filtros de la llamada. TanStack
    * empareja por prefijo, así que invalidar la raíz alcanza a todas las listas.
    */
   catalogs: {
     all: ['catalogs'] as const,
-    sedes: () => [...queryKeys.catalogs.all, 'sedes'] as const,
     turnos: () => [...queryKeys.catalogs.all, 'turnos'] as const,
     sabores: () => [...queryKeys.catalogs.all, 'sabores'] as const,
     saboresList: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.sabores(), filtros] as const,
@@ -32,8 +31,6 @@ export const queryKeys = {
     productosList: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.productos(), filtros] as const,
     velocidades: () => [...queryKeys.catalogs.all, 'velocidades-estandar'] as const,
     velocidadesList: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.velocidades(), filtros] as const,
-    maquinas: () => [...queryKeys.catalogs.all, 'maquinas'] as const,
-    maquinasList: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.maquinas(), filtros] as const,
     causasParada: () => [...queryKeys.catalogs.all, 'causas-parada'] as const,
     causasParadaArbol: (filtros: CatalogoFiltros = {}) =>
       [...queryKeys.catalogs.causasParada(), 'arbol', filtros] as const,

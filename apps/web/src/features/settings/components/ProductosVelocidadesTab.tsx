@@ -32,8 +32,8 @@ import {
   useVelocidadesEstandar,
 } from '@/features/catalogs/hooks';
 import { EliminarProductoModal } from './EliminarProductoModal';
-import { MatrizVelocidades } from './MatrizVelocidades';
 import { ProductoDrawer } from './ProductoDrawer';
+import { VelocidadesModal } from './VelocidadesModal';
 
 const POR_PAGINA = 25;
 const GUION = '—';
@@ -57,7 +57,9 @@ function normalizar(texto: string): string {
 
 /**
  * Pestaña "Productos y velocidades" (Figma 2165:11984): maestro de productos
- * arriba y, al seleccionar una fila, la matriz producto × 9 líneas debajo.
+ * arriba; «Ver velocidades» en el menú de cada fila abre `VelocidadesModal`
+ * con la matriz producto × 9 líneas (decisión 4-sep-2026: reemplaza el panel
+ * fijo bajo la tabla, que obligaba a bajar y resaltar la fila).
  *
  * El listado y la matriz comparten una sola consulta de pares
  * (`useVelocidadesEstandar()` sin filtros, 340 filas): la columna «Líneas con
@@ -75,11 +77,8 @@ export function ProductosVelocidadesTab() {
   const [busqueda, setBusqueda] = React.useState('');
   const [estado, setEstado] = React.useState<FiltroEstado>(TODOS);
   const [pagina, setPagina] = React.useState(1);
-  const [seleccionadoId, setSeleccionadoId] = React.useState<string>();
-  const matrizRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    if (seleccionadoId) matrizRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [seleccionadoId]);
+  /** Producto cuyo modal de velocidades está abierto (o a punto de abrirse). */
+  const [verVelocidadesId, setVerVelocidadesId] = React.useState<string>();
   const [drawer, setDrawer] = React.useState<{ producto?: Producto }>();
   const [eliminar, setEliminar] = React.useState<Producto>();
 
@@ -116,10 +115,10 @@ export function ProductosVelocidadesTab() {
   /* Cualquier cambio de filtro vuelve a la primera página. */
   React.useEffect(() => setPagina(1), [filtro, estado]);
 
-  const seleccionado = todos.find((p) => p.id === seleccionadoId);
-  const paresSeleccionado = React.useMemo(
-    () => (seleccionado ? pares.filter((par) => par.productoId === seleccionado.id) : []),
-    [pares, seleccionado],
+  const productoModal = todos.find((p) => p.id === verVelocidadesId);
+  const paresModal = React.useMemo(
+    () => (productoModal ? pares.filter((par) => par.productoId === productoModal.id) : []),
+    [pares, productoModal],
   );
 
   const activar = async (producto: Producto) => {
@@ -252,15 +251,13 @@ export function ProductosVelocidadesTab() {
               <TBody>
                 {visibles.map((p) => {
                   const conVelocidad = lineasPorProducto.get(p.id) ?? 0;
-                  const activo = p.id === seleccionadoId;
                   return (
-                    <TRow key={p.id} selected={activo}>
+                    <TRow key={p.id}>
                       <TCell className="font-medium tabular">{p.codigo}</TCell>
                       <TCell>
                         <button
                           type="button"
-                          aria-pressed={activo}
-                          onClick={() => setSeleccionadoId(activo ? undefined : p.id)}
+                          onClick={() => setVerVelocidadesId(p.id)}
                           className="min-w-0 max-w-full truncate rounded-xs text-left hover:underline focus-visible:shadow-focus focus-visible:outline-none"
                         >
                           {p.nombre}
@@ -292,7 +289,7 @@ export function ProductosVelocidadesTab() {
                             <Icon name="dots-horizontal" size={18} />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
-                            <DropdownMenuItem onSelect={() => setSeleccionadoId(p.id)}>
+                            <DropdownMenuItem onSelect={() => setVerVelocidadesId(p.id)}>
                               <Icon name="gauge" size={16} />
                               Ver velocidades
                             </DropdownMenuItem>
@@ -349,28 +346,20 @@ export function ProductosVelocidadesTab() {
         )}
       </section>
 
-      {/* La matriz vive bajo la tabla: al elegir "Ver velocidades" desde una
-          fila alta hay que llevar al usuario hasta ella, o el cambio pasa
-          desapercibido. */}
-      <div ref={matrizRef}>
-      {!cargando &&
-        (seleccionado ? (
-          <MatrizVelocidades
-            producto={seleccionado}
-            lineas={lineas?.data ?? []}
-            pares={paresSeleccionado}
-            cargando={velocidades.isFetching && paresSeleccionado.length === 0}
-          />
-        ) : (
-          todos.length > 0 && (
-            <EmptyState
-              icon={<Icon name="gauge" size={40} />}
-              title="Selecciona un producto para ver su matriz de velocidades"
-              description="La matriz muestra las 9 líneas agrupadas por tipo de proceso y permite crear el par que falte."
-            />
-          )
-        ))}
-      </div>
+      {productoModal && (
+        <VelocidadesModal
+          open
+          onOpenChange={(abierto) => {
+            if (!abierto) setVerVelocidadesId(undefined);
+          }}
+          producto={productoModal}
+          lineas={lineas?.data ?? []}
+          pares={paresModal}
+          cargando={velocidades.isFetching && paresModal.length === 0}
+          error={Boolean(velocidades.error)}
+          onReintentar={() => void velocidades.refetch()}
+        />
+      )}
 
       <ProductoDrawer
         open={drawer !== undefined}
@@ -388,7 +377,7 @@ export function ProductosVelocidadesTab() {
           }}
           producto={eliminar}
           onEliminado={() => {
-            if (seleccionadoId === eliminar.id) setSeleccionadoId(undefined);
+            if (verVelocidadesId === eliminar.id) setVerVelocidadesId(undefined);
             setEliminar(undefined);
           }}
         />

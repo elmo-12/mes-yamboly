@@ -47,6 +47,8 @@ export function CausaParadaDetalle({
       tiempoEstandarMin: causa.tiempoEstandarMin,
       lineasAplicables: causa.lineasAplicables,
       estado: causa.estado,
+      /* Trazabilidad interna con el maestro legado: se conserva al guardar,
+         pero ya no se muestra en la ficha. */
       codigoLegado: causa.codigoLegado ?? null,
     }),
     [causa],
@@ -108,19 +110,6 @@ export function CausaParadaDetalle({
         {
           label: <EtiquetaCampo titulo="Código" apoyo="Formato TT-GG-EE · no editable" />,
           value: <span className="font-medium tabular">{causa.codigo}</span>,
-        },
-        {
-          label: (
-            <EtiquetaCampo
-              titulo="Código del sistema anterior"
-              apoyo="Trazabilidad con el maestro legado (RUT04, FAL02…)"
-            />
-          ),
-          value: (
-            <span className="font-medium tabular text-text-secondary">
-              {causa.codigoLegado ?? 'Sin código legado'}
-            </span>
-          ),
         },
         {
           label: (
