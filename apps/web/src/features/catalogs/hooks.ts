@@ -161,11 +161,20 @@ export function useBajaProducto() {
 /* Velocidades estándar (par producto × línea)                         */
 /* ------------------------------------------------------------------ */
 
-export function useVelocidadesEstandar(filtros: VelocidadEstandarFiltros = {}) {
+/**
+ * @param opciones `enabled: false` evita traer la matriz completa (340 pares)
+ *   desde pantallas que sólo necesitan el par de un producto × línea concreto
+ *   (p. ej. `IniciarOrdenWizard`, montado siempre en `/tiempo-real`).
+ */
+export function useVelocidadesEstandar(
+  filtros: VelocidadEstandarFiltros = {},
+  opciones: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: queryKeys.catalogs.velocidadesList(clave(filtros)),
     queryFn: () => catalogsApi.velocidadesEstandar(filtros),
     staleTime: CATALOGO_STALE,
+    enabled: opciones.enabled ?? true,
   });
 }
 

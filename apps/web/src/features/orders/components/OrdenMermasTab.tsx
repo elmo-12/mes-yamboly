@@ -34,7 +34,7 @@ export function OrdenMermasTab({ mermas, resumen, cargando }: OrdenMermasTabProp
     <div className="flex flex-col gap-4">
       <SectionTitle
         title="Mermas registradas"
-        description="Clasificadas por tipo (MP · EP · PT) y causa codificada MR-01…MR-04 (RF4)."
+        description="Clasificadas por tipo (MP · EP · PT) y por el árbol tipo de producción › clasificación › causa."
       />
 
       {cargando ? (
@@ -75,7 +75,14 @@ export function OrdenMermasTab({ mermas, resumen, cargando }: OrdenMermasTabProp
                     {formatKg(m.cantidadKg)}
                   </TCell>
                   <TCell className="text-neutral-text">{m.sabor}</TCell>
-                  <TCell>{`${m.causaCodigo} ${m.causaNombre}`}</TCell>
+                  <TCell>
+                    <span className="block">{`${m.causaCodigo} ${m.causaNombre}`}</span>
+                    {(m.tipoCausaNombre ?? m.clasificacionNombre) && (
+                      <span className="block text-body-sm text-text-secondary">
+                        {[m.tipoCausaNombre, m.clasificacionNombre].filter(Boolean).join(' › ')}
+                      </span>
+                    )}
+                  </TCell>
                   <TCell className="text-neutral-text">{m.responsableNombre}</TCell>
                   <TCell className="text-neutral-text">{m.codigoBalde ?? '—'}</TCell>
                   <TCell>

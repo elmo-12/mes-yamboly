@@ -15,7 +15,7 @@ import {
   cn,
   toast,
 } from '@mes/ui';
-import { computeOee, formatNumber, formatPct } from '@mes/shared';
+import { computeOee, formatNumber, formatPct, formatSpeed } from '@mes/shared';
 import { finalizeOrdenSchema, type FinalizeOrdenInput } from '@mes/types';
 import { useFinalizarOrden, useOrden, useOrdenMermas, useOrdenParadas } from '@/features/orders/hooks';
 import type { ContextoLinea } from '../tipos';
@@ -77,13 +77,15 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
   const dentroDeTolerancia = diferenciaPct <= TOLERANCIA_CONTEO_PCT;
   const paradasMin = paradas?.resumen.minutos ?? 0;
   const mermaKg = mermas?.resumen.kg ?? 0;
+  /* Estándar congelado en la orden al iniciarla (u/min del par producto × línea). */
+  const velocidadEstandar = orden?.velocidadEstandar ?? contexto.velocidadEstandar;
 
   const oee = computeOee({
     tiempoPlanificadoMin: MINUTOS_TURNO,
     paradasMin,
     unidadesProducidas: producido,
     unidadesBuenas: Math.min(producido, conteo),
-    velocidadEstandar: orden?.velocidadEstandar ?? contexto.velocidadEstandar,
+    velocidadEstandar,
   });
 
   const guardar = form.handleSubmit(async (values) => {
@@ -193,7 +195,7 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
               <MiniKpi
                 label="Rendimiento"
                 value={formatPct(oee.desempeno)}
-                nota={`objetivo ${orden?.velocidadEstandar ?? contexto.velocidadEstandar} u/min`}
+                nota={`objetivo ${formatSpeed(velocidadEstandar, 1)}`}
               />
               <MiniKpi
                 label="Calidad"

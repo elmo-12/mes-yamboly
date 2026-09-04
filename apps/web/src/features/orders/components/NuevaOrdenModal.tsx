@@ -7,8 +7,14 @@ import { z } from 'zod';
 import { Button, Input, Modal, ModalContent, Select, toast } from '@mes/ui';
 import { TURNOS, TURNO_LABEL, createOrdenSchema } from '@mes/types';
 import type { CreateOrdenInput } from '@mes/types';
-import { addDays, toIsoDate } from '@mes/shared';
-import { useLineas, useProductos, useUsuarios } from '@/features/catalogs/hooks';
+import { addDays, formatNumber, formatSpeed, toIsoDate, turnoPorHora } from '@mes/shared';
+import {
+  useLineas,
+  useProductos,
+  useUsuarios,
+  useVelocidadesEstandar,
+} from '@/features/catalogs/hooks';
+import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
 import { useCrearOrden } from '../hooks';
 
 /** Campos visibles del modal (spec 04.I reducida a un paso, brief V3 §1). */
@@ -41,15 +47,32 @@ export function NuevaOrdenModal({ open, onOpenChange }: NuevaOrdenModalProps) {
     handleSubmit,
     watch,
     reset,
+    setError,
+    clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<NuevaOrdenInput>({
     resolver: zodResolver(nuevaOrdenSchema),
     /* `planificado` se deja sin valor para que el campo salga vacío. */
-    defaultValues: { lineaId: '', productoId: '', codigo: '', lote: '', turno: 'D' },
+    defaultValues: {
+      lineaId: '',
+      productoId: '',
+      codigo: '',
+      lote: '',
+      /* Turno sugerido por la hora de planta: D 06:00–18:00 · N 18:00–06:00. */
+      turno: turnoPorHora(new Date().getHours()),
+    },
   });
 
   const lineaId = watch('lineaId');
-  const { data: productos } = useProductos(lineaId || undefined);
+  const productoId = watch('productoId');
+  /* Sólo productos con par producto × línea activo en la línea elegida. */
+  const { data: productos } = useProductos({ lineaId: lineaId || undefined });
+  /* La velocidad estándar vive en el par, nunca en el producto. */
+  const { data: pares } = useVelocidadesEstandar(
+    { productoId, lineaId, estado: 'activo' },
+    { enabled: Boolean(productoId && lineaId) },
+  );
+  const par = pares?.data.find((v) => v.productoId === productoId && v.lineaId === lineaId);
 
   React.useEffect(() => {
     if (!open) reset();
@@ -85,8 +108,13 @@ export function NuevaOrdenModal({ open, onOpenChange }: NuevaOrdenModalProps) {
       });
       onOpenChange(false);
     } catch (error) {
+      /* 422: p. ej. `productoId` sin velocidad estándar en la línea elegida. */
+      const campos = aplicarErroresApi<NuevaOrdenInput>(error, setError);
       toast.error('No se pudo crear la orden', {
-        description: error instanceof Error ? error.message : 'Revisa los datos e inténtalo de nuevo.',
+        description:
+          campos.length > 0
+            ? 'Revisa los campos marcados.'
+            : mensajeDeError(error, 'Revisa los datos e inténtalo de nuevo.'),
       });
     }
   });
@@ -117,7 +145,10 @@ export function NuevaOrdenModal({ open, onOpenChange }: NuevaOrdenModalProps) {
                 placeholder="Selecciona una línea"
                 options={opcionesLinea}
                 value={field.value}
-                onValueChange={field.onChange}
+                onValueChange={(v) => {
+                  field.onChange(v);
+                  clearErrors('productoId');
+                }}
                 destructive={Boolean(errors.lineaId)}
                 hint={errors.lineaId?.message}
               />
@@ -132,10 +163,18 @@ export function NuevaOrdenModal({ open, onOpenChange }: NuevaOrdenModalProps) {
                 placeholder={lineaId ? 'Selecciona un producto' : 'Elige primero la línea'}
                 options={opcionesProducto}
                 value={field.value}
-                onValueChange={field.onChange}
+                onValueChange={(v) => {
+                  field.onChange(v);
+                  clearErrors('productoId');
+                }}
                 disabled={!lineaId}
                 destructive={Boolean(errors.productoId)}
-                hint={errors.productoId?.message}
+                hint={
+                  errors.productoId?.message ??
+                  (par
+                    ? `Velocidad estándar ${formatSpeed(par.velocidadUnidMin, 1)} · ${formatNumber(par.velocidadUnidHora)} u/h`
+                    : undefined)
+                }
               />
             )}
           />

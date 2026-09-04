@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
   Button,
   Checkbox,
@@ -15,19 +16,28 @@ import {
   Select,
   Stepper,
   Tag,
+  Textarea,
   TimerChip,
   cn,
   toast,
 } from '@mes/ui';
-import { TIPOS_MERMA, TIPO_MERMA_LABEL, createMermaSchema, type CreateMermaInput } from '@mes/types';
+import {
+  TIPOS_MERMA,
+  TIPO_MERMA_LABEL,
+  createMermaSchema,
+  type CausaMermaNodo,
+  type CreateMermaInput,
+  type TipoMermaCodigo,
+} from '@mes/types';
 import { formatNumber } from '@mes/shared';
-import { useCausasMerma, usePersonas, useProductos } from '@/features/catalogs/hooks';
+import { useCausasMermaArbol, usePersonas, useSabores } from '@/features/catalogs/hooks';
 import { useCrearMerma } from '@/features/scrap/hooks';
 import { useSession } from '@/hooks/use-session';
 import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
-import { etiquetaCausa } from '../causas';
+import { etiquetaCausa, tiposDeMerma } from '../causas';
 import type { ContextoLinea } from '../tipos';
 import { formatTriCorto, useTriTimer } from '../use-tri-timer';
+import { AdjuntarFoto } from './AdjuntarFoto';
 import { ContextoCaptura } from './ContextoCaptura';
 import { TecladoNumerico } from './TecladoNumerico';
 
@@ -35,8 +45,59 @@ const PASOS = [{ label: 'Tipo' }, { label: 'Causa' }, { label: 'Confirmar' }] as
 
 const CAMPOS_PASO: Record<number, (keyof CreateMermaInput)[]> = {
   0: ['tipo', 'cantidadKg', 'sabor'],
-  1: ['causaId', 'responsableId'],
+  1: ['tipoCausaId', 'clasificacionId', 'causaId', 'responsableId'],
 };
+
+/** Paso al que hay que volver cuando el 422 del servidor señala un campo. */
+function pasoDelCampo(campo: string): number {
+  for (const [paso, campos] of Object.entries(CAMPOS_PASO)) {
+    if ((campos as string[]).includes(campo)) return Number(paso);
+  }
+  return 1;
+}
+
+/** Un nodo aplica al tipo de merma elegido (`aplicaA` vacío = todos). */
+function aplicaAlTipo(nodo: CausaMermaNodo, tipo: TipoMermaCodigo): boolean {
+  return nodo.estado === 'activo' && (nodo.aplicaA.length === 0 || nodo.aplicaA.includes(tipo));
+}
+
+/**
+ * Reglas que dependen del catálogo (`requiereComentario` / `requiereSolicitud`
+ * / `requiereEvidencia` de la causa elegida) y que por eso no viven en
+ * `createMermaSchema`. Espejo del 422 de `ScrapService.validarCausa`.
+ */
+function reglasDeCausa(causa: CausaMermaNodo | undefined) {
+  return z
+    .object({
+      observacion: z.string().optional(),
+      numeroSolicitud: z.string().optional(),
+      evidencia: z.string().optional(),
+    })
+    .superRefine((valores, ctx) => {
+      if (!causa) return;
+      if (causa.requiereComentario && !valores.observacion?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['observacion'],
+          message: `La causa ${causa.codigo} exige un comentario`,
+        });
+      }
+      if (causa.requiereSolicitud && !valores.numeroSolicitud?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['numeroSolicitud'],
+          message: `La causa ${causa.codigo} exige un n.º de solicitud`,
+        });
+      }
+      if (causa.requiereEvidencia && !valores.evidencia) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['evidencia'],
+          message: `La causa ${causa.codigo} exige una foto de evidencia`,
+        });
+      }
+    });
+}
 
 export interface MermaWizardProps {
   contexto: ContextoLinea;
@@ -51,10 +112,13 @@ export interface MermaWizardProps {
 export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProps) {
   const [paso, setPaso] = React.useState(0);
   const [cantidadTexto, setCantidadTexto] = React.useState('');
+  const [fotoNombre, setFotoNombre] = React.useState<string>();
+  const [errorEvidencia, setErrorEvidencia] = React.useState<string>();
   const tri = useTriTimer(abierto);
   const { user } = useSession();
-  const { data: causas } = useCausasMerma();
-  const { data: productos } = useProductos(contexto.lineaId);
+  /* El árbol llega ya filtrado por `lineasAplicables` de la línea del contexto. */
+  const { data: arbol } = useCausasMermaArbol({ lineaId: contexto.lineaId });
+  const { data: sabores } = useSabores({ estado: 'activo' });
   const { data: personas } = usePersonas();
   const crear = useCrearMerma();
 
@@ -72,10 +136,14 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
       lineaId: ctx.lineaId,
       tipo: 'EP',
       cantidadKg: 0,
-      sabor: ctx.productoNombre ?? '',
+      /* El sabor sale del catálogo (41 reales), no del producto de la OF. */
+      sabor: '',
+      tipoCausaId: '',
+      clasificacionId: null,
       causaId: '',
       responsableId: usuarioIdRef.current ?? '',
       codigoBalde: '',
+      numeroSolicitud: '',
       enviarPasteurizacion: false,
       observacion: '',
       tiempoRegistroSeg: 0,
@@ -92,14 +160,56 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
     if (!abierto) return;
     setPaso(0);
     setCantidadTexto('');
+    setFotoNombre(undefined);
+    setErrorEvidencia(undefined);
     form.reset(defaults());
   }, [abierto, defaults, form]);
 
   const valores = form.watch();
   const errores = form.formState.errors;
-  const causasAplicables = (causas?.data ?? []).filter((c) => c.aplicaA.includes(valores.tipo));
-  const causaActual = causasAplicables.find((c) => c.id === valores.causaId);
+
+  /* Selector jerárquico tipo → clasificación → causa (igual que en paradas). */
+  const tipos = React.useMemo(
+    () => tiposDeMerma(arbol?.data ?? []).filter((t) => aplicaAlTipo(t, valores.tipo)),
+    [arbol, valores.tipo],
+  );
+  const tipoActual = tipos.find((t) => t.id === valores.tipoCausaId);
+  const clasificaciones = React.useMemo(
+    () =>
+      (tipoActual?.hijos ?? []).filter(
+        (c) =>
+          c.nivel === 'clasificacion' &&
+          aplicaAlTipo(c, valores.tipo) &&
+          c.hijos.some((hoja) => hoja.nivel === 'causa' && aplicaAlTipo(hoja, valores.tipo)),
+      ),
+    [tipoActual, valores.tipo],
+  );
+  const clasificacionActual = clasificaciones.find((c) => c.id === valores.clasificacionId);
+  const causasHoja = React.useMemo(
+    () =>
+      (clasificacionActual?.hijos ?? []).filter(
+        (c) => c.nivel === 'causa' && aplicaAlTipo(c, valores.tipo),
+      ),
+    [clasificacionActual, valores.tipo],
+  );
+  const causaActual = causasHoja.find((c) => c.id === valores.causaId);
   const responsable = personas?.data.find((p) => p.id === valores.responsableId);
+
+  /* El catálogo decide qué exige cada causa (mismo contrato que en paradas). */
+  const requiereComentario = Boolean(causaActual?.requiereComentario);
+  const requiereSolicitud = Boolean(causaActual?.requiereSolicitud);
+  const requiereEvidencia = Boolean(causaActual?.requiereEvidencia);
+
+  /** Cambiar de nivel invalida los inferiores: el par debe quedar consistente. */
+  const elegirTipoCausa = (id: string) => {
+    /* Vaciar no debe pintar el error de "obligatorio" antes de llegar al paso. */
+    form.setValue('tipoCausaId', id, { shouldValidate: id !== '' });
+    form.setValue('clasificacionId', null);
+    form.setValue('causaId', '');
+    form.clearErrors(['clasificacionId', 'causaId', 'observacion', 'numeroSolicitud']);
+    if (id === '') form.clearErrors('tipoCausaId');
+    setErrorEvidencia(undefined);
+  };
 
   const escribirCantidad = (texto: string) => {
     const limpio = texto.replace(/[^0-9,]/g, '').replace(/(,.*),/g, '$1').slice(0, 7);
@@ -109,7 +219,36 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
 
   const siguiente = async () => {
     const ok = await form.trigger(CAMPOS_PASO[paso] ?? []);
-    if (ok) setPaso((p) => p + 1);
+    if (!ok) return;
+    if (paso === 1) {
+      if (clasificaciones.length > 0 && !valores.clasificacionId) {
+        form.setError('clasificacionId', {
+          type: 'required',
+          message: 'Selecciona la clasificación',
+        });
+        return;
+      }
+      const extra = reglasDeCausa(causaActual).safeParse({
+        observacion: valores.observacion,
+        numeroSolicitud: valores.numeroSolicitud,
+        evidencia: fotoNombre,
+      });
+      setErrorEvidencia(undefined);
+      if (!extra.success) {
+        for (const incidencia of extra.error.issues) {
+          const campo = String(incidencia.path[0]);
+          if (campo === 'evidencia') setErrorEvidencia(incidencia.message);
+          else {
+            form.setError(campo as 'observacion' | 'numeroSolicitud', {
+              type: 'required',
+              message: incidencia.message,
+            });
+          }
+        }
+        return;
+      }
+    }
+    setPaso((p) => p + 1);
   };
 
   const guardar = form.handleSubmit(async (values) => {
@@ -119,15 +258,21 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
         ...values,
         codigoBalde: values.codigoBalde || undefined,
         observacion: values.observacion || undefined,
+        numeroSolicitud: values.numeroSolicitud || undefined,
         tiempoRegistroSeg: segundos,
       });
       toast.success(`Merma registrada en ${formatTriCorto(segundos)}`);
       onOpenChange(false);
     } catch (e) {
+      /* 422: el backend detalla el campo (causa fuera del tipo, comentario o
+         n.º de solicitud exigidos); se pinta bajo el campo y se vuelve al paso. */
       const campos = aplicarErroresApi<CreateMermaInput>(e, form.setError);
-      toast.error(
-        campos.length > 0 ? 'Revisa los campos marcados' : mensajeDeError(e, 'No se pudo registrar la merma'),
-      );
+      if (campos.length > 0) {
+        setPaso(pasoDelCampo(campos[0] as string));
+        toast.error('Revisa los campos marcados', { description: 'La merma no se registró.' });
+      } else {
+        toast.error(mensajeDeError(e, 'No se pudo registrar la merma'));
+      }
     }
   });
 
@@ -196,7 +341,8 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
                     selected={valores.tipo === t}
                     onClick={() => {
                       form.setValue('tipo', t, { shouldValidate: true });
-                      form.setValue('causaId', '');
+                      /* Cambiar MP/EP/PT cambia las causas aplicables. */
+                      elegirTipoCausa('');
                     }}
                   >
                     {`${t} · ${TIPO_MERMA_LABEL[t]}`}
@@ -233,13 +379,13 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
                     name="sabor"
                     render={({ field }) => (
                       <Select
-                        label="Sabor / producto"
-                        hint={errores.sabor?.message ?? 'Precargado desde la OF'}
-                        placeholder="Selecciona el producto"
+                        label="Sabor"
+                        hint={errores.sabor?.message ?? 'Catálogo de sabores de planta'}
+                        placeholder="Selecciona el sabor"
                         destructive={Boolean(errores.sabor)}
-                        options={(productos?.data ?? []).map((p) => ({
-                          value: p.nombre,
-                          label: p.nombre,
+                        options={(sabores?.data ?? []).map((s) => ({
+                          value: s.nombre,
+                          label: s.nombre,
                         }))}
                         value={field.value}
                         onValueChange={field.onChange}
@@ -267,20 +413,67 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
               />
               <p className="text-h4 text-text-primary">¿Cuál fue la causa?</p>
               <div className="flex flex-wrap gap-2">
-                {causasAplicables.map((c) => (
+                {tipos.map((t) => (
                   <Tag
-                    key={c.id}
+                    key={t.id}
                     size="lg"
-                    selected={valores.causaId === c.id}
-                    onClick={() => form.setValue('causaId', c.id, { shouldValidate: true })}
+                    selected={valores.tipoCausaId === t.id}
+                    onClick={() => elegirTipoCausa(t.id)}
                   >
-                    {etiquetaCausa(c)}
+                    {etiquetaCausa(t)}
                   </Tag>
                 ))}
               </div>
-              {errores.causaId && (
-                <p className="text-body-sm text-error-text">{errores.causaId.message}</p>
+              {errores.tipoCausaId && (
+                <p className="text-body-sm text-error-text">{errores.tipoCausaId.message}</p>
               )}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Controller
+                  control={form.control}
+                  name="clasificacionId"
+                  render={({ field }) => (
+                    <Select
+                      label="Clasificación"
+                      hint={errores.clasificacionId?.message ?? 'Nivel intermedio del árbol'}
+                      placeholder={tipoActual ? 'Selecciona la clasificación' : 'Elige primero el tipo'}
+                      disabled={!tipoActual}
+                      destructive={Boolean(errores.clasificacionId)}
+                      options={clasificaciones.map((c) => ({
+                        value: c.id,
+                        label: etiquetaCausa(c),
+                      }))}
+                      value={field.value ?? ''}
+                      onValueChange={(v) => {
+                        field.onChange(v);
+                        form.setValue('causaId', '');
+                        form.clearErrors(['clasificacionId', 'causaId']);
+                      }}
+                    />
+                  )}
+                />
+                <Controller
+                  control={form.control}
+                  name="causaId"
+                  render={({ field }) => (
+                    <Select
+                      label="Causa"
+                      hint={errores.causaId?.message ?? 'Catálogo codificado de mermas'}
+                      placeholder={
+                        clasificacionActual ? 'Selecciona la causa' : 'Elige primero la clasificación'
+                      }
+                      disabled={!clasificacionActual}
+                      destructive={Boolean(errores.causaId)}
+                      options={causasHoja.map((c) => ({ value: c.id, label: etiquetaCausa(c) }))}
+                      value={field.value}
+                      onValueChange={(v) => {
+                        field.onChange(v);
+                        form.clearErrors(['observacion', 'numeroSolicitud']);
+                        setErrorEvidencia(undefined);
+                      }}
+                    />
+                  )}
+                />
+              </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Controller
                   control={form.control}
@@ -308,6 +501,56 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
                   {...form.register('codigoBalde')}
                 />
               </div>
+              {(requiereSolicitud || requiereEvidencia) && (
+                <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2">
+                  {requiereSolicitud && (
+                    <Input
+                      label="N.º de solicitud"
+                      placeholder="SM-4471"
+                      hint={
+                        errores.numeroSolicitud?.message ??
+                        `Obligatorio para ${causaActual ? causaActual.codigo : 'esta causa'}`
+                      }
+                      destructive={Boolean(errores.numeroSolicitud)}
+                      {...form.register('numeroSolicitud')}
+                    />
+                  )}
+                  {requiereEvidencia && (
+                    <div className="flex flex-col gap-1.5">
+                      <AdjuntarFoto
+                        label="Evidencia (foto)"
+                        cta="Adjuntar foto"
+                        value={fotoNombre}
+                        onChange={(nombre) => {
+                          setFotoNombre(nombre);
+                          setErrorEvidencia(undefined);
+                        }}
+                      />
+                      <p
+                        className={cn(
+                          'text-body-sm',
+                          errorEvidencia ? 'text-error-text' : 'text-text-secondary',
+                        )}
+                      >
+                        {errorEvidencia ?? 'Obligatoria para esta causa'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              <Textarea
+                rows={2}
+                label={requiereComentario ? 'Observación' : 'Observación (opcional)'}
+                placeholder="Describe qué ocurrió con el producto"
+                hint={
+                  errores.observacion?.message ??
+                  (requiereComentario
+                    ? `Obligatoria para ${causaActual ? causaActual.codigo : 'esta causa'}`
+                    : 'Máximo 300 caracteres')
+                }
+                destructive={Boolean(errores.observacion)}
+                {...form.register('observacion')}
+              />
               <Controller
                 control={form.control}
                 name="enviarPasteurizacion"
@@ -336,8 +579,22 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
                       value: `${valores.tipo} · ${TIPO_MERMA_LABEL[valores.tipo]}`,
                     },
                     { label: 'Cantidad', value: `${formatNumber(valores.cantidadKg, 1)} kg` },
-                    { label: 'Sabor / producto', value: valores.sabor },
+                    { label: 'Sabor', value: valores.sabor || '—' },
+                    {
+                      label: 'Tipo de producción',
+                      value: tipoActual ? etiquetaCausa(tipoActual) : '—',
+                    },
+                    {
+                      label: 'Clasificación',
+                      value: clasificacionActual ? etiquetaCausa(clasificacionActual) : '—',
+                    },
                     { label: 'Causa', value: causaActual ? etiquetaCausa(causaActual) : '—' },
+                    ...(valores.numeroSolicitud
+                      ? [{ label: 'N.º de solicitud', value: valores.numeroSolicitud }]
+                      : []),
+                    ...(valores.observacion
+                      ? [{ label: 'Observación', value: valores.observacion }]
+                      : []),
                     {
                       label: 'Responsable',
                       value: responsable ? `${responsable.nombre} · ${responsable.cargo}` : '—',
@@ -346,7 +603,7 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
                     {
                       label: 'Pasteurización',
                       value: valores.enviarPasteurizacion
-                        ? 'Se enviará al Pasteurizador PT-01'
+                        ? 'Se enviará al almacén de mermas recuperables'
                         : 'No aplica',
                     },
                   ]}

@@ -17,13 +17,14 @@ import {
   toast,
 } from '@mes/ui';
 import { createOrdenSchema, type CreateOrdenInput } from '@mes/types';
-import { formatDurationMin, formatNumber } from '@mes/shared';
+import { formatDurationMin, formatNumber, formatSpeed, turnoPorHora } from '@mes/shared';
 import {
   useColaboradores,
   useLineas,
   usePersonas,
   useProductos,
   useTurnos,
+  useVelocidadesEstandar,
 } from '@/features/catalogs/hooks';
 import { useCrearOrden, useOrdenes } from '@/features/orders/hooks';
 import { useSession } from '@/hooks/use-session';
@@ -36,6 +37,14 @@ const CAMPOS_PASO: Record<number, (keyof CreateOrdenInput)[]> = {
   0: ['lineaId', 'productoId', 'codigo', 'turno', 'lote', 'vencimiento', 'planificado'],
   1: ['maquinistaId', 'supervisorId', 'operarios'],
 };
+
+/** Paso al que hay que volver cuando el 422 del servidor señala un campo. */
+function pasoDelCampo(campo: string): number {
+  for (const [paso, campos] of Object.entries(CAMPOS_PASO)) {
+    if ((campos as string[]).includes(campo)) return Number(paso);
+  }
+  return 0;
+}
 
 /** `OF-2026-0815` → `OF-2026-0816`. */
 function siguienteCodigo(ultimo: string | undefined): string {
@@ -50,6 +59,11 @@ function loteSugerido(): string {
   const hoy = new Date();
   const yy = String(hoy.getFullYear()).slice(2);
   return `L-${yy}${String(hoy.getMonth() + 1).padStart(2, '0')}${String(hoy.getDate()).padStart(2, '0')}-01`;
+}
+
+/** Turno sugerido por la hora de planta: `D` 06:00–18:00 · `N` 18:00–06:00. */
+function turnoSugerido(): CreateOrdenInput['turno'] {
+  return turnoPorHora(new Date().getHours());
 }
 
 function vencimientoSugerido(meses = 18): string {
@@ -89,7 +103,7 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
       codigo: '',
       lote: loteSugerido(),
       vencimiento: vencimientoSugerido(),
-      turno: 'M',
+      turno: turnoSugerido(),
       planificado: 0,
       maquinistaId: '',
       supervisorId: '',
@@ -100,7 +114,16 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
 
   const valores = form.watch();
   const errores = form.formState.errors;
-  const { data: productos } = useProductos(valores.lineaId || undefined);
+  /* Sólo productos con par producto × línea activo en la línea elegida. */
+  const { data: productos } = useProductos({ lineaId: valores.lineaId || undefined });
+  /* La velocidad estándar vive en el par, nunca en el producto. */
+  const { data: pares } = useVelocidadesEstandar(
+    { productoId: valores.productoId, lineaId: valores.lineaId, estado: 'activo' },
+    { enabled: Boolean(valores.productoId && valores.lineaId) },
+  );
+  const par = pares?.data.find(
+    (v) => v.productoId === valores.productoId && v.lineaId === valores.lineaId,
+  );
   const producto = productos?.data.find((p) => p.id === valores.productoId);
   const linea = lineas?.data.find((l) => l.id === valores.lineaId);
   const turno = turnos?.data.find((t) => t.codigo === valores.turno);
@@ -117,7 +140,7 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
       codigo: codigoSugerido,
       lote: loteSugerido(),
       vencimiento: vencimientoSugerido(),
-      turno: 'M',
+      turno: turnoSugerido(),
       planificado: 0,
       maquinistaId: '',
       supervisorId: '',
@@ -136,7 +159,12 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
   /* `register` guarda el valor como texto: se normaliza antes de calcular. */
   const planificado = Number(valores.planificado) || 0;
   const operarios = Number(valores.operarios) || 0;
-  const minutosEstimados = producto && planificado > 0 ? planificado / producto.velocidadEstandar : 0;
+  /* El estándar del par está en u/min: unidades ÷ u/min = minutos. */
+  const minutosEstimados =
+    par && par.velocidadUnidMin > 0 && planificado > 0 ? planificado / par.velocidadUnidMin : 0;
+  const velocidadTexto = par
+    ? `${formatSpeed(par.velocidadUnidMin, 1)} · ${formatNumber(par.velocidadUnidHora)} u/h`
+    : undefined;
 
   const siguiente = async () => {
     const ok = await form.trigger(CAMPOS_PASO[paso] ?? []);
@@ -150,10 +178,15 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
       toast.success(`Orden ${orden.codigo} iniciada en ${formatTriCorto(segundos)}`);
       onOpenChange(false);
     } catch (e) {
+      /* 422: el backend detalla el campo (p. ej. `productoId` sin velocidad
+         estándar en la línea); se pinta bajo el campo y se vuelve a su paso. */
       const campos = aplicarErroresApi<CreateOrdenInput>(e, form.setError);
-      toast.error(
-        campos.length > 0 ? 'Revisa los campos marcados' : mensajeDeError(e, 'No se pudo iniciar la orden'),
-      );
+      if (campos.length > 0) {
+        setPaso(pasoDelCampo(campos[0] as string));
+        toast.error('Revisa los campos marcados', { description: 'La orden no se inició.' });
+      } else {
+        toast.error(mensajeDeError(e, 'No se pudo iniciar la orden'));
+      }
     }
   });
 
@@ -233,7 +266,9 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
                       value={field.value}
                       onValueChange={(v) => {
                         field.onChange(v);
+                        /* El par producto × línea cambia con la línea. */
                         form.setValue('productoId', '');
+                        form.clearErrors('productoId');
                       }}
                     />
                   )}
@@ -245,9 +280,14 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
                     <Select
                       label="Producto"
                       hint={
-                        producto
-                          ? `Velocidad estándar ${producto.velocidadEstandar} u/min`
-                          : (errores.productoId?.message ?? 'Elige primero la línea')
+                        errores.productoId?.message ??
+                        (velocidadTexto
+                          ? `Velocidad estándar ${velocidadTexto}`
+                          : producto
+                            ? 'Sin velocidad estándar en esta línea'
+                            : valores.lineaId
+                              ? 'Sólo productos con velocidad estándar en la línea'
+                              : 'Elige primero la línea')
                       }
                       placeholder="Selecciona el producto"
                       disabled={!valores.lineaId}
@@ -257,7 +297,10 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
                         label: p.nombre,
                       }))}
                       value={field.value}
-                      onValueChange={field.onChange}
+                      onValueChange={(v) => {
+                        field.onChange(v);
+                        form.clearErrors('productoId');
+                      }}
                     />
                   )}
                 />
@@ -407,7 +450,7 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
                     {
                       label: 'Producto',
                       value: producto
-                        ? `${producto.nombre} · ${producto.velocidadEstandar} u/min`
+                        ? [producto.nombre, velocidadTexto].filter(Boolean).join(' · ')
                         : '—',
                     },
                     { label: 'Turno', value: turno ? `${turno.label} · ${turno.inicio}–${turno.fin}` : '—' },

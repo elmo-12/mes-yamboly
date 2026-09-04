@@ -16,6 +16,11 @@ export interface ContextoLinea {
   turnoLabel: string;
   turnoRango: string;
   velocidad: number;
+  /**
+   * Estándar **en u/min** congelado en la orden en curso al iniciarla (del par
+   * producto × línea). Nunca sale del producto: el mismo producto tiene
+   * velocidades distintas según la línea donde se fabrique.
+   */
   velocidadEstandar: number;
   producido: number;
   plan: number;
