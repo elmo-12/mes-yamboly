@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { EstadoCatalogo, NivelCausaMerma, TipoMermaCodigo } from '@mes/types';
 
 /**
@@ -48,4 +48,10 @@ export class CausaMerma {
   /** Nº de mermas históricas — se conservan aunque se dé de baja la causa. */
   @Column('integer', { default: 0 })
   mermasHistoricas!: number;
+
+  /** FK real sobre `parentId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => CausaMerma, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'parentId' })
+  parent?: CausaMerma | null;
 }

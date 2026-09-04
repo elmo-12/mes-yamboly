@@ -1,4 +1,6 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { ImportacionFuente } from './importacion-fuente.entity';
+import { Linea } from './linea.entity';
 
 /**
  * Solicitud de mantenimiento/merma del sistema externo
@@ -38,4 +40,15 @@ export class SolicitudExterna {
 
   @Column('text', { default: '' })
   descripcion!: string;
+
+  /** FK real sobre `importacionId` — no se carga (los servicios usan la columna escalar). */
+  @ManyToOne(() => ImportacionFuente, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'importacionId' })
+  importacion?: ImportacionFuente | null;
+
+  /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => Linea, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'lineaId' })
+  linea?: Linea | null;
 }

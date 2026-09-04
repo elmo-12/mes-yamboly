@@ -6,6 +6,7 @@ import type { Paginated, RegistroVelocidadListItem } from '@mes/types';
 import { calcDesvioVelocidad } from '@mes/shared';
 import type { AuthUser } from '../../common/decorators/current-user';
 import { TRI_REGISTRO_EVENT, type TriRegistroEvent } from '../../common/events/tri.event';
+import { ValidationException } from '../../common/exceptions/business.exception';
 import { enriquecerVelocidad } from '../../common/mappers/enrich';
 import { LookupsService } from '../../common/mappers/lookups.service';
 import { AuditService } from '../../common/services/audit.service';
@@ -50,6 +51,13 @@ export class SpeedsService {
   async crear(dto: CreateVelocidadDto, usuario: AuthUser): Promise<RegistroVelocidadListItem> {
     const orden = await this.orders.buscar(dto.ordenId);
     const lookups = await this.lookups.load();
+    /* Las validaciones de negocio se adelantan a las FKs: 422 en vez de 500. */
+    if (!lookups.lineas.has(dto.lineaId)) {
+      throw new ValidationException({ lineaId: 'La línea seleccionada no existe' });
+    }
+    if (!lookups.usuarios.has(dto.responsableId)) {
+      throw new ValidationException({ responsableId: 'El responsable indicado no existe' });
+    }
     const velocidadEstandar =
       orden.velocidadEstandar ||
       (LookupsService.parActivo(lookups, orden.productoId, orden.lineaId)?.velocidadUnidMin ?? 0);

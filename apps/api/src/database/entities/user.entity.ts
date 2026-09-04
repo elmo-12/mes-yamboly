@@ -1,5 +1,6 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { Role } from '@mes/types';
+import { Linea } from './linea.entity';
 
 @Entity('usuario')
 export class User {
@@ -48,4 +49,10 @@ export class User {
   /** Hash bcrypt — nunca se expone en las respuestas. */
   @Column('text')
   passwordHash!: string;
+
+  /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => Linea, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'lineaId' })
+  linea?: Linea | null;
 }

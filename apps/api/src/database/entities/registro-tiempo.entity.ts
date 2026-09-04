@@ -1,5 +1,6 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { EtapaMedicion } from '@mes/types';
+import { User } from './user.entity';
 
 /**
  * Anexo 02 — Ficha de registro del tiempo de registro de información (TRI).
@@ -43,4 +44,10 @@ export class RegistroTiempo {
 
   @Column('text', { nullable: true })
   observacion?: string | null;
+
+  /** FK real sobre `usuarioId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'usuarioId' })
+  usuario?: User | null;
 }

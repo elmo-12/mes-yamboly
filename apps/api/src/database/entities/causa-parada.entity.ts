@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { EstadoCatalogo, NivelCausa } from '@mes/types';
 
 @Entity('causa_parada')
@@ -45,4 +45,10 @@ export class CausaParada {
   /** Código del sistema original (`PNP`, `RUT04`, `FAL02`, `IMP10`); `null` si no existía. */
   @Column('text', { nullable: true })
   codigoLegado!: string | null;
+
+  /** FK real sobre `parentId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => CausaParada, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'parentId' })
+  parent?: CausaParada | null;
 }

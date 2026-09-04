@@ -1,5 +1,7 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { EstadoDeteccion } from '@mes/types';
+import { Linea } from './linea.entity';
+import { Parada } from './parada.entity';
 
 @Entity('deteccion_iot')
 export class DeteccionIoT {
@@ -27,4 +29,15 @@ export class DeteccionIoT {
 
   @Column('text')
   texto!: string;
+
+  /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
+  @ManyToOne(() => Linea, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'lineaId' })
+  linea?: Linea | null;
+
+  /** FK real sobre `paradaId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => Parada, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'paradaId' })
+  parada?: Parada | null;
 }

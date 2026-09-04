@@ -1,5 +1,8 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { TipoMermaCodigo } from '@mes/types';
+import { ImportacionFuente } from './importacion-fuente.entity';
+import { Linea } from './linea.entity';
+import { Producto } from './producto.entity';
 
 /**
  * Transferencia de merma registrada en SAP (`plantilla-transferencias-sap.xlsx`).
@@ -43,4 +46,20 @@ export class TransferenciaSap {
 
   @Column('text', { default: '' })
   motivo!: string;
+
+  /** FK real sobre `importacionId` — no se carga (los servicios usan la columna escalar). */
+  @ManyToOne(() => ImportacionFuente, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'importacionId' })
+  importacion?: ImportacionFuente | null;
+
+  /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
+  @ManyToOne(() => Linea, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'lineaId' })
+  linea?: Linea | null;
+
+  /** FK real sobre `productoCodigo` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => Producto, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'productoCodigo', referencedColumnName: 'codigo' })
+  producto?: Producto | null;
 }

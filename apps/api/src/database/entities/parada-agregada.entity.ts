@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { CausaParada } from './causa-parada.entity';
 
 /** Rutinarias · Imprevistas · Fallas (donut de spec 06.B). */
 export type CategoriaParada = 'rutinarias' | 'imprevistas' | 'fallas';
@@ -44,4 +45,10 @@ export class ParadaAgregada {
 
   @Column('integer', { default: 0 })
   orden!: number;
+
+  /** FK real sobre `causaId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => CausaParada, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'causaId' })
+  causa?: CausaParada | null;
 }

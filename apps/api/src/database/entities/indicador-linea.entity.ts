@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { Linea } from './linea.entity';
 
 /**
  * Hecho de OEE por línea (spec 06.A). Guarda las magnitudes crudas del
@@ -37,4 +38,10 @@ export class IndicadorLinea {
 
   @Column('integer', { default: 0 })
   orden!: number;
+
+  /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => Linea, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'lineaId' })
+  linea?: Linea | null;
 }

@@ -1,5 +1,7 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { EstadoCatalogo } from '@mes/types';
+import { Linea } from './linea.entity';
+import { Producto } from './producto.entity';
 
 /**
  * Velocidad estándar del par producto × línea (tabla `producto_linea` del
@@ -43,4 +45,14 @@ export class VelocidadEstandar {
 
   @Column('text', { default: 'activo' })
   estado!: EstadoCatalogo;
+
+  /** FK real sobre `productoId` — no se carga (los servicios usan la columna escalar). */
+  @ManyToOne(() => Producto, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'productoId' })
+  producto?: Producto | null;
+
+  /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
+  @ManyToOne(() => Linea, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'lineaId' })
+  linea?: Linea | null;
 }

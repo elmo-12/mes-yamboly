@@ -1,5 +1,6 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { ClaveCriterioTci, CriterioTCI, TipoRegistroTci, Turno } from '@mes/types';
+import { Linea } from './linea.entity';
 
 /**
  * Anexo 03 — Ficha de evaluación de la calidad de la información (TCI).
@@ -72,4 +73,10 @@ export class EvaluacionCalidad {
 
   @Column('text', { default: '' })
   observacion!: string;
+
+  /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => Linea, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'lineaId' })
+  linea?: Linea | null;
 }
