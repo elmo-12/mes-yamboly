@@ -339,7 +339,7 @@ esta sección.
 | `/evidencia/tci/resumen` | GET | cualquiera | — | `ResumenTCI` (cabecera sin el detalle fila a fila: totales, `porTipo`, `ultimaValidacion`, `fuentes`) | 401 |
 | `/evidencia/tci/:id` | PATCH | `jefe`, `investigador`, `calidad` | `OverrideTciDto { overrides?: {clave: boolean\|null}, observacion? }` — `null` devuelve el criterio a la regla | `EvaluacionTCI` recalculada | 404 · 422 clave de criterio no reconocida / observación > 300 car. |
 | `/evidencia/tsp` | GET | cualquiera | — | `EvidenciaTSP { items[8], invitaciones, respuestas, invitados, promedio, pctAcuerdo, meta, estado, enlace }` | 401 |
-| `/evidencia/tsp/invitaciones` | POST | `jefe`, `investigador` | `CrearInvitacionDto { invitado (3–80 car.), rol? (≤60 car.) }` | `InvitacionTSP { token, invitado, rol?, url, respondida: false, creadaEn }` (201) | 422 nombre corto/largo |
+| `/evidencia/tsp/invitaciones` | POST | `jefe`, `investigador` | `CrearInvitacionDto { usuarioId }` — `invitado`/`rol` se derivan del usuario | `InvitacionTSP { token, usuarioId, invitado, rol?, url, respondida: false, creadaEn }` (201) | 422 `usuarioId` vacío, inexistente o inactivo · 409 el usuario ya tiene invitación |
 | `/evidencia/cfs` | GET | cualquiera | — | `EvidenciaCFS { items[9], cumplidas, totales, porcentaje, meta, estado }` | 401 |
 | `/evidencia/cfs/:id` | PATCH | `jefe`, `investigador` | `VerificacionCfsDto { cumple, observacion? (≤300 car., default '') }` | `{ item: VerificacionCFS, resumen: EvidenciaCFS }` | 404 · 422 |
 | `/evidencia/ep` | GET | cualquiera | — | `EvidenciaEP { registros, prediccionesCorrectas, prediccionesTotales, porcentaje, meta, estado }` | 401 |
@@ -438,7 +438,7 @@ cubierto).
 
 ### TSP — invitaciones + encuesta pública (Anexo 04)
 
-1. `POST /evidencia/tsp/invitaciones { invitado, rol? }` crea una invitación nominal con un **token de un solo uso** y devuelve `{ token, url }` (`url` = enlace público completo, `http://localhost:3000/encuesta/tsp-2026-01`). `NuevaInvitacionModal.tsx` la crea y ofrece copiar el enlace.
+1. `POST /evidencia/tsp/invitaciones { usuarioId }` crea una invitación nominal a un **usuario del MES** (`GET /usuarios`) con un **token de un solo uso**; `invitado` y `rol` se copian de la cuenta (`nombre`, `ROLE_LABEL[rol]`) y devuelve `{ token, url }` (`url` = enlace público completo, `http://localhost:3000/encuesta/tsp-2026-01`). 422 si el usuario no existe o está inactivo; 409 si ya tiene una invitación (pendiente o respondida). `NuevaInvitacionModal.tsx` elige el usuario en un `Select` (activos, excluye a los ya invitados) y ofrece copiar el enlace.
 2. El enlace se comparte fuera del sistema (WhatsApp, papel); `/encuesta/:token` es pública (`@Public()`, sin JWT).
 3. `GET /encuesta/:token` sirve la ficha (8 ítems, sin exponer si ya fue respondida más que con el flag `respondida`); `POST /encuesta/:token { respuestas: number[8], comentario? }` guarda las respuestas (409 si el token ya se usó) y **recalcula el TSP** de inmediato.
 4. `GET /evidencia/tsp` agrega: `invitaciones` (con `respondida`/`respondidaEn`), `respuestas`, `invitados`, `promedio` Likert global (`null` sin respuestas) y `pctAcuerdo` (`PO/PT × 100`, % de respuestas 4 o 5).

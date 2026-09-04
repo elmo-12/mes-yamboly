@@ -193,7 +193,11 @@ export function TspTab({ tsp }: { tsp: EvidenciaTSP }) {
         </div>
       )}
 
-      <NuevaInvitacionModal open={modalAbierto} onOpenChange={setModalAbierto} />
+      <NuevaInvitacionModal
+        open={modalAbierto}
+        onOpenChange={setModalAbierto}
+        invitaciones={tsp.invitaciones}
+      />
     </div>
   );
 }

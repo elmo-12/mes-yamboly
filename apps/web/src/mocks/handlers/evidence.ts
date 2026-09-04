@@ -15,7 +15,7 @@ import type {
   TipoFuenteExterna,
   TipoRegistroTci,
 } from '@mes/types';
-import { TIPOS_FUENTE_EXTERNA, TIPOS_REGISTRO_TCI } from '@mes/types';
+import { ROLE_LABEL, TIPOS_FUENTE_EXTERNA, TIPOS_REGISTRO_TCI } from '@mes/types';
 import {
   METAS_TESIS,
   calcEpOpcional,
@@ -41,6 +41,7 @@ import {
   nextId,
   triActual,
   triPretestPromedio,
+  usuarioPorId,
 } from '../store';
 import {
   ArchivoSinFilasError,
@@ -89,6 +90,7 @@ function evidenciaTri(): EvidenciaTRI {
 function aInvitacion(s: InvitacionTSP): InvitacionTSP {
   return {
     token: s.token,
+    ...(s.usuarioId ? { usuarioId: s.usuarioId } : {}),
     invitado: s.invitado,
     ...(s.rol ? { rol: s.rol } : {}),
     url: `${baseWeb()}/encuesta/${s.token}`,
@@ -520,14 +522,20 @@ export const evidenceHandlers = [
     const prohibido = exigeRol(request, 'jefe', 'investigador');
     if (prohibido) return prohibido;
     const store = getStore();
-    const body = (await request.json()) as { invitado?: string; rol?: string };
-    const invitado = String(body.invitado ?? '').trim();
-    if (invitado.length < 3) {
-      return errores.validacion({ invitado: 'Escribe el nombre del invitado' });
+    const body = (await request.json()) as { usuarioId?: string };
+    const usuarioId = String(body.usuarioId ?? '').trim();
+    if (usuarioId.length === 0) {
+      return errores.validacion({ usuarioId: 'Selecciona un usuario' });
     }
-    if (invitado.length > 80) return errores.validacion({ invitado: 'Máximo 80 caracteres' });
-    if (body.rol !== undefined && body.rol.length > 60) {
-      return errores.validacion({ rol: 'Máximo 60 caracteres' });
+    const usuario = usuarioPorId(usuarioId);
+    if (!usuario) {
+      return errores.validacion({ usuarioId: 'El usuario seleccionado no existe' });
+    }
+    if (!usuario.activo) {
+      return errores.validacion({ usuarioId: `${usuario.nombre} está dado de baja` });
+    }
+    if (store.invitacionesTsp.some((s) => s.usuarioId === usuarioId)) {
+      return errores.conflicto(`${usuario.nombre} ya tiene una invitación`, { usuarioId });
     }
 
     const prefijo = `tsp-${new Date().getFullYear()}-`;
@@ -539,8 +547,9 @@ export const evidenceHandlers = [
 
     const invitacion: InvitacionTSP = {
       token: `${prefijo}${String(siguiente).padStart(2, '0')}`,
-      invitado,
-      ...(body.rol ? { rol: body.rol } : {}),
+      usuarioId,
+      invitado: usuario.nombre,
+      rol: ROLE_LABEL[usuario.rol] ?? usuario.rol,
       url: '',
       respondida: false,
       creadaEn: ahoraIso(),

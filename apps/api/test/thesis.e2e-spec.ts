@@ -117,7 +117,7 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
 
     beforeAll(async () => {
       const { body } = await post('/evidencia/tsp/invitaciones')
-        .send({ invitado: 'Rosa Huamán', rol: 'Supervisora' })
+        .send({ usuarioId: 'USR-06' })
         .expect(201);
       tokenEncuesta = body.invitacion.token as string;
       expect(body.invitacion.url).toContain(`/encuesta/${tokenEncuesta}`);
@@ -152,7 +152,7 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
 
     it('rechaza respuestas fuera del rango 1–5', async () => {
       const { body } = await post('/evidencia/tsp/invitaciones')
-        .send({ invitado: 'Pedro Ccahuana' })
+        .send({ usuarioId: 'USR-09' })
         .expect(201);
       await request(app.getHttpServer())
         .post(`/api/v1/encuesta/${body.invitacion.token}`)
