@@ -95,6 +95,16 @@ import {
   Topbar,
   toast,
 } from '@mes/ui';
+import { useMaquinas, useProductos, useUsuarios } from '@/features/catalogs/hooks';
+import { DesactivarUsuarioModal } from '@/features/settings/components/DesactivarUsuarioModal';
+import { EliminarMaquinaModal } from '@/features/settings/components/EliminarMaquinaModal';
+import { EliminarProductoModal } from '@/features/settings/components/EliminarProductoModal';
+import { MaquinaDrawer } from '@/features/settings/components/MaquinaDrawer';
+import { ProductoDrawer } from '@/features/settings/components/ProductoDrawer';
+import { RestablecerPasswordModal } from '@/features/settings/components/RestablecerPasswordModal';
+import { SedeDrawer } from '@/features/settings/components/SedeDrawer';
+import { UsuarioDrawer } from '@/features/settings/components/UsuarioDrawer';
+import { VelocidadEstandarModal } from '@/features/settings/components/VelocidadEstandarModal';
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -215,6 +225,131 @@ const HEATMAP = [
   { causa: 'PA-05 Falta de insumo', valores: [22, 51, 18] },
   { causa: 'PE-02 Falla eléctrica', valores: [8, 12, 37] },
 ];
+
+/* --------------------------------------------------- mantenedores (4a) QA */
+
+/**
+ * Galería de QA de los drawers/modales de mantenedores (oleada 4a): usa el
+ * primer registro real de cada catálogo (mock o API según `NEXT_PUBLIC_DATA_SOURCE`)
+ * para probar alta, edición y baja lógica sin depender de las pestañas de
+ * Configuración (las integra la oleada 4b).
+ */
+function MantenedoresQA() {
+  const productos = useProductos();
+  const usuarios = useUsuarios();
+  const maquinas = useMaquinas();
+
+  const primerProducto = productos.data?.data[0];
+  const primerUsuario = usuarios.data?.data[0];
+  const primeraMaquina = maquinas.data?.data[0];
+
+  const [productoAlta, setProductoAlta] = React.useState(false);
+  const [productoEdicion, setProductoEdicion] = React.useState(false);
+  const [velocidadAlta, setVelocidadAlta] = React.useState(false);
+  const [eliminarProducto, setEliminarProducto] = React.useState(false);
+
+  const [sedeAlta, setSedeAlta] = React.useState(false);
+
+  const [usuarioAlta, setUsuarioAlta] = React.useState(false);
+  const [usuarioEdicion, setUsuarioEdicion] = React.useState(false);
+  const [restablecerPassword, setRestablecerPassword] = React.useState(false);
+  const [desactivarUsuario, setDesactivarUsuario] = React.useState(false);
+
+  const [maquinaAlta, setMaquinaAlta] = React.useState(false);
+  const [maquinaEdicion, setMaquinaEdicion] = React.useState(false);
+  const [eliminarMaquina, setEliminarMaquina] = React.useState(false);
+
+  return (
+    <>
+      <Row label="Producto (ProductoDrawer · VelocidadEstandarModal · EliminarProductoModal)">
+        <Button variant="secondary" onClick={() => setProductoAlta(true)}>Nuevo producto</Button>
+        <Button variant="secondary" disabled={!primerProducto} onClick={() => setProductoEdicion(true)}>
+          Editar {primerProducto?.codigo ?? 'producto'}
+        </Button>
+        <Button variant="secondary" disabled={!primerProducto} onClick={() => setVelocidadAlta(true)}>
+          Nueva velocidad estándar
+        </Button>
+        <Button variant="danger" disabled={!primerProducto} onClick={() => setEliminarProducto(true)}>
+          Eliminar {primerProducto?.codigo ?? 'producto'}
+        </Button>
+      </Row>
+
+      <Row label="Sede (SedeDrawer)">
+        <Button variant="secondary" onClick={() => setSedeAlta(true)}>Nueva sede</Button>
+      </Row>
+
+      <Row label="Usuario (UsuarioDrawer · RestablecerPasswordModal · DesactivarUsuarioModal)">
+        <Button variant="secondary" onClick={() => setUsuarioAlta(true)}>Nuevo usuario</Button>
+        <Button variant="secondary" disabled={!primerUsuario} onClick={() => setUsuarioEdicion(true)}>
+          Editar {primerUsuario?.nombre ?? 'usuario'}
+        </Button>
+        <Button variant="secondary" disabled={!primerUsuario} onClick={() => setRestablecerPassword(true)}>
+          Restablecer contraseña
+        </Button>
+        <Button variant="danger" disabled={!primerUsuario} onClick={() => setDesactivarUsuario(true)}>
+          Desactivar {primerUsuario?.nombre ?? 'usuario'}
+        </Button>
+      </Row>
+
+      <Row label="Máquina (MaquinaDrawer · EliminarMaquinaModal)">
+        <Button variant="secondary" onClick={() => setMaquinaAlta(true)}>Nueva máquina</Button>
+        <Button variant="secondary" disabled={!primeraMaquina} onClick={() => setMaquinaEdicion(true)}>
+          Editar {primeraMaquina?.codigo ?? 'máquina'}
+        </Button>
+        <Button variant="danger" disabled={!primeraMaquina} onClick={() => setEliminarMaquina(true)}>
+          Eliminar {primeraMaquina?.codigo ?? 'máquina'}
+        </Button>
+      </Row>
+
+      <ProductoDrawer open={productoAlta} onOpenChange={setProductoAlta} />
+      {primerProducto && (
+        <>
+          <ProductoDrawer open={productoEdicion} onOpenChange={setProductoEdicion} producto={primerProducto} />
+          <VelocidadEstandarModal open={velocidadAlta} onOpenChange={setVelocidadAlta} producto={primerProducto} />
+          <EliminarProductoModal
+            open={eliminarProducto}
+            onOpenChange={setEliminarProducto}
+            producto={primerProducto}
+            onEliminado={() => void productos.refetch()}
+          />
+        </>
+      )}
+
+      <SedeDrawer open={sedeAlta} onOpenChange={setSedeAlta} />
+
+      <UsuarioDrawer open={usuarioAlta} onOpenChange={setUsuarioAlta} />
+      {primerUsuario && (
+        <>
+          <UsuarioDrawer open={usuarioEdicion} onOpenChange={setUsuarioEdicion} usuario={primerUsuario} />
+          <RestablecerPasswordModal
+            open={restablecerPassword}
+            onOpenChange={setRestablecerPassword}
+            usuario={primerUsuario}
+          />
+          <DesactivarUsuarioModal
+            open={desactivarUsuario}
+            onOpenChange={setDesactivarUsuario}
+            usuario={primerUsuario}
+            onDesactivado={() => void usuarios.refetch()}
+          />
+        </>
+      )}
+
+      <MaquinaDrawer open={maquinaAlta} onOpenChange={setMaquinaAlta} />
+      {primeraMaquina && (
+        <>
+          <MaquinaDrawer open={maquinaEdicion} onOpenChange={setMaquinaEdicion} maquina={primeraMaquina} />
+          <EliminarMaquinaModal
+            open={eliminarMaquina}
+            onOpenChange={setEliminarMaquina}
+            maquina={primeraMaquina}
+            onEliminada={() => void maquinas.refetch()}
+          />
+        </>
+      )}
+    </>
+  );
+}
 
 /* -------------------------------------------------------------------- page */
 
@@ -974,6 +1109,17 @@ export default function DevUiPage() {
                   Toast warning
                 </Button>
               </Row>
+            </Block>
+
+            <Divider />
+
+            {/* --------------------------------------------- mantenedores (4a) */}
+            <Block
+              id="mantenedores-4a"
+              title="Mantenedores (4a)"
+              description="Drawers y modales de productos, velocidades, sedes, usuarios y máquinas — sobre el primer registro real de cada catálogo"
+            >
+              <MantenedoresQA />
             </Block>
 
             <Divider />
