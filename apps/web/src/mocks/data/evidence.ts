@@ -54,7 +54,9 @@ const SEGUNDOS_PRETEST = [168, 186, 162, 204, 156, 180, 174, 150, 192, 168];
 export const triPretest: RegistroTRI[] = SEGUNDOS_PRETEST.map((segundos, i) => ({
   id: `TRI-PR-${String(i + 1).padStart(2, '0')}`,
   n: i + 1,
-  fecha: fechaMenos(30 + i),
+  /* 24→28-ago-2026, 2 filas por día: dentro de la ventana declarada
+     `pretestDesde`/`pretestHasta` (24-ago→21-sep) para el `HOY` congelado. */
+  fecha: fechaMenos(4 - Math.floor(i / 2)),
   eventoRegistrado: EVENTOS_TRI[i]!,
   horaInicioRegistro: HORAS_PRETEST[i]!,
   tiempoMin: Math.round((segundos / 60) * 10) / 10,

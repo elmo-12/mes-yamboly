@@ -87,7 +87,9 @@ export class ThesisEvidenceSeeder implements Seeder {
         repo.create({
           id: `TRI-PR-${pad(i + 1)}`,
           n: i + 1,
-          fecha: fechaMenos(30 + i),
+          /* 24→28-ago-2026, 2 filas por día: dentro de la ventana declarada
+             `pretestDesde`/`pretestHasta` (24-ago→21-sep) para el `HOY` congelado. */
+          fecha: fechaMenos(4 - Math.floor(i / 2)),
           eventoRegistrado: EVENTOS_PRETEST[i]!,
           horaInicioRegistro: HORAS_PRETEST[i]!,
           segundos,
