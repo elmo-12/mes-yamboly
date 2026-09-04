@@ -2,31 +2,20 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  AlertCard,
-  Badge,
-  Button,
-  EmptyState,
-  Icon,
-  LineCard,
-  type LineState,
-} from '@mes/ui';
-import type { EstadoLinea, User } from '@mes/types';
+import { AlertCard, Badge, Button, EmptyState, Icon, LineCard } from '@mes/ui';
+import type { User } from '@mes/types';
 import { SEVERIDAD_ALERTA_LABEL } from '@mes/types';
-import { formatNumber, formatPct, formatSpeed, turnoRango } from '@mes/shared';
+import { turnoRango } from '@mes/shared';
+import {
+  BOTON_FILA,
+  BOTON_PRINCIPAL,
+  lineCardAmpliaProps,
+} from '@/features/realtime/components/linea-view';
 import { useResumenMaquinista } from '../hooks';
 import { HomeHeader } from './HomeHeader';
 import { HomeSkeleton } from './HomeSkeleton';
 import { KpiRow } from './KpiRow';
 import { MisUltimosRegistros } from './MisUltimosRegistros';
-
-const ESTADO_LINE_CARD: Record<EstadoLinea, LineState> = {
-  produciendo: 'produciendo',
-  parada: 'parada',
-  alerta: 'alerta',
-  sugerida: 'sugerida',
-  sin_orden: 'sin-orden',
-};
 
 /**
  * `Home / Dashboard Maquinista / Default` (Figma 2165:769) — vista de maquinista
@@ -101,38 +90,20 @@ export function DashboardMaquinista({ user }: { user: User }) {
         <>
           <div className="flex w-full flex-col items-stretch gap-4 lg:flex-row lg:items-start">
             <LineCard
-              line={`${linea.lineaCodigo} · ${linea.lineaNombre}`}
-              order={
-                linea.orden
-                  ? `${linea.orden.codigo} · ${linea.orden.productoNombre}`
-                  : 'Sin orden activa'
-              }
-              state={ESTADO_LINE_CARD[linea.estado]}
-              message={linea.alerta?.texto}
-              metrics={[
-                {
-                  label: 'Producido',
-                  value: `${formatNumber(linea.producido)} u`,
-                  note: `${formatPct(linea.plan > 0 ? (linea.producido / linea.plan) * 100 : 0, 0)} del objetivo (${formatNumber(linea.plan)} u)`,
-                },
-                {
-                  label: 'Velocidad',
-                  value: formatSpeed(linea.velocidad),
-                  note: `objetivo ${formatSpeed(linea.velocidadEstandar)}`,
-                },
-                {
-                  label: 'Turno',
-                  value: resumen.tiempoReal?.turnoLabel ?? '—',
-                  note: resumen.tiempoReal?.turnoRango,
-                },
-              ]}
-              segments={resumen.segmentos}
+              {...lineCardAmpliaProps(linea, resumen.tiempoReal ?? { turnoLabel: '', turnoRango: '' })}
               actions={
                 <>
-                  <Button variant="primary" size="lg" block icon={<Icon name="stop-circle" />} asChild>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    block
+                    className={BOTON_PRINCIPAL}
+                    icon={<Icon name="stop-circle" />}
+                    asChild
+                  >
                     <Link href="/tiempo-real?accion=parada">Parada</Link>
                   </Button>
-                  <Button variant="secondary" size="lg" block asChild>
+                  <Button variant="secondary" size="lg" block className={BOTON_FILA} asChild>
                     <Link href="/tiempo-real?accion=merma">Merma</Link>
                   </Button>
                   <Button
@@ -141,11 +112,12 @@ export function DashboardMaquinista({ user }: { user: User }) {
                     icon={<Icon name="dots-horizontal" />}
                     iconPosition="only"
                     aria-label="Más acciones de la línea"
+                    className="shrink-0"
                     onClick={() => router.push(`/tiempo-real?linea=${linea.lineaId}`)}
                   />
                 </>
               }
-              className="w-full lg:w-[548px] lg:shrink-0"
+              className="min-w-0 flex-1"
             />
 
             {resumen.alerta && (

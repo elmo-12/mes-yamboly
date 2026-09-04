@@ -23,7 +23,7 @@ export class AlertaQueryDto extends PaginationDto {
   @IsOptional()
   estado?: EstadoAlerta | EstadoAlerta[];
 
-  @ApiPropertyOptional({ description: 'Busca en la predicción, la línea y la máquina' })
+  @ApiPropertyOptional({ description: 'Busca en la predicción y la línea' })
   @IsOptional()
   @IsString()
   search?: string;

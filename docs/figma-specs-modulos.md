@@ -10,6 +10,13 @@ La rama `feat/maestros-reales` migró los catálogos de ejemplo a los maestros r
 - **Sedes y usuarios**: pestaña de Configuración con CRUD real de sedes (9) y usuarios (11), no solo lectura.
 - Las rutas **`/pasteurizacion`** y **`/personal`** se retiraron de la navegación (el flag `enviarPasteurizacion` de merma se conserva como dato informativo).
 
+Ajustes del 4-sep-2026 (tarde, sobre lo anterior): el producto decidió retirar el nivel máquina/equipo y el catálogo de sedes.
+- **Sin paso Máquina en el wizard de parada** (`Parada / Paso 2 Detalle`, frame **2156:8367**): el Dropdown "Máquina" (`Envolvedora L2` en la spec) ya no existe; la parada se registra hasta línea.
+- **Pestaña Máquinas → Líneas** (`Configuración / Máquinas`, frame **2165:11984**): pasa a ser el mantenedor de Líneas (alta/edición/baja), no de equipos por línea.
+- **Sin sedes**: no hay catálogo de sedes ni selector de sede (el Dropdown inline "Sede: Lima" de `Tiempo real / Líneas / Default` desaparece); Yamboly opera una única sede (Lima).
+- **Tarjetas de tiempo real ampliadas** (`Tiempo real / Líneas / Default / 1440`, frame **2156:3936**): `LineCard` ampliada (2 columnas ≥1280 px, métricas 2×2, progreso etiquetado, mensaje contextual), sin filtro de línea.
+- **Velocidades en modal**: "Ver velocidades" abre un `VelocidadesModal` con alta/edición/baja anidadas, en vez del panel embebido bajo la matriz de "Productos y velocidades".
+
 ## 02 Auth & Home (RF10, RF6, RF7)
 A. `Auth / Login / Default`: layout 2 columnas: izquierda 720 px panel #F9FAFB con logo, "MES Yamboly", frase "Control y monitoreo de la producción en tiempo real", 3 bullets (Registro en segundos · Indicadores OEE · Alertas tempranas con IA); derecha formulario 400 px centrado: H2 "Iniciar sesión", Input "Correo o DNI", Input password, Checkbox "Recordarme", link "¿Olvidaste tu contraseña?", Button Primary lg "Ingresar" ancho completo, pie "Acceso restringido al personal de Helatony's S.A.C.".
 B. `Auth / Login / Error`: Input Destructive con hint "Correo o contraseña incorrectos".

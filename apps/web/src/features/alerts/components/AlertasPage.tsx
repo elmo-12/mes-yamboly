@@ -284,8 +284,8 @@ export function AlertasPage() {
           >
             <Input
               leadingIcon={<Icon name="search" />}
-              placeholder="Buscar alerta o máquina"
-              aria-label="Buscar alerta o máquina"
+              placeholder="Buscar alerta o línea"
+              aria-label="Buscar alerta o línea"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />

@@ -21,7 +21,7 @@ export function esPreciso(e: EvaluacionCalidad): boolean {
   return e.overridePreciso ?? (e.duracionMin > 0 && e.causaEspecifica);
 }
 
-/** Trazable: el registro apunta a una orden, una máquina y un responsable. */
+/** Trazable: el registro apunta a una orden, una línea y un responsable. */
 export function esTrazable(e: EvaluacionCalidad): boolean {
   return e.overrideTrazable ?? (e.tieneOrden && e.tieneLinea && e.tieneResponsable);
 }

@@ -11,7 +11,7 @@ import {
   Skeleton,
 } from '@mes/ui';
 import type { LineaEstado, TiempoRealResumen } from '@mes/types';
-import { lineCardAmpliaProps } from './linea-view';
+import { BOTON_FILA, BOTON_PRINCIPAL, lineCardAmpliaProps } from './linea-view';
 
 export type AccionLinea =
   | 'detalle'
@@ -59,16 +59,6 @@ export function LineasGrid({ lineas, resumen, onAccion }: LineasGridProps) {
     </div>
   );
 }
-
-/**
- * Reparto de la botonera dentro de la Line card ampliada (contenedor
- * `@container/line-card`). `BOTON_PRINCIPAL`: por debajo de 24rem de tarjeta
- * el Primary ocupa la fila completa y la secundaria + el menú bajan a la
- * siguiente; a partir de ahí los tres comparten una sola fila.
- * `BOTON_FILA`: reparto a partes iguales del ancho que quede.
- */
-const BOTON_PRINCIPAL = 'basis-full @sm/line-card:flex-1 @sm/line-card:basis-0';
-const BOTON_FILA = 'flex-1 basis-0';
 
 function AccionesLinea({
   linea,

@@ -106,7 +106,7 @@ export function LineasTab() {
         title="Líneas de producción"
         description={`${formatNumber(todas.length - inactivas)} líneas activas · ${formatNumber(
           inactivas,
-        )} inactivas · la línea es la máquina física y su código se usa en órdenes, paradas y mermas`}
+        )} inactivas · el código de línea se usa en órdenes, paradas y mermas`}
         actions={
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <Input

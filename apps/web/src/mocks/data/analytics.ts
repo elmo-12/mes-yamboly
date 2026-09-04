@@ -188,7 +188,6 @@ export const modelo: Modelo = {
     { id: 'VAR-01', nombre: 'Línea', importancia: 92 },
     { id: 'VAR-02', nombre: 'Turno', importancia: 84 },
     { id: 'VAR-03', nombre: 'Producto', importancia: 71 },
-    { id: 'VAR-04', nombre: 'Máquina', importancia: 88 },
     { id: 'VAR-05', nombre: 'Causa', importancia: 79 },
     { id: 'VAR-06', nombre: 'Tiempo de operación', importancia: 66 },
     { id: 'VAR-07', nombre: 'Velocidad', importancia: 74 },

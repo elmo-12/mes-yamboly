@@ -1,6 +1,6 @@
-# Resumen de implementación — MES Yamboly (28 ago 2026 · fase 2: 3–4 sep 2026)
+# Resumen de implementación — MES Yamboly (28 ago 2026 · fase 2: 3–4 sep 2026 · fase 2b: 4 sep 2026 tarde)
 
-Implementación en código del rediseño Figma (`WOfwZEmPx1Hcw7ehaIsnpx`, sección `MES · YAMBOLY`) siguiendo la skill `figma-design-to-code` (`get_design_context` por frame, gates G1/G2–G4/G5). Estado tras la fase 1 (28-ago-2026): **`pnpm typecheck` · `lint` · `build` · `test:e2e` (55/55) en verde**. Estado tras la fase 2 "maestros reales" (4-sep-2026, ver sección al final de este documento): **`pnpm typecheck` (7/7) · `lint` limpio · `build` (4/4) · `pnpm --filter @mes/api test:e2e` (118/118 en 7 suites) en verde; `pnpm dev` levanta web (:3000) y api (:4000)**.
+Implementación en código del rediseño Figma (`WOfwZEmPx1Hcw7ehaIsnpx`, sección `MES · YAMBOLY`) siguiendo la skill `figma-design-to-code` (`get_design_context` por frame, gates G1/G2–G4/G5). Estado tras la fase 1 (28-ago-2026): **`pnpm typecheck` · `lint` · `build` · `test:e2e` (55/55) en verde**. Estado tras la fase 2 "maestros reales" (4-sep-2026 mañana, ver sección al final de este documento): **`pnpm typecheck` (7/7) · `lint` limpio · `build` (4/4) · `pnpm --filter @mes/api test:e2e` (118/118 en 7 suites) en verde**. Estado tras la fase 2b — ajustes de configuración y tiempo real (4-sep-2026 tarde, sin máquina/equipo ni sedes; ver «Fase 2b» al final): **`pnpm typecheck` en verde · `lint` limpio · `build` en verde · `pnpm --filter @mes/api test:e2e` (114/114 en 7 suites) en verde; `pnpm dev` levanta web (:3000) y api (:4000)**.
 
 ## 1. Figma
 
@@ -15,23 +15,23 @@ Implementación en código del rediseño Figma (`WOfwZEmPx1Hcw7ehaIsnpx`, secci�
 
 ## 2. Frontend (`apps/web`, Next.js 15.3 App Router)
 
-- **Rutas (16, antes 18):** `/login` · `/` (Home por rol) · `/tiempo-real` (+ 7 flujos de captura como modales/drawers) · `/tv` · `/ordenes` · `/ordenes/[id]` (7 pestañas) · `/reportes` (5 pestañas) · `/alertas` (+ drawer detalle, modal lote, drawer umbrales) · `/analitica` (4 pestañas + estado insuficiente) · `/evidencia` (7 pestañas) · `/encuesta/[token]` (pública) · `/configuracion` (6 pestañas: causas de parada, causas de merma, máquinas, productos y velocidades, umbrales, sedes y usuarios) · `/perfil` · `/dev/ui`, `/dev/api` (QA) · 404. `/pasteurizacion` y `/personal` (placeholders de la fase 1) se retiraron en la fase 2 (E9-05) — ver sección de fase 2 al final de este documento.
-- **Layouts:** `AppShell` (sidebar 260 fija ≥1280, drawer con hamburguesa <1280, topbar 64, guard de sesión y rol), `AuthLayout`, `TvLayout`, `PublicLayout`.
+- **Rutas (16, antes 18):** `/login` · `/` (Home por rol) · `/tiempo-real` (+ 6 flujos de captura como modales/drawers, antes 7 — el paso Máquina del wizard de parada se retiró en fase 2b) · `/tv` · `/ordenes` · `/ordenes/[id]` (7 pestañas) · `/reportes` (5 pestañas) · `/alertas` (+ drawer detalle, modal lote, drawer umbrales) · `/analitica` (4 pestañas + estado insuficiente) · `/evidencia` (7 pestañas) · `/encuesta/[token]` (pública) · `/configuracion` (6 pestañas: causas de parada, causas de merma, **líneas** (antes «máquinas»), productos y velocidades, umbrales, **usuarios** (antes «sedes y usuarios» — fase 2b retira el catálogo de sedes, ver «Fase 2b» al final)) · `/perfil` · `/dev/ui`, `/dev/api` (QA) · 404. `/pasteurizacion` y `/personal` (placeholders de la fase 1) se retiraron en la fase 2 (E9-05) — ver sección de fase 2 al final de este documento.
+- **Layouts:** `AppShell` (sidebar 260 fija ≥1280, drawer con hamburguesa <1280, topbar 64 **sin selector de sede** desde fase 2b, guard de sesión y rol), `AuthLayout`, `TvLayout`, `PublicLayout`.
 - **Features (14):** auth, home, realtime, capture, orders, downtimes, scrap, speeds, catalogs, reports, alerts, analytics, evidence, settings — cada una con `api.ts` (servicio tipado), `hooks.ts` (TanStack Query) y `components/` (117 componentes de vista en total, ninguna página monolítica).
 - **Capa de datos:** UI → hooks → `features/*/api.ts` → `services/api/client.ts` (baseURL, JWT, ApiError tipado, 401→logout, 422→errores de campo) → **mock (msw 2, `apps/web/src/mocks`)** o **HTTP NestJS**, según `NEXT_PUBLIC_DATA_SOURCE`.
-- **Mocks:** datasets deterministas (semilla fija), idénticos a los seeds de la API desde la fase 2 (maestros reales): 9 líneas (antes 6), 9 sedes, 41 sabores, 201 productos (antes 11), 333 velocidades estándar producto×línea (antes 178, velocidad única por producto), 33 máquinas (antes 12), 83 causas de parada + 56 causas de merma (antes 45 causas planas), 2 turnos D/N, 11 usuarios, 60 OF (OF-2026-0815 exacta a Figma), 188 paradas, 92 mermas, 24 alertas, predicciones 30 d, modelo v3.2, evidencia TRI/TCI/TSP/CFS/EP con los valores del diseño; store mutable (crear parada → OF/tiempo real; confirmar alerta → EP; encuesta → TSP); latencia 150–400 ms; errores con `?__error=`.
+- **Mocks:** datasets deterministas (semilla fija), idénticos a los seeds de la API: 9 líneas (antes 6), 41 sabores, 201 productos (antes 11), 333 velocidades estándar producto×línea (antes 178, velocidad única por producto), 83 causas de parada + 56 causas de merma (antes 45 causas planas), 2 turnos D/N, 11 usuarios, 60 OF (OF-2026-0815 exacta a Figma), 188 paradas, 92 mermas, 24 alertas, predicciones 30 d, modelo v3.2, evidencia TRI/TCI/TSP/CFS/EP con los valores del diseño; store mutable (crear parada → OF/tiempo real; confirmar alerta → EP; encuesta → TSP); latencia 150–400 ms; errores con `?__error=`. Desde fase 2b **sin catálogo de sedes** (única sede Lima) **ni de máquinas** (33 registros hasta el cierre de fase 2, retirados junto con el nivel máquina/equipo — ver «Fase 2b»).
 - **Estados implementados:** loading (skeletons por bloque), empty, no-results, error (+ reintentar), success/toast, validación zod por paso, confirmación (Danger siempre con modal), disabled (Primary base con overlay), read-only, forbidden (RoleGate), 404, unauthorized (redirección).
 - **Responsive:** verificado 1440 / 1280 / 1024 / 768 / 390 sin scroll horizontal del body; tablas con scroll propio; grids que reflowan; Modo TV 1920 y 1440.
 
 ## 3. Backend (`apps/api`, NestJS 11 + TypeORM + SQLite)
 
-- **Módulos (12):** auth, users, catalogs, orders, downtimes, scrap, speeds, realtime, reports, alerts, analytics, evidence. Estructura `module / controller / service / dto / mappers`, entidades en `database/entities` (34), seeds ordenados (`SEEDERS`) que reproducen los mocks y se ejecutan al arrancar si la BD está vacía (`pnpm seed` la regenera).
-- **Endpoints:** 95 rutas bajo `/api/v1` (79 antes de la fase 2; contrato en `docs/api-contracts.md`), colecciones `{data, meta}`, errores `{statusCode, code, message, details}` (422 con `campo → mensaje`), SSE `/tiempo-real/stream`, descarga de XLSX reales (exceljs) en reportes y evidencia (una hoja por anexo 02–06), encuesta pública con token de un solo uso.
+- **Módulos (12):** auth, users, catalogs, orders, downtimes, scrap, speeds, realtime, reports, alerts, analytics, evidence. Estructura `module / controller / service / dto / mappers`, entidades en `database/entities` (**33**, antes 34/35 con `Maquina` y `Sede` — ambas retiradas en fase 2b), seeds ordenados (`SEEDERS`) que reproducen los mocks y se ejecutan al arrancar si la BD está vacía (`pnpm seed` la regenera).
+- **Endpoints:** **91** rutas bajo `/api/v1` (95 al cierre de la fase 2, 79 antes de la fase 2; contrato en `docs/api-contracts.md`) — fase 2b retira `/sedes` (3 rutas) y `/maquinas` (4 rutas) y añade `POST/PATCH/DELETE /lineas` (3 rutas): 95 − 3 − 4 + 3 = 91, verificado contando `@Get|@Post|@Patch|@Delete|@Put` en los 13 `*.controller.ts` de `apps/api/src/modules/**`. Colecciones `{data, meta}`, errores `{statusCode, code, message, details}` (422 con `campo → mensaje`), SSE `/tiempo-real/stream`, descarga de XLSX reales (exceljs) en reportes y evidencia (una hoja por anexo 02–06), encuesta pública con token de un solo uso.
 - **Validación:** DTOs con class-validator/transformer (18 archivos DTO), `ValidationPipe` whitelist, excepciones de negocio tipadas (`BUSINESS_RULE`, `CONFLICT`, `NOT_FOUND`).
 - **Seguridad (P0/P1 del diagnóstico):** JWT (`JwtAuthGuard` global + `@Public()`), `RolesGuard` por endpoint (6 roles), contraseñas bcrypt, sin claves en el cliente, CORS restringido, autorización en servidor (no solo en front).
 - **IA (RF8/RF9):** `AlertsEngineService` (reglas de umbral) + `PredictionProvider` inyectable: `RuleBasedPredictionProvider` (activo) y `PythonHttpPredictionProvider` (stub para el microservicio scikit-learn vía `PREDICTION_SERVICE_URL`, con fallback). Evento `evidence.tri.registro` alimenta TRI automáticamente desde cada captura.
 - **Swagger:** `http://localhost:4000/docs` (12 tags, bearer auth, DTOs y errores documentados).
-- **Tests:** 7 suites e2e (auth, orders, downtimes, realtime, thesis + catalogs-crud, users desde la fase 2) — 118/118 (55/55 al cierre de la fase 1).
+- **Tests:** 7 suites e2e (auth, orders, downtimes, realtime, thesis, catalogs-crud, users) — **114/114** (118/118 al cierre de la fase 2, 55/55 al cierre de la fase 1); fase 2b resta ~10 casos de máquinas/sedes y suma ~6 de líneas, ver «Fase 2b» al final.
 - **Pendiente backend:** microservicio Python real; exportación CSV/PDF (solo XLSX). `/pasteurizacion` y `/personal` se retiraron en la fase 2 (ya no aplican como pendiente, ver sección **Fase 2** al final de este documento).
 
 ## 4. Integración
@@ -55,7 +55,7 @@ Cambio de modo: `NEXT_PUBLIC_DATA_SOURCE=mock|api` en `apps/web/.env.local` (por
 | ¿Formularios funcionan? | Sí: react-hook-form + zod compartido con el backend; 422 del servidor mapeado a campos |
 | ¿Estados loading/error/empty cubiertos? | Sí en todas las rutas (`loading.tsx`, `error.tsx`, EmptyState por vista) |
 | ¿Frontend desacoplado de mocks? | Sí: las vistas solo usan hooks; el adapter se elige por variable de entorno |
-| ¿Backend NestJS funciona? | Sí: 95 endpoints (79 al cierre de la fase 1), seeds con maestros reales, 118 e2e en 7 suites (55 al cierre de la fase 1), Swagger |
+| ¿Backend NestJS funciona? | Sí: 91 endpoints (95 al cierre de la fase 2, 79 al cierre de la fase 1), seeds con maestros reales, 114 e2e en 7 suites (118 al cierre de la fase 2, 55 al cierre de la fase 1), Swagger |
 | ¿Endpoints documentados? | Sí: Swagger + `docs/api-contracts.md` |
 | ¿Contratos coherentes front↔back? | Sí: `@mes/types` compartido; 11 divergencias corregidas en integración |
 | ¿Compila? | Sí: `pnpm typecheck`, `lint`, `build` en verde (4 paquetes) |
@@ -85,6 +85,13 @@ de planta de la fase 1 (5 líneas + PT-01, turnos M/T/N, catálogos de ejemplo) 
 extraído del sistema anterior, y completa los mantenedores de Configuración que en la fase 1 quedaban de solo
 lectura. Estado final verificado: `pnpm typecheck` 7/7 · `pnpm lint` limpio · `pnpm build` 4/4 ·
 `pnpm --filter @mes/api test:e2e` **118/118 en 7 suites**.
+
+> **Nota (4-sep-2026, tarde):** esta sección documenta el estado de la fase 2 tal como cerró la mañana del 4-sep-2026
+> — incluye el mantenedor de "Máquinas" (33 equipos, confirmados en `apps/api/.../catalogs.ts` y en el mock,
+> coherentes entre sí) y el catálogo de "Sedes" (9 reales). Esa misma tarde el producto decidió retirar ambos del
+> alcance (la parada llega hasta línea, única sede Lima); no se reescribió esta sección para conservar el registro
+> histórico de la decisión anterior. El estado **vigente** —91 endpoints, 114/114 e2e, pestañas Líneas/Usuarios—
+> está en **«Fase 2b — ajustes del 4-sep»**, al final de este documento.
 
 ### Decisiones
 
@@ -122,11 +129,11 @@ lectura. Estado final verificado: `pnpm typecheck` 7/7 · `pnpm lint` limpio · 
 | `catalogs` — turnos, líneas | `GET /turnos`, `GET /lineas` |
 | `users` — usuarios | `POST /usuarios`, `PATCH /usuarios/:id`, `POST /usuarios/:id/estado`, `POST /usuarios/:id/restablecer-password`, `GET /colaboradores` |
 
-**Total: 95 endpoints bajo `/api/v1`** (79 al cierre de la fase 1).
+**Total: 95 endpoints bajo `/api/v1`** (79 al cierre de la fase 1) — **91 tras la fase 2b** (`/sedes` y `/maquinas` retirados, `POST/PATCH/DELETE /lineas` añadidos), ver «Fase 2b» al final.
 
 ### Frontend
 
-- **Tabs de Configuración (6):** causas de parada, causas de merma (nueva), máquinas, productos y velocidades (reescrita), umbrales, sedes y usuarios (pasa de solo lectura a mantenedor completo).
+- **Tabs de Configuración (6):** causas de parada, causas de merma (nueva), máquinas, productos y velocidades (reescrita), umbrales, sedes y usuarios (pasa de solo lectura a mantenedor completo). Fase 2b renombra «máquinas» → «líneas» y «sedes y usuarios» → «usuarios» (sin sedes), ver «Fase 2b».
 - **Árbol genérico:** `CausasTree.tsx` (nodo `{id, codigo, nombre, estado, nivel, hijos}`) reutilizado por `CausasParadaTab` y el nuevo `CausasMermaTab`; detalle compartido en `CausaDetalleShell.tsx` (`CausaParadaDetalle.tsx`, `CausaMermaDetalle.tsx`).
 - **Overlays nuevos:** `ProductoDrawer`, `EliminarProductoModal`, `VelocidadEstandarModal`, `EliminarVelocidadModal`, `MatrizVelocidades` (tabla producto × 9 líneas), `SedeDrawer`, `DesactivarSedeModal`, `UsuarioDrawer`, `RestablecerPasswordModal`, `DesactivarUsuarioModal`, `MaquinaDrawer` (gana modo edición), `NuevaCausaModal`, `EliminarCausaModal`, `EliminarMaquinaModal`.
 - **Wizards de captura** reconectados al par (producto, línea): `IniciarOrdenWizard` (resuelve y congela `velocidadUnidMin`, 422 bajo `productoId` si no hay par vigente), `MermaWizard` (selector en cascada tipo → clasificación → causa sobre el árbol real), `VelocidadDrawer` (`desvioPct` contra el estándar del par, etiqueta u/min).
@@ -167,3 +174,65 @@ corregido en el QA de esta fase).
 
 Detalle completo de correcciones, veredictos de fidelidad y responsive de esta fase en «QA fase 2 · maestros
 reales y mantenedores (4-sep-2026)», al inicio de `docs/qa-report.md`.
+
+---
+
+## Fase 2b — ajustes de configuración y tiempo real (4-sep-2026, tarde)
+
+Tercera fase de implementación, en la rama `feat/ajustes-configuracion` (sobre `feat/maestros-reales`, commit
+`19172ce`). El mismo día del cierre de la fase 2, el producto revisó dos decisiones de modelo (nivel máquina/equipo
+y catálogo de sedes) y las revirtió; esta fase aplica esa decisión al código, no añade funcionalidad nueva. Estado
+final verificado: `pnpm typecheck`, `pnpm lint` y `pnpm build` en verde · `pnpm --filter @mes/api test:e2e`
+**114/114 en 7 suites**.
+
+### Los 7 puntos del ajuste
+
+1. **Sin nivel máquina/equipo:** la parada se registra hasta **línea** (línea = máquina física de planta); se
+   elimina `Maquina` de `@mes/types`, de la API (`/maquinas` retirado), de los mocks, del wizard de parada
+   (`ParadaWizard.tsx` pierde el paso "Máquina") y de Configuración.
+2. **Pestaña Máquinas → Líneas:** mantenedor completo de las 9 líneas (alta, edición, baja lógica) —
+   `LineasTab.tsx` / `LineaDrawer.tsx` / `DesactivarLineaModal.tsx`, `POST/PATCH/DELETE /lineas`.
+3. **Solo existe la sede Lima:** sedes fuera de la UI y de la API (`/sedes` eliminado); la pestaña **Usuarios**
+   (antes «Sedes y usuarios») queda sin sede; sin selector de sede en el topbar ni en el tiempo real;
+   `SEDE_UNICA_ID` como constante interna.
+4. **"Ver velocidades" abre un modal** (`VelocidadesModal`) con alta/edición/baja anidadas, en vez del panel
+   inferior de `ProductosVelocidadesTab`.
+5. **Se quita "Código del sistema anterior"** del detalle de causa de parada (`CausaParadaDetalle.tsx`); el dato
+   `codigoLegado` se conserva en el JSON de causas, solo deja de mostrarse en la UI.
+6. **Tiempo real sin filtro de líneas ni de sede:** `LineasFilterBar` y `TiempoRealHeader` simplificados; `LineCard`
+   ampliada (2 columnas en ≥1280 px, métricas en grilla 2×2, barra de progreso etiquetada, mensaje contextual).
+7. **Fix ⌘K:** `AppShell.tsx` leía `e.key` sin comprobar que existiera; guarda añadida antes de comparar
+   `e.key === 'k'`.
+
+### Conteos
+
+| Concepto | Antes (cierre fase 2) | Después (fase 2b) |
+| --- | --- | --- |
+| Endpoints bajo `/api/v1` | 95 | **91** (`/sedes` −3, `/maquinas` −4, `POST/PATCH/DELETE /lineas` +3) |
+| Entidades TypeORM (`database/entities`) | 34 (con `Maquina`, `Sede`) | **33** |
+| Suite e2e | 118/118 en 7 suites | **114/114** en 7 suites (−10 casos de máquinas/sedes, +6 de líneas) |
+| Pestañas de Configuración | 6 (…, Máquinas, …, Sedes y usuarios) | 6 (…, **Líneas**, …, **Usuarios**) |
+| Máquinas (equipos de línea) | 33 registros curados a mano | retirado |
+| Sedes | 9 reales | retirado (única sede Lima, `SEDE_UNICA_ID` interno) |
+
+El conteo de endpoints se verificó contando `@Get|@Post|@Patch|@Delete|@Put` en los 13 archivos
+`apps/api/src/modules/**/**.controller.ts`: alerts 10 · analytics 7 · auth 3 · catalogs 22 · downtimes 7 ·
+evidence 10 · survey 2 · orders 10 · realtime 3 · reports 6 · scrap 3 · speeds 2 · users 6 = **91**.
+
+### Referencias que quedan como estaban (fuera del alcance de esta fase)
+
+`docs/api-contracts.md`, `README.md` y `docs/BRIEF-agentes.md` se actualizaron en el mismo commit por la tarea de
+código (`19172ce`) y ya reflejan el modelo vigente (sin máquinas ni sedes). Este documento (`implementation-summary.md`)
+y `docs/qa-report.md` se actualizan en esta revisión de `docs/`; las secciones anteriores del documento marcadas
+como históricas («Fase 2», sección 3 «Backend» con conteos previos) se anotaron con referencias a esta sección en
+vez de reescribirse.
+
+### Pendientes detectados en el QA de fase 2b
+
+- El overlay del modal anidado dentro de `VelocidadesModal` no oscurece el modal base: `--z-overlay` (60) queda por
+  debajo de `--z-modal` (70).
+- `LineaEstado.oeeTurnoPct` no existe en el contrato — la `LineCard` ampliada muestra «Última parada» en su lugar,
+  no un OEE de turno.
+- `DashboardMaquinista` en revisión (pendiente de verificar contra la `LineCard` ampliada).
+
+Detalle completo en «QA fase 2b (4-sep-2026 tarde)» en `docs/qa-report.md`.

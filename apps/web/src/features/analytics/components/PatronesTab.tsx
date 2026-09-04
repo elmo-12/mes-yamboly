@@ -23,7 +23,7 @@ export interface PatronesTabProps {
   patrones: Patrones;
 }
 
-const VARIABLES = ['Línea', 'Turno', 'Producto', 'Máquina', 'Causa'] as const;
+const VARIABLES = ['Línea', 'Turno', 'Producto', 'Causa'] as const;
 type Variable = (typeof VARIABLES)[number];
 
 const PERIODOS = ['30 días', '90 días', 'Año'] as const;

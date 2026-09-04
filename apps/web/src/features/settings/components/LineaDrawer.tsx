@@ -105,8 +105,8 @@ export function LineaDrawer({ open, onOpenChange, linea }: LineaDrawerProps) {
         <div className="flex flex-col gap-4">
           <Overline>Datos de la línea</Overline>
           <p className="text-body leading-[22px] text-neutral-text">
-            La línea es la máquina física de planta. Su código se usa al registrar órdenes de
-            fabricación, paradas, mermas y velocidades estándar.
+            Cada línea es una unidad de planta independiente. Su código se usa al registrar
+            órdenes de fabricación, paradas, mermas y velocidades estándar.
           </p>
 
           <form id="form-linea" onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>

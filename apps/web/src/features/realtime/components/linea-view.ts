@@ -34,6 +34,16 @@ const SEGMENTOS: Record<EstadoLinea, readonly LineSegment[]> = {
   sin_orden: [{ tone: 'idle' }],
 };
 
+/**
+ * Reparto de la botonera dentro de la Line card ampliada (contenedor
+ * `@container/line-card`). `BOTON_PRINCIPAL`: por debajo de 24rem de tarjeta
+ * el Primary ocupa la fila completa y la secundaria + el menú bajan a la
+ * siguiente; a partir de ahí los tres comparten una sola fila.
+ * `BOTON_FILA`: reparto a partes iguales del ancho que quede.
+ */
+export const BOTON_PRINCIPAL = 'basis-full @sm/line-card:flex-1 @sm/line-card:basis-0';
+export const BOTON_FILA = 'flex-1 basis-0';
+
 export function badgeLinea(linea: LineaEstado): string {
   switch (linea.estado) {
     case 'parada':
