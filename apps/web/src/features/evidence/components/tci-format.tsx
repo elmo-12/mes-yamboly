@@ -1,6 +1,7 @@
 import { Icon, Tooltip, type BadgeColor, type IconName } from '@mes/ui';
 import {
   COLUMNAS_FUENTE,
+  COLUMNAS_OPCIONALES_FUENTE,
   type CriterioTCI,
   type MapeoImportacion,
   type TipoFuenteExterna,
@@ -118,12 +119,12 @@ export function mapeoAutomatico(
   return mapeo;
 }
 
-/** Columnas obligatorias por fuente (el resto puede quedar sin mapear). */
-export const COLUMNAS_OPCIONALES: Record<TipoFuenteExterna, readonly string[]> = {
-  sensores: ['velocidad_unid_min'],
-  solicitudes: ['linea', 'descripcion'],
-  sap_mermas: ['tipo_merma', 'motivo'],
-};
+/**
+ * Columnas que pueden quedar sin mapear; el resto son obligatorias y la API
+ * responde 422 si faltan. Vive en `@mes/types` para que API, mock y UI usen
+ * exactamente la misma lista.
+ */
+export const COLUMNAS_OPCIONALES = COLUMNAS_OPCIONALES_FUENTE;
 
 /**
  * Icono check / cruz de un criterio en la tabla de evaluaciones, con el detalle

@@ -99,6 +99,9 @@ export function NuevaOrdenModal({ open, onOpenChange }: NuevaOrdenModalProps) {
       supervisorId: supervisor?.id ?? '',
       operarios: 5,
       colaboradorIds: [],
+      /* Este alta no lleva cronómetro TRI (el del Anexo 02 vive en el wizard
+         de Tiempo real): sin segundos no se crea fila de postest. */
+      tiempoRegistroSeg: 0,
     };
 
     try {

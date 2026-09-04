@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   METAS_TESIS,
-  calcCfs,
+  calcCfsOpcional,
   calcEpOpcional,
   calcTri,
   calcTriOpcional,
@@ -135,7 +135,10 @@ export class EvidenceService {
         metaValor: 100,
         estado: cfs.estado,
         anexo: 'Anexo 05',
-        detalle: `${cfs.cumplidas} de ${cfs.totales} funcionalidades verificadas`,
+        detalle:
+          cfs.verificadas === 0
+            ? 'Se calcula al marcar cada funcionalidad en la lista de cotejo del Anexo 05'
+            : `${cfs.cumplidas} de ${cfs.totales} funcionalidades cumplen · ${cfs.verificadas} verificadas`,
       },
       {
         id: 'EP',
@@ -369,16 +372,18 @@ export class EvidenceService {
       cumple: f.cumple,
       observacion: f.observacion,
       ruta: f.ruta,
+      verificadaEn: f.verificadaEn ?? null,
     }));
     const cumplidas = items.filter((i) => i.cumple).length;
+    const verificadas = items.filter((i) => i.verificadaEn).length;
     const totales = items.length || METAS_TESIS.CFS_TOTAL;
     /* El instrumento fija FT = 9; sólo si la lista creciera se recalcula a mano. */
-    const porcentaje =
-      totales === METAS_TESIS.CFS_TOTAL ? calcCfs(cumplidas) : redondear((cumplidas / totales) * 100);
+    const porcentaje = calcCfsOpcional(cumplidas, verificadas, totales);
     return {
       items,
       cumplidas,
       totales: items.length,
+      verificadas,
       porcentaje,
       meta: `${METAS_TESIS.CFS_TOTAL} / ${METAS_TESIS.CFS_TOTAL} funcionalidades`,
       estado: estadoCfs(porcentaje),
@@ -390,6 +395,8 @@ export class EvidenceService {
     if (!fila) throw new NoEncontradoException('Verificación funcional');
     fila.cumple = dto.cumple;
     fila.observacion = dto.observacion ?? fila.observacion;
+    /* Marcarla desde la ficha ya cuenta como verificada, cumpla o no. */
+    fila.verificadaEn = ahoraIso();
     await this.verificaciones.save(fila);
     const resumen = await this.cfs();
     const item = resumen.items.find((i) => i.id === id)!;

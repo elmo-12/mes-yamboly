@@ -197,6 +197,16 @@ export class OrdersService {
       texto: `${usuario.nombre} creó la orden ${orden.codigo} · ${producto?.nombre ?? ''} · ${orden.planificado} unidades`,
     });
 
+    /* El cronómetro del wizard de inicio también alimenta el postest del TRI. */
+    this.emitirTri({
+      tipo: 'orden',
+      segundos: dto.tiempoRegistroSeg ?? 0,
+      usuarioId: usuario.id,
+      fecha: orden.fecha,
+      referenciaId: `${orden.id}-inicio`,
+      descripcion: `Inicio de ${orden.codigo}`,
+    });
+
     return enriquecerOrden(orden, await this.lookups.load());
   }
 
@@ -230,7 +240,7 @@ export class OrdersService {
       segundos: dto.tiempoRegistroSeg ?? 0,
       usuarioId: usuario.id,
       fecha: orden.fin.slice(0, 10),
-      referenciaId: orden.id,
+      referenciaId: `${orden.id}-cierre`,
       descripcion: `Cierre de ${orden.codigo}`,
     });
 

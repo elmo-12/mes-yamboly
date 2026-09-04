@@ -136,15 +136,15 @@ export const evidenciaTsp: EvidenciaTSP = {
 /* ------------------------------------------------------------------ */
 
 export const verificacionesCfs: VerificacionCFS[] = [
-  { id: 'CFS-1', n: 1, rf: 'RF1', funcionalidad: 'Captura de datos productivos', cumple: false, observacion: '', ruta: '/tiempo-real' },
-  { id: 'CFS-2', n: 2, rf: 'RF2', funcionalidad: 'Registro de producción', cumple: false, observacion: '', ruta: '/ordenes' },
-  { id: 'CFS-3', n: 3, rf: 'RF3', funcionalidad: 'Registro de paradas', cumple: false, observacion: '', ruta: '/ordenes/ORD-0815' },
-  { id: 'CFS-4', n: 4, rf: 'RF4', funcionalidad: 'Registro de mermas', cumple: false, observacion: '', ruta: '/ordenes/ORD-0815' },
-  { id: 'CFS-5', n: 5, rf: 'RF5', funcionalidad: 'Repositorio centralizado', cumple: false, observacion: '', ruta: '/ordenes' },
-  { id: 'CFS-6', n: 6, rf: 'RF6', funcionalidad: 'Dashboard en tiempo real', cumple: false, observacion: '', ruta: '/tiempo-real' },
-  { id: 'CFS-7', n: 7, rf: 'RF7', funcionalidad: 'Indicadores', cumple: false, observacion: '', ruta: '/reportes' },
-  { id: 'CFS-8', n: 8, rf: 'RF8', funcionalidad: 'Analítica con IA', cumple: false, observacion: '', ruta: '/analitica' },
-  { id: 'CFS-9', n: 9, rf: 'RF9', funcionalidad: 'Alertas', cumple: false, observacion: '', ruta: '/alertas' },
+  { id: 'CFS-1', n: 1, rf: 'RF1', funcionalidad: 'Captura de datos productivos', cumple: false, observacion: '', verificadaEn: null, ruta: '/tiempo-real' },
+  { id: 'CFS-2', n: 2, rf: 'RF2', funcionalidad: 'Registro de producción', cumple: false, observacion: '', verificadaEn: null, ruta: '/ordenes' },
+  { id: 'CFS-3', n: 3, rf: 'RF3', funcionalidad: 'Registro de paradas', cumple: false, observacion: '', verificadaEn: null, ruta: '/ordenes/ORD-0815' },
+  { id: 'CFS-4', n: 4, rf: 'RF4', funcionalidad: 'Registro de mermas', cumple: false, observacion: '', verificadaEn: null, ruta: '/ordenes/ORD-0815' },
+  { id: 'CFS-5', n: 5, rf: 'RF5', funcionalidad: 'Repositorio centralizado', cumple: false, observacion: '', verificadaEn: null, ruta: '/ordenes' },
+  { id: 'CFS-6', n: 6, rf: 'RF6', funcionalidad: 'Dashboard en tiempo real', cumple: false, observacion: '', verificadaEn: null, ruta: '/tiempo-real' },
+  { id: 'CFS-7', n: 7, rf: 'RF7', funcionalidad: 'Indicadores', cumple: false, observacion: '', verificadaEn: null, ruta: '/reportes' },
+  { id: 'CFS-8', n: 8, rf: 'RF8', funcionalidad: 'Analítica con IA', cumple: false, observacion: '', verificadaEn: null, ruta: '/analitica' },
+  { id: 'CFS-9', n: 9, rf: 'RF9', funcionalidad: 'Alertas', cumple: false, observacion: '', verificadaEn: null, ruta: '/alertas' },
 ];
 
 export const META_CFS = `${METAS_TESIS.CFS_TOTAL} / ${METAS_TESIS.CFS_TOTAL} funcionalidades`;
@@ -153,9 +153,10 @@ export const evidenciaCfs: EvidenciaCFS = {
   items: verificacionesCfs,
   cumplidas: 0,
   totales: verificacionesCfs.length,
-  porcentaje: 0,
+  verificadas: 0,
+  porcentaje: null,
   meta: META_CFS,
-  estado: estadoCfs(0),
+  estado: estadoCfs(null),
 };
 
 /* ------------------------------------------------------------------ */

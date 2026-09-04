@@ -51,10 +51,33 @@ export function errorSimulado(request: Request): Response | null {
   }
 }
 
-/** Envoltura común: latencia + error simulable. Devuelve `null` si debe continuar. */
+/**
+ * 422 espejo de `PaginationDto` de la API: `page ≥ 1` y `1 ≤ pageSize ≤ 100`.
+ * Sin esto el mock aceptaba páginas que la API rechaza y los fallos de
+ * paginación sólo aparecían al cambiar a modo `api`.
+ */
+export function errorPaginacion(url: URL): Response | null {
+  const detalles: Record<string, string> = {};
+  const revisar = (clave: 'page' | 'pageSize', maximo?: number) => {
+    const bruto = url.searchParams.get(clave);
+    if (bruto === null || bruto === '') return;
+    const valor = Number(bruto);
+    if (!Number.isInteger(valor)) detalles[clave] = `${clave} debe ser un entero`;
+    else if (valor < 1) detalles[clave] = `${clave} debe ser 1 o mayor`;
+    else if (maximo !== undefined && valor > maximo) {
+      detalles[clave] = `${clave} no puede superar ${maximo}`;
+    }
+  };
+  revisar('page');
+  revisar('pageSize', 100);
+  return Object.keys(detalles).length > 0 ? errores.validacion(detalles) : null;
+}
+
+/** Envoltura común: latencia + error simulable + paginación. `null` = continuar. */
 export async function preludio(request: Request): Promise<Response | null> {
-  await latencia(new URL(request.url).pathname);
-  return errorSimulado(request);
+  const url = new URL(request.url);
+  await latencia(url.pathname);
+  return errorSimulado(request) ?? errorPaginacion(url);
 }
 
 export function paginar<T>(items: T[], page: number, pageSize: number): Paginated<T> {

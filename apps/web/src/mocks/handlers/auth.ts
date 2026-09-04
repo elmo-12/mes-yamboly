@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import type { LoginResponse, User } from '@mes/types';
+import type { LoginResponse, Role, User } from '@mes/types';
 import { getStore, toUser } from '../store';
 import { API, ahoraIso, errores, normalizar, preludio } from './_utils';
 
@@ -10,6 +10,16 @@ export function usuarioDesdeToken(request: Request): User | null {
   const id = auth.slice(7).replace('mock.', '');
   const encontrado = getStore().usuarios.find((u) => u.id === id);
   return encontrado?.activo ? toUser(encontrado) : null;
+}
+
+/**
+ * Espejo de `@Roles` en la API: 403 si el usuario del token no está en la lista.
+ * Devuelve `null` cuando el handler puede continuar.
+ */
+export function exigeRol(request: Request, ...roles: Role[]): Response | null {
+  const usuario = usuarioDesdeToken(request);
+  if (!usuario) return errores.noAutorizado();
+  return roles.includes(usuario.rol) ? null : errores.prohibido();
 }
 
 export const authHandlers = [

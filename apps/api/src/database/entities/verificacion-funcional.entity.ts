@@ -25,4 +25,12 @@ export class VerificacionFuncional {
   /** Ruta de la pantalla que evidencia la funcionalidad. */
   @Column('text')
   ruta!: string;
+
+  /**
+   * ISO-8601 de la última verificación del investigador; `null` mientras nadie
+   * la haya revisado. Sin esta marca no se puede distinguir «verificada y no
+   * cumple» de «sin verificar», y el CFS arrancaría en 0 % en vez de sin datos.
+   */
+  @Column('text', { nullable: true, default: null })
+  verificadaEn!: string | null;
 }

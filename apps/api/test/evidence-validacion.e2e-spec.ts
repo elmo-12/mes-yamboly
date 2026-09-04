@@ -75,8 +75,8 @@ describe('evidencia · importación y validación de calidad (e2e)', () => {
       expect(porId[id]).toMatchObject({ valor: null, estado: 'sin_datos' });
     }
     expect(porId.TRI!.detalle).toContain('2,9 min');
-    /* Las 9 funcionalidades arrancan sin verificar: 0 %, no cumple. */
-    expect(porId.CFS).toMatchObject({ valor: 0, estado: 'no_cumple' });
+    /* Las 9 funcionalidades arrancan sin verificar: sin datos, no 0 %. */
+    expect(porId.CFS).toMatchObject({ valor: null, estado: 'sin_datos' });
 
     expect(body.comparativaTri).toEqual([
       { etapa: 'Pretest', minutos: 2.9 },
@@ -175,6 +175,33 @@ describe('evidencia · importación y validación de calidad (e2e)', () => {
 
     const historial = await get('/evidencia/fuentes/sensores/importaciones').expect(200);
     expect(historial.body.data).toHaveLength(2);
+    /* Dos importaciones del mismo segundo: el id correlativo desempata y la
+       más reciente encabeza el historial y el resumen de la fuente. */
+    expect(historial.body.data[0].id > historial.body.data[1].id).toBe(true);
+    const fuentes = await get('/evidencia/fuentes').expect(200);
+    const sensores = fuentes.body.data.find((f: { tipo: string }) => f.tipo === 'sensores');
+    expect(sensores.ultimaImportacion.id).toBe(historial.body.data[0].id);
+  });
+
+  it('rechaza con 422 el archivo al que le falta una columna obligatoria', async () => {
+    /* «Fecha y hora» no normaliza a `fecha_hora`: sin mapeo la columna no
+       existe y todas las filas caerían con un motivo que oculta la causa. */
+    const archivo = await xlsx(
+      ['Línea', 'Fecha y hora', 'Estado'],
+      [['LLEN-A1', `${DIA} 06:00`, 'PRODUCIENDO']],
+    );
+    const { body } = await post('/evidencia/fuentes/sensores/importar')
+      .attach('archivo', archivo, 'sin-columna.xlsx')
+      .expect(422);
+    expect(body.code).toBe('VALIDATION_ERROR');
+    expect(body.details.archivo).toContain('fecha_hora');
+
+    /* Con el mapeo que envía el wizard de la web sí entra. */
+    const ok = await post('/evidencia/fuentes/sensores/importar')
+      .field('mapeo', JSON.stringify({ linea: 'Línea', fecha_hora: 'Fecha y hora', estado: 'Estado' }))
+      .attach('archivo', archivo, 'sin-columna.xlsx')
+      .expect(201);
+    expect(ok.body.filasOk + ok.body.filasDuplicadas).toBe(1);
   });
 
   it('importa solicitudes y transferencias SAP con el mapeo de columnas', async () => {
@@ -299,7 +326,11 @@ describe('evidencia · importación y validación de calidad (e2e)', () => {
     /* Parada con n.º de solicitud: se comprueba contra la importación. */
     const par03 = porRegistro.get('PAR-0815-03')!;
     expect(par03.valido).toBe(true);
-    expect(par03.criterios[2]!.detalle).toBe('Solicitud SM-2026-0421 registrada el 28/08/2026');
+    /* La causa PN-02-01 no exige solicitud, pero el registro trae una y se
+       verifica igual: el detalle debe explicar por qué se comprobó. */
+    expect(par03.criterios[2]!.detalle).toBe(
+      'Solicitud SM-2026-0421 verificada aunque la causa PN-02-01 no la exige (registrada el 28/08/2026)',
+    );
 
     /* Parada sin tramo de sensor cerca: falla por Δ inicio. */
     const par02 = porRegistro.get('PAR-0815-02')!;
@@ -424,7 +455,23 @@ describe('evidencia · importación y validación de calidad (e2e)', () => {
     const { body } = await patch('/evidencia/cfs/CFS-1')
       .send({ cumple: true, observacion: 'Verificado en /tiempo-real con cronómetro TRI' })
       .expect(200);
-    expect(body.resumen).toMatchObject({ cumplidas: 1, totales: 9, porcentaje: 11.1, estado: 'no_cumple' });
+    expect(body.item.verificadaEn).toEqual(expect.any(String));
+    expect(body.resumen).toMatchObject({
+      cumplidas: 1,
+      verificadas: 1,
+      totales: 9,
+      porcentaje: 11.1,
+      estado: 'no_cumple',
+    });
+  });
+
+  it('una funcionalidad revisada que no cumple suma verificación pero no cumplimiento', async () => {
+    const { body } = await patch('/evidencia/cfs/CFS-8')
+      .send({ cumple: false, observacion: 'Pendiente de reentrenar el modelo de analítica' })
+      .expect(200);
+    expect(body.item).toMatchObject({ cumple: false });
+    expect(body.item.verificadaEn).toEqual(expect.any(String));
+    expect(body.resumen).toMatchObject({ cumplidas: 1, verificadas: 2, porcentaje: 11.1 });
   });
 
   it('confirmar una alerta crea la primera fila del Anexo 06', async () => {

@@ -70,6 +70,13 @@ export class CreateOrdenDto {
   @IsArray()
   @IsString({ each: true })
   colaboradorIds?: string[];
+
+  @ApiPropertyOptional({ description: 'Segundos de registro — alimenta el KPI TRI', default: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  tiempoRegistroSeg?: number;
 }
 
 export class FinalizeOrdenDto {

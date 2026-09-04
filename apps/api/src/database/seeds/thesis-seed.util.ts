@@ -4,6 +4,10 @@
  * (mismo `mulberry32`, mismos offsets) para que API y mock den las mismas cifras.
  */
 
+import { HOY as HOY_SEED } from './data/seed';
+
+export { HOY_SEED as HOY };
+
 export const SEED = 20260828;
 
 export function mulberry32(seed: number): () => number {
@@ -38,10 +42,14 @@ function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
-/** `YYYY-MM-DD` de hoy en hora local. */
+/**
+ * Día de referencia de los seeds de tesis. Es la misma fecha congelada que usan
+ * los datasets operativos (`data/seed.ts`) y el mock del navegador: si aquí se
+ * leyera el reloj real, la API y el mock devolverían fechas distintas para el
+ * mismo dato sembrado (alertas, reportes, analítica y pretest del TRI).
+ */
 export function hoy(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  return HOY_SEED;
 }
 
 /** Hoy menos `dias`, en `YYYY-MM-DD`. */

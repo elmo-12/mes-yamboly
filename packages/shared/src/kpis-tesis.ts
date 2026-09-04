@@ -137,12 +137,29 @@ export function estadoTsp(pct: number | null | undefined): EstadoKpi {
 /* ------------------------------------------------------------------ */
 
 /** CFS = FV / FT × 100 (funcionalidades verificadas sobre 9). */
-export function calcCfs(funcionalidadesVerificadas: number, total = METAS_TESIS.CFS_TOTAL): number {
+export function calcCfs(
+  funcionalidadesVerificadas: number,
+  total: number = METAS_TESIS.CFS_TOTAL,
+): number {
   if (total <= 0) return 0;
   return round1((funcionalidadesVerificadas / total) * 100);
 }
 
-export function estadoCfs(pct: number): EstadoKpi {
+/**
+ * CFS del Anexo 05: `null` mientras el investigador no haya verificado ninguna
+ * de las 9 funcionalidades. Una funcionalidad sin verificar no es lo mismo que
+ * una verificada que no cumple, así que el KPI arranca en «sin datos».
+ */
+export function calcCfsOpcional(
+  funcionalidadesCumplidas: number,
+  funcionalidadesVerificadas: number,
+  total: number = METAS_TESIS.CFS_TOTAL,
+): number | null {
+  return funcionalidadesVerificadas <= 0 ? null : calcCfs(funcionalidadesCumplidas, total);
+}
+
+export function estadoCfs(pct: number | null | undefined): EstadoKpi {
+  if (sinMuestras(pct)) return 'sin_datos';
   if (pct >= 100) return 'cumple';
   if (pct >= 80) return 'en_riesgo';
   return 'no_cumple';

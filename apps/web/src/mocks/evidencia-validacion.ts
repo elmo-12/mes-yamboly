@@ -280,10 +280,14 @@ export function criterioSolicitud(
       : 'porque aún no se importó ninguna solicitud';
     return criterio('solicitud', false, `Solicitud ${numero} no encontrada ${donde}`);
   }
+  /* Un número anotado sin que la causa lo exija sigue siendo trazable: se
+     verifica igual, pero el detalle debe decir por qué se comprobó. */
   return criterio(
     'solicitud',
     true,
-    `Solicitud ${encontrada.numero} registrada el ${fechaCorta(encontrada.fecha)}`
+    requiere
+      ? `Solicitud ${encontrada.numero} registrada el ${fechaCorta(encontrada.fecha)}`
+      : `Solicitud ${encontrada.numero} verificada aunque la causa ${causaCodigo} no la exige (registrada el ${fechaCorta(encontrada.fecha)})`
   );
 }
 

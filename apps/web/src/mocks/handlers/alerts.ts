@@ -3,9 +3,22 @@ import type { AlertasResumen, Alerta } from '@mes/types';
 import { confirmarAcierto, epActual, getStore } from '../store';
 import { API, ahoraIso, errores, listaQuery, normalizar, numeroQuery, paginar, preludio } from './_utils';
 
+/**
+ * «Día operativo» de la bandeja, espejo de `diaOperativo` en la API: si hay
+ * alertas del día real ese es el día; si no, el más reciente con actividad.
+ * Sin esta regla el juego de datos congelado dejaba «Atendidas hoy» en 0.
+ */
+function diaOperativoAlertas(alertas: readonly Alerta[]): string {
+  const hoyReal = ahoraIso().slice(0, 10);
+  const fechas = alertas.map((a) => (a.atendidaEn ?? a.generadaEn).slice(0, 10));
+  if (fechas.includes(hoyReal)) return hoyReal;
+  const masReciente = fechas.reduce((mejor, f) => (f > mejor ? f : mejor), '');
+  return masReciente || hoyReal;
+}
+
 function resumen(): AlertasResumen {
   const store = getStore();
-  const hoy = ahoraIso().slice(0, 10);
+  const hoy = diaOperativoAlertas(store.alertas);
   return {
     activas: store.alertas.filter((a) => a.estado === 'activa').length,
     atendidasHoy: store.alertas.filter(

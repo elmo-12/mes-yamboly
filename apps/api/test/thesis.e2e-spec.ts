@@ -50,8 +50,9 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       expect(porId.TCI).toMatchObject({ valor: null, estado: 'sin_datos' });
       expect(porId.TSP).toMatchObject({ valor: null, estado: 'sin_datos' });
       expect(porId.EP).toMatchObject({ valor: null, estado: 'sin_datos' });
-      /* La lista de cotejo existe pero arranca sin ninguna funcionalidad marcada. */
-      expect(porId.CFS).toMatchObject({ valor: 0, estado: 'no_cumple' });
+      /* La lista de cotejo existe pero arranca sin ninguna funcionalidad
+         verificada: sin verificaciones el CFS es «sin datos», no 0 %. */
+      expect(porId.CFS).toMatchObject({ valor: null, estado: 'sin_datos' });
       expect(porId.TCI!.detalle).toContain('fuentes externas');
 
       expect(body.comparativaTri).toEqual([
@@ -98,7 +99,12 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
     expect(body.items).toHaveLength(9);
     expect(body.cumplidas).toBe(0);
     expect(body.totales).toBe(9);
-    expect(body.porcentaje).toBe(0);
+    expect(body.verificadas).toBe(0);
+    expect(body.porcentaje).toBeNull();
+    expect(body.estado).toBe('sin_datos');
+    expect(body.items.every((i: { verificadaEn: string | null }) => i.verificadaEn === null)).toBe(
+      true,
+    );
   });
 
   /* ---------------------------------------------------------------- */

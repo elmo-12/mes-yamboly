@@ -1,7 +1,7 @@
 # Product Backlog — MES Yamboly
 
-Fecha de corte: 4-sep-2026, tarde (ajustes de configuración y tiempo real: sin máquina/equipo, mantenedor de líneas, sin sedes; corte anterior 4-sep-2026 con el cierre de la fase 2 "maestros reales"; corte previo 3-sep-2026 con 8 historias `En curso`) · Rama `feat/ajustes-configuracion` (sobre `feat/maestros-reales`, base `main` en `2bb7f89`) · Producto: MES con analítica IA para Helatony's S.A.C. (Yamboly).
-Fuente de estado: `git log --oneline`, `git status` y el código en `apps/api`, `apps/web`, `packages/types` al momento del corte, más el QA de integración de fase 2 y fase 2b (`docs/qa-report.md`).
+Fecha de corte: **4-sep-2026, noche** (fase "Evidencia real": limpieza del postest hipotético, importadores de fuentes externas, validación de calidad TCI, invitaciones TSP; corte anterior 4-sep-2026 tarde con los ajustes de configuración y tiempo real — sin máquina/equipo, mantenedor de líneas, sin sedes; corte previo 4-sep-2026 mañana con el cierre de la fase 2 "maestros reales"; corte previo 3-sep-2026 con 8 historias `En curso`) · Rama `feat/evidencia-real` (sobre `feat/ajustes-configuracion` → `feat/maestros-reales`, base `main` en `2bb7f89`) · Producto: MES con analítica IA para Helatony's S.A.C. (Yamboly).
+Fuente de estado: `git log --oneline`, `git status` y el código en `apps/api`, `apps/web`, `packages/types` al momento del corte, más el QA de integración de fase 2 y fase 2b (`docs/qa-report.md`; la fase 3 aún no tiene su pasada de QA, ver «QA fase 3 (pendiente de la pasada de integración)» en ese mismo documento).
 
 ---
 
@@ -11,15 +11,15 @@ Yamboly opera 9 líneas de envasado (4 llenadoras, 2 extrusoras, 3 moldeadoras) 
 
 El MES Yamboly es el sistema construido para la tesis *"Implementación de un MES con analítica inteligente basada en IA para el control y monitoreo de la producción en la empresa Yamboly, Lima, 2026"* (UNT). Su objetivo es doble: (1) dar a la planta una herramienta real de captura en tiempo real, indicadores OEE, alertas predictivas y evidencia auditable, y (2) servir de instrumento experimental para demostrar, con datos medibles, que el registro de datos deja de tomar minutos y pasa a tomar segundos, que la información capturada es confiable, y que las alertas predictivas aciertan con la frecuencia suficiente para ser útiles. Todo el diseño viene de un Master Design System validado en Figma (57 pantallas) y todo el modelo de datos —líneas, productos, velocidades y causas— viene de la extracción real del sistema anterior (Strapi/Postgres), no de datos inventados.
 
-El sistema se evalúa con 5 KPIs de tesis, cada uno con una meta y un valor demostrado sobre los datos de evidencia (Anexos 02–06):
+El sistema se evalúa con 5 KPIs de tesis, cada uno con una meta y un instrumento que lo sustenta (Anexos 02–06). Desde la fase "Evidencia real" (4-sep-2026, noche) el **postest** de los 5 KPI ya no se siembra con datos hipotéticos: cada instrumento arranca vacío y se llena únicamente con uso real del sistema (capturas, encuesta pública, checklist manual, alertas confirmadas, validación TCI contra fuentes externas importadas). Los valores que documentaban corte anteriores de este backlog (TRI 1,4 min, TCI 93,3 %, TSP 84,2 %, CFS 100 %, EP 83,5 %) eran un **seed hipotético de la fase 1, retirado el 4-sep-2026**; no hay un valor de reemplazo que reportar hasta que la planta genere datos reales — el sistema los calculará automáticamente sobre esos datos según use la planta.
 
-| KPI | Definición | Meta | Valor actual |
+| KPI | Definición | Meta | Estado al corte |
 | --- | --- | --- | --- |
-| **TRI** | Tiempo de Registro de Incidencias (ΣTR / n) | Reducción ≥ 40 % vs. pretest | **1,4 min (−51,7 % vs. 2,9 min pretest)** |
-| **TCI** | Tasa de Calidad de Información (RC / RT × 100) | ≥ 90 % | **93,3 % (28/30 registros correctos)** |
-| **TSP** | Tasa de Satisfacción del Personal (encuesta de 8 ítems, PO / PT × 100) | ≥ 80 % de acuerdo | **84,2 % (128/152, 19 respuestas)** |
-| **CFS** | Cumplimiento Funcional del Sistema (FV / FT, funcionalidades verificadas / totales) | 9 / 9 | **9 / 9 (100 %)** |
-| **EP** | Efectividad de las Predicciones (PCC / PTG × 100) | ≥ 80 % | **83,5 % (137/164 predicciones acertadas)** |
+| **TRI** | Tiempo de Registro de Incidencias (ΣTR / n) | Reducción ≥ 40 % vs. pretest | `sin_datos` — postest vacío; **pretest conservado: 2,9 min** (10 registros medidos a mano, línea base) |
+| **TCI** | Tasa de Calidad de Información (RC / RT × 100) | ≥ 90 % | `sin_datos` — sin evaluaciones; se calcula con `POST /evidencia/tci/validar` contra sensores/solicitudes/SAP importados |
+| **TSP** | Tasa de Satisfacción del Personal (encuesta de 8 ítems, PO / PT × 100) | ≥ 80 % de acuerdo | `sin_datos` — sin invitaciones ni respuestas; se llena desde `/encuesta/[token]` |
+| **CFS** | Cumplimiento Funcional del Sistema (FV / FT, funcionalidades verificadas / totales) | 9 / 9 | `sin_datos` — 9 funcionalidades sin verificar (`cumple: false`, sin `verificadaEn`) |
+| **EP** | Efectividad de las Predicciones (PCC / PTG × 100) | ≥ 80 % | `sin_datos` — sin confirmaciones de evidencia; se llena al confirmar alertas reales en `/alertas` |
 
 Este backlog documenta el trabajo necesario para sostener esos 5 KPIs con datos reales de Yamboly y hacer que las 9 funcionalidades contractuales (captura de datos, registro de producción, paradas, mermas, repositorio centralizado, dashboard en tiempo real, indicadores, analítica IA y alertas/predicciones) funcionen de punta a punta, tanto en el mock de demostración como contra el backend real.
 
@@ -43,7 +43,7 @@ Este backlog documenta el trabajo necesario para sostener esos 5 KPIs con datos 
 - **Prioridad (MoSCoW):** `Must` (bloquea la tesis o la operación diaria) · `Should` (valor claro, no bloqueante) · `Could` (mejora deseable) · `Won't` (fuera de este alcance).
 - **Estimación:** puntos de historia, escala Fibonacci (1, 2, 3, 5, 8, 13, 21).
 - **Estados:** `Hecho` (código en `main`/rama de fase, verificado) · `En curso` (código presente pero incompleto o con cambios sin commitear) · `Pendiente` (no iniciado) · `Descartada` (se retira del alcance por una decisión explícita del producto, documentada en la propia historia con fecha; **sus puntos no se computan** en ningún total de la sección 6 "Métricas del backlog" — se muestran aparte).
-- **Sprints:** `S1–S4` = fase Figma → código (ago-2026, base `2bb7f89`, 57/57 frames) · `S5` = fase actual "maestros reales" (mantenedores completos + datos reales, en curso) · `S6+` = pendientes sin fecha asignada.
+- **Sprints:** `S1–S4` = fase Figma → código (ago-2026, base `2bb7f89`, 57/57 frames) · `S5` = fase "maestros reales" + ajustes del 4-sep tarde (Hecho) · `S6` = fase "Evidencia real" (4-sep-2026, noche: limpieza del postest hipotético, importadores de fuentes externas, validación TCI, invitaciones TSP) · `S7+` = pendientes sin fecha asignada.
 - **Definición de Terminado (DoD):** `pnpm --filter @mes/types build && pnpm typecheck && pnpm lint && pnpm build` en verde · suite e2e correspondiente en verde · paridad mock↔API (mismos datos, mismo contrato) · fidelidad a Figma o desviación justificada por documento · todos los estados de UI cubiertos (loading / empty / no-results / error / success+toast / validación / confirmación / forbidden) · un único `Button variant="primary"` por pantalla · baja lógica con modal de confirmación en toda acción Danger.
 
 ---
@@ -126,7 +126,7 @@ Como **supervisor de turno**, quiero ver las 9 líneas reales (no las 5 anterior
 - Barrido de turnos M/T/N → D/N aplicado en tiempo real y TV (turno único de 12 h, no 3 de 8 h).
 
 **E2-07 — Persistir evidencia fotográfica de merma**
-`Prioridad: Should · Puntos: 3 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Should · Puntos: 3 · Estado: Pendiente · Sprint: S7`
 Como **encargado de mermas**, quiero que la foto de evidencia que adjunto al registrar una merma quede guardada en el servidor, para poder revisarla después sin depender de que nadie borre el archivo local.
 - Hoy `Merma.evidenciaUrl` no se persiste: la foto sólo se exige como validación en el cliente (`AdjuntarFoto`), el backend no la recibe ni la guarda.
 - Requiere un endpoint de subida (multipart o presigned URL) y que `POST /mermas` acepte `evidenciaUrl` resuelta.
@@ -138,6 +138,12 @@ Como **supervisor de turno**, quiero que cada `LineCard` de `/tiempo-real` muest
 - `LineCard` ampliada: 2 columnas en pantallas ≥1280 px, métricas en grilla 2×2, barra de progreso etiquetada (no solo el número), mensaje contextual según el estado de la línea.
 - `LineasFilterBar` pierde el filtro de línea (9 tarjetas siempre visibles) y el selector de sede del header (`TiempoRealHeader`); `GET /tiempo-real/lineas` deja de aceptar `sedeId`.
 - **Cierre (4-sep-2026, tarde):** commit `19172ce`; `LineasGrid.tsx`, `TiempoRealHeader.tsx`, `TiempoRealPage.tsx` y `linea-view.ts` migrados; frame Figma 2156:3936 documentado como desviación (grid de tarjetas más grandes, sin selector de sede) en `docs/figma-map.md`/`docs/figma-specs-modulos.md`. Verificado responsive 1440/1024/390 sin desbordamiento (`docs/qa-report.md`, QA fase 2b).
+
+**E2-09 — `LineaEstado.oeeTurnoPct` en el contrato**
+`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S7`
+Como **supervisor de turno**, quiero que la `LineCard` ampliada muestre el OEE del turno en curso (no sólo "Última parada"), para leer el desempeño de la línea sin salir de `/tiempo-real`.
+- Detectado en el QA de fase 2b (4-sep-2026): `oeeTurnoPct` no existe hoy en `LineaEstado`; la `LineCard` ampliada de `E2-08` muestra «Última parada» en su lugar.
+- Requiere calcular el OEE parcial del turno en curso en `realtime.service.ts` y sumarlo al contrato `TiempoRealResumen`.
 
 ---
 
@@ -201,7 +207,7 @@ Como **investigador**, quiero exportar los datasets de reportes en XLSX, para ll
 - 422 si `datasets` viene vacío.
 
 **E4-05 — Exportación CSV/PDF**
-`Prioridad: Could · Puntos: 5 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Could · Puntos: 5 · Estado: Pendiente · Sprint: S7`
 Como **jefe de producción**, quiero exportar también en CSV y PDF, para compartir reportes con quien no abre Excel.
 - `formato` del contrato ya admite `csv|pdf`, pero el backend solo genera XLSX hoy.
 - Requiere plantilla PDF (encabezado, KPIs, gráficos) y serialización CSV por dataset.
@@ -227,7 +233,7 @@ Como **supervisor de turno**, quiero atender una alerta describiendo la acción 
 Como **calidad**, quiero confirmar si la alerta ocurrió realmente o fue un falso positivo, para que el sistema acumule la Efectividad de las Predicciones (EP) con datos reales.
 - `ConfirmarEvento{ocurrio, observacion?}` devuelve `ep` (EP acumulada en %) además de la alerta y el resumen.
 - 409 si la alerta ya fue confirmada.
-- Alimenta el Anexo 06 (137/164 predicciones acertadas, sin alterar el total al redistribuir entre líneas).
+- Alimenta el Anexo 06; desde `E7-14` (S6) sólo cuentan las confirmaciones reales, no las alertas «confirmadas» de demostración del seed.
 
 **E5-04 — Confirmación en lote**
 `Prioridad: Should · Puntos: 3 · Estado: Hecho · Sprint: S3`
@@ -265,7 +271,7 @@ Como **investigador**, quiero ver las 6 fases CRISP-DM, las métricas del modelo
 - `PredictionProvider` intercambiable: `RuleBasedPredictionProvider` activo hoy, `PythonHttpPredictionProvider` como stub con fallback (`PREDICTION_SERVICE_URL`).
 
 **E6-05 — Microservicio Python real (scikit-learn)**
-`Prioridad: Must · Puntos: 13 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Must · Puntos: 13 · Estado: Pendiente · Sprint: S7`
 Como **investigador**, quiero que las predicciones vengan de un modelo scikit-learn entrenado con los datos reales de la planta (no solo reglas), para que el capítulo de analítica IA de la tesis tenga un modelo entrenado detrás.
 - Servicio HTTP en Python que implemente el contrato ya definido por `PythonHttpPredictionProvider`.
 - Entrenamiento con los datos reales extraídos (paradas, mermas, velocidades) siguiendo CRISP-DM (fases ya documentadas en `/analitica/modelo`).
@@ -277,38 +283,111 @@ Como **investigador**, quiero que las predicciones vengan de un modelo scikit-le
 
 **E7-01 — TRI: tiempo de registro de incidencias**
 `Prioridad: Must · Puntos: 5 · Estado: Hecho · Sprint: S4`
-Como **investigador**, quiero ver el TRI postest comparado contra el pretest cargado manualmente, para sustentar la reducción del 51,7 % con datos trazables al Anexo 02.
+Como **investigador**, quiero ver el TRI postest comparado contra el pretest cargado manualmente, para sustentar la reducción del tiempo de registro con datos trazables al Anexo 02.
 - `EvidenciaTRI{postest, pretest, promedioPostest, promedioPretest, reduccionPct, meta, estado}`.
 - `POST /evidencia/tri/pretest` carga la hoja pretest (`{fecha, eventoRegistrado, horaInicioRegistro, tiempoMin}`); 422 si la lista viene vacía.
 - `tiempoRegistroSeg` de cada parada/merma/velocidad alimenta el postest automáticamente (evento `evidence.tri.registro`).
+- **Nota (S6, 4-sep-2026 noche):** el postest ya no trae un seed hipotético — `promedioPostest`/`reduccionPct` son `null` (`estado: 'sin_datos'`) hasta la primera captura real; el pretest (2,9 min) se conserva como línea base. Ver `E7-07`.
 
 **E7-02 — TCI: tasa de calidad de información**
-`Prioridad: Must · Puntos: 5 · Estado: Hecho · Sprint: S4`
-Como **investigador**, quiero ver cuántos registros de validación de orden fueron correctos sobre el total, para sustentar el 93,3 % (28/30) del Anexo 03.
-- `EvidenciaTCI{registros, registrosCorrectos, registrosTotales, porcentaje, meta, estado}` calculado sobre `E3-03`.
+`Prioridad: Must · Puntos: 5 · Estado: Hecho · Sprint: S4 (rediseñada en S6)`
+Como **investigador**, quiero ver cuántos registros son correctos sobre el total evaluado, para sustentar la tasa de calidad de información del Anexo 03 con un criterio verificable.
+- `EvidenciaTCI{registros, registrosCorrectos, registrosTotales, porcentaje, meta, estado}`.
+- **Superada por `E7-09` (S6):** hasta el cierre de la fase 2 este KPI se calculaba sobre `E3-03` (validar orden); desde la fase "Evidencia real" se calcula con un motor de reglas propio contra 3 fuentes externas importadas (sensores, solicitudes, transferencias SAP). Esta historia queda como el enunciado original del instrumento; el modelo vigente está en `E7-08`–`E7-11`.
 
 **E7-03 — TSP: satisfacción del personal + encuesta pública**
 `Prioridad: Must · Puntos: 8 · Estado: Hecho · Sprint: S4`
-Como **investigador**, quiero una encuesta pública de 8 ítems Likert que cualquier operario pueda responder con un enlace, para sustentar el 84,2 % de acuerdo (128/152, 19 respuestas) sin depender de que estén logueados.
+Como **investigador**, quiero una encuesta pública de 8 ítems Likert que cualquier operario pueda responder con un enlace, para sustentar la tasa de satisfacción del personal sin depender de que estén logueados.
 - `GET/POST /encuesta/:token` público, token de un solo uso, recalcula TSP al recibir cada respuesta.
 - `EncuestaTSP{items[8], respuestas, invitados, promedio, pctAcuerdo, meta, estado, enlace}`.
+- **Ampliada en S6 (`E7-12`):** el enlace único se reemplaza por invitaciones nominales con token de un solo uso por invitado.
 
 **E7-04 — CFS: cumplimiento funcional (9/9)**
 `Prioridad: Must · Puntos: 3 · Estado: Hecho · Sprint: S4`
-Como **calidad**, quiero un checklist de las 9 funcionalidades contractuales marcadas cumple/no cumple, para sustentar el CFS = 9/9 con evidencia verificable ítem por ítem.
+Como **calidad**, quiero un checklist de las 9 funcionalidades contractuales marcadas cumple/no cumple, para sustentar el CFS con evidencia verificable ítem por ítem (meta 9/9 funcionalidades verificadas).
 - `EvidenciaCFS{items[9], cumplidas, totales, porcentaje, meta, estado}`.
 - `PATCH /evidencia/cfs/:id {cumple, observacion}` deja registro de quién validó cada ítem.
+- **Ampliada en S6 (`E7-13`):** `porcentaje` distingue "sin verificar" de "verificada y no cumple" (`verificadaEn`); el seed arranca con las 9 sin verificar, no con el checklist ya resuelto.
 
 **E7-05 — EP: efectividad de las predicciones**
 `Prioridad: Must · Puntos: 5 · Estado: Hecho · Sprint: S4`
-Como **investigador**, quiero ver el acumulado de predicciones acertadas sobre el total, para sustentar el 83,5 % (137/164) del Anexo 06.
+Como **investigador**, quiero ver el acumulado de predicciones acertadas sobre el total, para sustentar la efectividad de las predicciones del Anexo 06 con confirmaciones reales.
 - `EvidenciaEP{registros, prediccionesCorrectas, prediccionesTotales, porcentaje, meta, estado}` alimentado por `E5-03`.
+- **Nota (S6):** las alertas «confirmadas» del seed de demostración dejan de contar como evidencia — sólo suman EP las confirmaciones reales hechas en `/alertas`. Ver `E7-14`.
 
 **E7-06 — Exportación de anexos XLSX (02–06)**
 `Prioridad: Should · Puntos: 5 · Estado: Hecho · Sprint: S4`
 Como **investigador**, quiero exportar los 5 KPIs como anexos XLSX (una hoja por anexo), para entregarlos directamente en la tesis sin retrabajo.
 - `POST /evidencia/exportar {kpis[], formato, destino(spss|informe)}` (202).
 - Una hoja por KPI, generada con `exceljs` sobre los datos reales de la evidencia.
+
+**E7-07 — Vaciar el postest hipotético del seed de tesis**
+`Prioridad: Must · Puntos: 3 · Estado: Hecho · Sprint: S6`
+Como **investigador**, quiero que los 5 instrumentos arranquen sin datos de postest inventados, para que ningún resultado de la tesis dependa de un valor que el sistema no generó con uso real.
+- `thesis-evidence.seed.ts` deja de sembrar TRI postest, evaluaciones TCI, respuestas TSP y registros EP; sólo conserva el pretest del TRI (10 filas, 2,9 min) y las 9 verificaciones CFS sin marcar.
+- `KpiTesis.estado` gana el valor `sin_datos` (`valor: null`); `EvidenciaResumen.comparativaTri` devuelve `Postest.minutos: null` mientras no haya capturas.
+- Paridad literal con el mock (`apps/web/src/mocks/data/evidence.ts` vaciado igual).
+
+**E7-08 — Importadores de fuentes externas (sensores, solicitudes, SAP) con plantillas**
+`Prioridad: Must · Puntos: 8 · Estado: Hecho · Sprint: S6`
+Como **investigador**, quiero descargar una plantilla XLSX por fuente, llenarla con lo que exporta el sensor/ERP y subirla, para validar el TCI sin depender de una integración en vivo que la planta todavía no tiene.
+- `GET /evidencia/fuentes/:tipo/plantilla` (XLSX con 3 filas de ejemplo + hoja «Instrucciones»), `POST /evidencia/fuentes/:tipo/importar` (multipart, ≤5 MB, `mapeo` opcional de columnas), `GET /evidencia/fuentes` y `.../importaciones` (estado y historial).
+- Lectura tolerante (`tabla.util.ts`): cabeceras normalizadas, fechas Excel/ISO/latina, números con coma decimal, deduplicación por clave natural, motivo de rechazo por fila.
+- `ImportarFuenteModal.tsx` con vista previa; en mock, lectura con `xlsx` (SheetJS) en el navegador.
+
+**E7-09 — Motor de validación de calidad (TCI) contra fuentes externas**
+`Prioridad: Must · Puntos: 8 · Estado: Hecho · Sprint: S6`
+Como **investigador**, quiero que cada parada, merma y velocidad se valide contra sensores, solicitudes y transferencias SAP importados, para sustentar el TCI con un criterio objetivo y no con la validación manual de la orden.
+- `POST /evidencia/tci/validar {desde?, hasta?, tipos?}` reemplaza las evaluaciones del rango; `GET /evidencia/tci` paginado con filtros (`tipo`, `resultado`, `desde`, `hasta`); `GET /evidencia/tci/resumen` para la cabecera.
+- Criterios por tipo (`evidence.rules.ts`): `completo` (todos); `sensor` (parada: tiempos vs. tramos de sensor; velocidad: u/min vs. lectura cercana); `solicitud` (parada/merma, si la causa lo exige); `sap` (merma: transferencia por línea/producto/fecha/kg).
+- `ValidarTciModal.tsx` lanza la corrida; `EvaluacionTCI.detalle` explica cada criterio en lenguaje llano.
+
+**E7-10 — Overrides manuales por criterio TCI**
+`Prioridad: Should · Puntos: 3 · Estado: Hecho · Sprint: S6`
+Como **calidad**, quiero forzar el resultado de un criterio con una justificación cuando la regla se equivoca (dato mal cargado en la fuente, sensor con falla puntual), para no perder un registro válido por un problema de la fuente externa, no del registro.
+- `PATCH /evidencia/tci/:id {overrides: {clave: boolean|null}, observacion?}`; `null` devuelve el criterio a la regla.
+- `RevisarEvaluacionDrawer.tsx`: un switch por criterio, con la explicación de la regla y la observación obligatoria para justificar el override.
+
+**E7-11 — Tolerancias del TCI configurables en Umbrales**
+`Prioridad: Should · Puntos: 2 · Estado: Hecho · Sprint: S6`
+Como **jefe de producción**, quiero ajustar la tolerancia de tiempo, cantidad y fecha que usa la validación TCI, para calibrarla a la precisión real de los sensores y del proceso de SAP de la planta.
+- `Umbrales` suma `tciToleranciaMin` (±5 min, def.), `tciToleranciaPct` (±5 %, def.) y `tciToleranciaDiasSap` (±1 día, def.).
+- Sección «Validación de calidad (TCI)» en `UmbralesTab.tsx` (Configuración); `UmbralesDrawer.tsx` (Alertas) reenvía los 3 campos sin exponerlos, para no perderlos en el `PUT`.
+
+**E7-12 — Invitaciones nominales a la encuesta TSP**
+`Prioridad: Must · Puntos: 5 · Estado: Hecho · Sprint: S6`
+Como **investigador**, quiero invitar a cada persona con un enlace de un solo uso, para saber exactamente quién respondió y no depender de un único enlace compartido sin control de duplicados.
+- `POST /evidencia/tsp/invitaciones {invitado, rol?}` → token + URL pública; `GET /evidencia/tsp` agrega `invitaciones` (respondida/pendiente) junto a los 8 ítems.
+- `NuevaInvitacionModal.tsx` crea la invitación y copia el enlace; sin seed de invitaciones ni respuestas.
+
+**E7-13 — CFS: distinguir "sin verificar" de "verificada y no cumple"**
+`Prioridad: Should · Puntos: 2 · Estado: Hecho · Sprint: S6`
+Como **calidad**, quiero que el sistema distinga una funcionalidad que aún no reviso de una que revisé y no cumple, para que el CFS no se lea como "0 % cumplido" cuando en realidad nadie lo verificó todavía.
+- `VerificacionCFS.verificadaEn` (ISO-8601 o `null`), sellado por `PATCH /evidencia/cfs/:id`; `EvidenciaCFS.verificadas` cuenta las revisadas y `porcentaje` es `null` (`estado: 'sin_datos'`) mientras `verificadas === 0`.
+- Seed: 9 funcionalidades sin verificar (antes: implícitamente ya cumplidas).
+
+**E7-14 — EP: excluir del acumulado las alertas de demostración**
+`Prioridad: Should · Puntos: 2 · Estado: Hecho · Sprint: S6`
+Como **investigador**, quiero que el EP sólo cuente confirmaciones reales hechas en `/alertas`, para que el KPI no incluya las 7 alertas «confirmadas» que trae el seed únicamente para poder demostrar la pantalla.
+- Sin seed de `registro_ep`; se crea al confirmar una alerta real (`POST /alertas/:id/confirmar`), acierto o no.
+- Las alertas de demostración del seed quedan marcadas para no generar EP.
+
+**E7-15 — Home sin KPI de TRI fijo**
+`Prioridad: Should · Puntos: 1 · Estado: Hecho · Sprint: S6`
+Como **jefe de producción**, quiero que el Home no muestre un TRI fijo cuando el postest todavía no tiene capturas, para no ver en el dashboard un número que la planta aún no generó.
+- `homeKpisSecundarios` (mock) deja de traer el TRI; el Home lo compone desde `GET /evidencia/resumen` (`useResumenJefe`), que devuelve `null` sin capturas postest.
+
+**E7-16 — Conector en vivo con sensores IoT para el TCI**
+`Prioridad: Should · Puntos: 8 · Estado: Pendiente · Sprint: S7`
+Como **investigador**, quiero que las lecturas de sensor lleguen automáticamente al TCI en vez de importarse por archivo, para validar el TCI en tiempo real y no depender de que alguien exporte y suba un XLSX cada cierto tiempo.
+- Reemplazaría el paso "descargar plantilla → llenar → subir" de `E7-08` por un stream o polling contra el sistema de sensores de planta, alimentando `LecturaSensor` directamente.
+- El motor de reglas de `E7-09` no cambia: sólo cambia el origen de los datos.
+
+**E7-17 — Integración en vivo con SAP (transferencias de merma)**
+`Prioridad: Should · Puntos: 8 · Estado: Pendiente · Sprint: S7`
+Como **investigador**, quiero que las transferencias de merma de SAP lleguen automáticamente al TCI, para no depender de una exportación manual del ERP para validar el criterio `sap` de cada merma.
+- Requiere acceso al ERP de Yamboly (API o exportación programada); hoy sólo hay importación manual (`E7-08`).
+- El criterio `sap` de `evidence.rules.ts` no cambia: sólo cambia el origen de `TransferenciaSap`.
 
 ---
 
@@ -375,7 +454,7 @@ Como **jefe de producción**, quiero crear usuarios, editarlos, activarlos/desac
 - **Ajuste (4-sep-2026, tarde):** usuarios **sin sede** (decisión del producto, ver E8-08 Descartada) — `sedeId` se retira de `CreateUsuario`/`User`, del filtro `GET /usuarios` y del `UsuarioDrawer` (ya no filtra "sólo sedes activas", ese campo no existe). La pestaña pasa de `SedesUsuariosTab.tsx` a `UsuariosTab.tsx`, mantenedor exclusivo de personas. Verificado en el QA de fase 2b contra la API real.
 
 **E8-10 — Umbrales de alerta: modelo completo según Figma**
-`Prioridad: Could · Puntos: 3 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Could · Puntos: 3 · Estado: Pendiente · Sprint: S7`
 Como **jefe de producción**, quiero ajustar los 8 umbrales y acciones de cabecera que muestra el frame Figma **2165:13218** (no solo los 5 campos actuales), para calibrar el motor de reglas con el mismo nivel de detalle que diseñó el MDS.
 - El modelo actual (`E8-07`, Hecho) cubre `velocidadBajoEstandarPct`, `oeeMinimo`, `probabilidadMinima`, `notificarN8n`, `mostrarTv` — una reducción consciente frente a los 8 ajustes + acciones de cabecera del frame (decisión previa, documentada en el QA de fase 1 y sostenida en la fase 2).
 - Requiere ampliar `Umbrales` en `@mes/types` y el contrato `GET/PUT /alertas/umbrales`.
@@ -415,7 +494,7 @@ Como **equipo de desarrollo**, quiero las entidades TypeORM y los servicios de `
 Como **investigador**, quiero que los seeds de la API y los mocks del frontend usen exactamente los mismos datos (misma semilla), para que demostrar el sistema en modo mock o contra la API real dé el mismo resultado.
 - `apps/api/src/database/seeds/data/*` y `apps/web/src/mocks/data/*` regenerados con la misma `SEED`.
 - Barrido M/T/N → D/N en ~18 vistas (órdenes, reportes, analítica, home, evidencia, heatmaps, comparativa por turno).
-- Los totales de tesis no se alteran al redistribuir entre 9 líneas × 2 turnos: 164/137 predicciones, 412 kg de merma, 7 puntos de tendencia OEE, 28/30 TCI, 128/152 TSP.
+- Los totales operativos no se alteran al redistribuir entre 9 líneas × 2 turnos: 412 kg de merma, 7 puntos de tendencia OEE, 164 predicciones generadas (el postest de tesis se vació de datos hipotéticos en `E7-07`, S6 — este punto describe el estado del código al cierre de S5, no los KPI vigentes).
 
 **E9-05 — Retiro de Pasteurización y Personal**
 `Prioridad: Should · Puntos: 2 · Estado: Hecho · Sprint: S5`
@@ -425,37 +504,37 @@ Como **jefe de producción**, quiero que las rutas `/pasteurizacion` y `/persona
 - El flag `enviarPasteurizacion` de merma se conserva como dato (E2-03), sin prometer una pantalla.
 
 **E9-06 — Importar históricos reales de paradas y mermas**
-`Prioridad: Should · Puntos: 8 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Should · Puntos: 8 · Estado: Pendiente · Sprint: S7`
 Como **investigador**, quiero cargar el histórico real de paradas y mermas del sistema anterior (no solo los catálogos), para que los reportes de tendencia reflejen producción real y no solo datos sintéticos de demostración.
 - Requiere extraer y mapear las tablas transaccionales del dump (`paradas`, `mermas` reales) contra el nuevo modelo de causas y líneas.
 - Debe convivir con los seeds de tesis (E9-04) sin romper los totales fijos de los 5 KPIs.
 
 **E9-07 — Migración a PostgreSQL**
-`Prioridad: Should · Puntos: 8 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Should · Puntos: 8 · Estado: Pendiente · Sprint: S7`
 Como **equipo de desarrollo**, quiero migrar de SQLite a PostgreSQL, para operar en un entorno de producción con concurrencia y respaldo reales.
 - `TypeOrmModule` ya está aislado detrás de un datasource (documentado en el README como "migrar a PostgreSQL = cambiar el datasource"), pero no hay migraciones ni script de despliegue todavía.
 - Requiere generar migraciones TypeORM (hoy `synchronize: true`) antes del corte a producción.
 
 **E9-08 — Tiempos estándar de cambio producto × producto**
-`Prioridad: Could · Puntos: 5 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Could · Puntos: 5 · Estado: Pendiente · Sprint: S7`
 Como **jefe de producción**, quiero registrar el tiempo estándar de cambio (changeover) entre cada par de productos en una misma línea, tal como lo tenía el sistema anterior, para que el OEE descuente correctamente el tiempo de preparación al cambiar de producto.
 - El sistema anterior incorporaba esta matriz producto×producto (fuera del alcance de `producto_lineas`, que ya se migró en E9-01/E9-03).
 - No forma parte del modelo actual (`VelocidadEstandar` cubre `cipMin`/`arranqueMin` por par, no la transición entre dos productos distintos).
 
 **E9-09 — Sincronizar el snapshot mock de tiempo real con la API**
-`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S7`
 Como **equipo de desarrollo**, quiero que el snapshot mock de `lineaEstados` (escrito a mano) coincida exactamente con lo que produce la API, para que demostrar el sistema en modo mock o modo api dé el mismo estado de planta.
 - El snapshot mock difiere de la API en 3 líneas y en el turno (hallazgo del QA de fase 2).
 - Requiere regenerar `apps/web/src/mocks/data/realtime.ts` desde la misma semilla que usa `realtime.service.ts`, no mantenerlo a mano.
 
 **E9-10 — Anclar los seeds de tesis al día operativo**
-`Prioridad: Should · Puntos: 3 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Should · Puntos: 3 · Estado: Pendiente · Sprint: S7`
 Como **investigador**, quiero que los seeds de evidencia de tesis en la API usen el mismo día operativo fijo que usa el mock (constante `HOY`), no el reloj real del servidor, para que los 5 KPIs no varíen según la fecha en que se levante la demo.
 - Hoy `apps/api/src/database/seeds/thesis-seed.util.ts` calcula `hoy()` contra el reloj real; el mock usa una constante `HOY` fija.
 - Detectado en el QA de fase 2 (4-sep-2026); no afecta los totales fijos de los 5 KPIs, sólo la fecha de referencia.
 
 **E9-11 — Importar tiempos estándar de resolución de causas de parada cuando el dump los incluya**
-`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S7`
 Como **jefe de producción**, quiero que `CausaParada.tiempoEstandarMin` refleje el tiempo estándar real de resolución de cada causa específica, para poder comparar el tiempo real de una parada contra su estándar.
 - El dump extraído en E9-01 es anterior a esta funcionalidad: `tiempoEstandarMin` queda en 0 en las 52 causas específicas.
 - Depende de que el sistema anterior (o una fuente equivalente) exporte esos tiempos; hasta entonces el campo se mantiene editable a mano en el mantenedor de causas.
@@ -483,18 +562,18 @@ Como **equipo de desarrollo**, quiero una suite e2e que cubra el modelo real (9 
 - 118 pruebas en verde (5 + 43 + 11 + 11 + 25 + 6 + 17 por archivo).
 
 **E10-04 — Refresh token**
-`Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S7`
 Como **maquinista**, quiero que mi sesión se renueve sola durante el turno, para no reloguearme a mitad de un registro de parada por expiración del token.
 - Hoy solo hay `accessToken` con expiración fija (`JWT_EXPIRES_IN`); no hay flujo de refresco.
 
 **E10-05 — Auditoría de accesos y rate limiting**
-`Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S7`
 Como **jefe de producción**, quiero un registro de quién entró, cuándo y con qué IP, y un límite de intentos de login, para detectar accesos indebidos antes de que sean un incidente.
 - No existe hoy un log de accesos separado del `ultimoAcceso` sellado en `User`.
 - Sin límite de tasa en `/auth/login` (expuesto a fuerza bruta).
 
 **E10-06 — Integración continua (CI)**
-`Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S7`
 Como **equipo de desarrollo**, quiero que cada cambio corra `typecheck`/`lint`/`build`/`test:e2e` automáticamente antes de mezclar a `main`, para no depender de que un agente o una persona recuerde correrlo a mano.
 - Hoy la verificación es manual, por oleada (`pnpm --filter @mes/types build && pnpm typecheck && pnpm lint && pnpm build`).
 - No hay pipeline (`GitHub Actions` u otro) configurado en el repositorio.
@@ -504,17 +583,17 @@ Como **equipo de desarrollo**, quiero que cada cambio corra `typecheck`/`lint`/`
 ### E11 — Despliegue y operación
 
 **E11-01 — Dockerizar `web` y `api`**
-`Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S7`
 Como **equipo de desarrollo**, quiero imágenes Docker de `apps/web` y `apps/api`, para desplegar el sistema en cualquier entorno sin instalar Node/pnpm manualmente.
 - No existen `Dockerfile` ni `docker-compose.yml` en el repositorio hoy.
 
 **E11-02 — Variables de entorno y secretos por ambiente**
-`Prioridad: Should · Puntos: 3 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Should · Puntos: 3 · Estado: Pendiente · Sprint: S7`
 Como **equipo de desarrollo**, quiero `.env` diferenciados por ambiente (desarrollo/staging/producción) con secretos fuera del repositorio, para no reutilizar el `JWT_SECRET` de desarrollo en producción.
 - Hoy solo hay `.env.example` de referencia para desarrollo local.
 
 **E11-03 — Backups y monitoreo**
-`Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S7`
 Como **jefe de producción**, quiero backups automáticos de la base de datos y alertas si el sistema cae, para no perder el histórico de producción de la planta ni enterarme de una caída por un operario que no puede registrar una parada.
 - Depende de E9-07 (PostgreSQL) para backups gestionados; sobre SQLite hoy no hay estrategia de respaldo.
 
@@ -523,25 +602,25 @@ Como **jefe de producción**, quiero backups automáticos de la base de datos y 
 ### E12 — Mejoras UX detectadas
 
 **E12-01 — Agrupar filtro de líneas por proceso**
-`Prioridad: Could · Puntos: 2 · Estado: Descartada — decisión del producto, 4-sep-2026: tiempo real ya no filtra por línea · Sprint: S6`
+`Prioridad: Could · Puntos: 2 · Estado: Descartada — decisión del producto, 4-sep-2026: tiempo real ya no filtra por línea · Sprint: S7`
 Como **supervisor de turno**, quería que el filtro de líneas agrupe por tipo de proceso (llenadora/extrusora/moldeadora), para encontrar mi línea entre 9 opciones sin leerlas una por una.
 - **Descartada (4-sep-2026, tarde):** ya no aplica — `/tiempo-real` retiró el filtro de línea (y el de sede) a favor de mostrar siempre las 9 `LineCard` ampliadas (ver E2-08). Puntos no computables, excluidos de los totales (sección 6).
 
 **E12-02 — `TvRow` con código de OF y producto**
-`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S7`
 Como **supervisor de turno**, quiero que el Modo TV muestre el código de la orden y el producto (no solo el detalle de la alerta), para identificar qué se está produciendo sin acercarme a la pantalla.
 
 **E12-03 — "Periodo anterior" en la tendencia OEE**
-`Prioridad: Could · Puntos: 3 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Could · Puntos: 3 · Estado: Pendiente · Sprint: S7`
 Como **jefe de producción**, quiero ver la serie del periodo anterior superpuesta en la tendencia OEE, para comparar visualmente sin sacar dos reportes por separado.
 - Requiere un campo nuevo en el contrato de `/reportes/indicadores` (`tendenciaOee` con serie comparativa).
 
 **E12-04 — Dropdown de rol en la encuesta pública**
-`Prioridad: Could · Puntos: 1 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Could · Puntos: 1 · Estado: Pendiente · Sprint: S7`
 Como **maquinista**, quiero elegir mi rol en un dropdown al responder la encuesta TSP, para no escribirlo a mano cada vez que un enlace se comparte con alguien nuevo.
 
 **E12-05 — Unificar `paradasConservadas`**
-`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S7`
 Como **jefe de producción**, quiero que el número de paradas conservadas al dar de baja una causa coincida con el contador del panel, para no ver dos cifras distintas del mismo dato (histórico + vivas vs. solo histórico).
 
 **E12-06 — Filtro `?periodo=hoy` anclado al día operativo**
@@ -550,7 +629,7 @@ Como **supervisor de turno**, quiero que "hoy" en el filtro de órdenes respete 
 - **Cierre (4-sep-2026):** `GET /ordenes?periodo=hoy` usa el día operativo (antes devolvía 0 órdenes «hoy», ahora 8); timeline y tiempos de tiempo real también anclados al día operativo (`realtime.service.ts`, `AlertaLinea.generadaEn`, `TiempoRealResumen.diaOperativo`); `useResumenMaquinista` corregido en el mismo sentido. Verificado en el QA de fase 2.
 
 **E12-07 — `LineCard`: distinguir "sin orden" de "última orden cerrada"**
-`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S6`
+`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S7`
 Como **supervisor de turno**, quiero que una línea sin orden activa muestre claramente "Sin orden" en vez de los datos de la última OF cerrada, para no confundir una línea parada con una línea todavía produciendo.
 - Hoy la `LineCard` en estado `sin_orden` sigue mostrando la última OF cerrada de esa línea.
 - Detectado en el QA de fase 2 (4-sep-2026).
@@ -572,27 +651,43 @@ Como **cualquier persona con sesión iniciada**, quiero que el atajo ⌘K abra l
 | **S3** | Reportes, alertas, analítica IA (motor de reglas) | 11 | 57 | Hecho |
 | **S4** | Evidencia de tesis: los 5 KPIs y su exportación | 6 | 31 | Hecho |
 | **S5** | Maestros reales + ajustes del 4-sep tarde: 9 líneas, par producto×línea, árbol de merma, mantenedor de líneas, usuarios sin sede, tarjetas de tiempo real ampliadas | 23 | 140 | **22 Hecho · 1 Descartada** |
-| **S6+** | Microservicio Python, históricos reales, PostgreSQL, seguridad avanzada, despliegue, mejoras UX | 22 | 90 | **21 Pendiente · 1 Descartada** |
-| **Total** | — | **73** | **391** | — |
+| **S6** | Evidencia real (4-sep-2026, noche): limpieza del postest hipotético, importadores de fuentes externas + plantillas, motor de validación TCI, overrides, tolerancias, invitaciones TSP, CFS/EP reales, Home sin KPI fijo | 9 | 34 | Hecho |
+| **S7+** | Conector en vivo de sensores/SAP, microservicio Python, históricos reales, PostgreSQL, `oeeTurnoPct`, seguridad avanzada, despliegue, mejoras UX | 25 | 108 | **24 Pendiente · 1 Descartada** |
+| **Total** | — | **85** | **443** | — |
 
 Cierre de S5 (4-sep-2026, mañana): las 8 historias que estaban `En curso` (E2-01, E2-03, E2-04, E8-04, E8-05, E8-06,
 E8-08, E8-09) se completaron, commitearon y verificaron (`pnpm typecheck` 7/7 · `pnpm lint` limpio · `pnpm build` 4/4
 · `pnpm --filter @mes/api test:e2e` 118/118); además `E12-06` (filtro `?periodo=hoy` anclado al día operativo) se
-resolvió en el mismo QA de cierre y se reclasifica de `S6+` a `S5`. Detalle completo en «QA fase 2 · maestros
+resolvió en el mismo QA de cierre y se reclasifica de `S7+` a `S5`. Detalle completo en «QA fase 2 · maestros
 reales y mantenedores (4-sep-2026)» en `docs/qa-report.md`.
 
 Ajustes de S5 (4-sep-2026, tarde, commit `19172ce`): decisión del producto — se descarta el nivel máquina/equipo
 (la parada llega hasta línea) y el catálogo de sedes (única sede Lima). `E8-08` (Sedes) pasa de `Hecho` a
 `Descartada` (−3 puntos computables); `E8-03`/`E8-04` se reescriben como mantenedor de líneas; se suman dos
 historias `Hecho` nuevas — `E2-08` (tarjetas ampliadas y filtros simplificados, +5 puntos) y `E12-08` (corrección de
-⌘K, +1 punto) — y `E12-01` (agrupar filtro de líneas por proceso) pasa de `Pendiente` a `Descartada` en `S6+`
+⌘K, +1 punto) — y `E12-01` (agrupar filtro de líneas por proceso) pasa de `Pendiente` a `Descartada` en `S7+`
 (−2 puntos computables, ya no aplica sin filtro de línea). `pnpm typecheck`/`lint`/`build` en verde ·
 `pnpm --filter @mes/api test:e2e` **114/114** en 7 suites. Detalle en «QA fase 2b (4-sep-2026 tarde)» en
 `docs/qa-report.md`.
 
+Cierre de S6 (4-sep-2026, noche, rama `feat/evidencia-real`): decisión del producto — el módulo Evidencia deja de
+sembrar un postest hipotético; los 5 KPI arrancan en `sin_datos` y se llenan con uso real (`E7-07`). Se suman 9
+historias `Hecho` nuevas al épica E7 — importadores de fuentes externas (`E7-08`), motor de validación TCI
+(`E7-09`), overrides por criterio (`E7-10`), tolerancias configurables (`E7-11`), invitaciones TSP (`E7-12`), CFS
+con `verificadaEn` (`E7-13`), EP sin las alertas de demostración (`E7-14`) y Home sin TRI fijo (`E7-15`) — y 3
+historias `Pendiente` nuevas en `S7+`: conector en vivo con sensores (`E7-16`), integración en vivo con SAP
+(`E7-17`) y `LineaEstado.oeeTurnoPct` (`E2-09`, hallazgo de QA de fase 2b sin historia formal hasta ahora).
+`pnpm --filter @mes/types build && pnpm typecheck && pnpm lint && pnpm build` en verde ·
+`pnpm --filter @mes/api test:e2e` **131/131** en **8 suites** (7 de la fase 2b + `evidence-validacion.e2e-spec.ts`
+nueva; `thesis.e2e-spec.ts` reescrita al flujo real). QA de integración de esta fase **todavía no corrió**: ver
+«QA fase 3 (pendiente de la pasada de integración)» en `docs/qa-report.md`. Detalle funcional completo en
+`docs/implementation-summary.md` § «Fase 3».
+
 ### Riesgos y dependencias
 
 - **Microservicio Python (E6-05):** sin él, la analítica IA sigue operando con reglas (`RuleBasedPredictionProvider`); el capítulo de analítica de la tesis debe dejar explícito que el modelo entrenado es un hito posterior al periodo experimental actual.
+- **Sin integración en vivo con sensores/SAP (E7-16/E7-17):** el TCI se valida contra archivos XLSX/CSV subidos a mano; mientras no exista un conector automático, la frecuencia de validación depende de que alguien exporte e importe cada fuente, y un archivo desactualizado puede dejar registros recientes sin validar (no incorrectos, sólo sin evaluar todavía).
+- **QA de integración de la fase 3 pendiente:** «Evidencia real» (S6) está commiteada pero no tiene su pasada de QA de integración (fidelidad, responsive, consola); hasta que corra, no hay garantía de paridad mock↔API dato a dato en los flujos nuevos (importación, validación TCI, invitaciones TSP).
 - **Calidad de los datos del dump (E9-01/E9-06/E9-11):** la extracción dedujo sabor por coincidencia de texto (sin FK en el dump original), descartó filas de prueba/duplicadas y es anterior a `tiempoEstandarMin` (queda en 0 en las 52 causas específicas); una nueva extracción de históricos (E9-06) hereda el mismo riesgo de datos sucios y debe reportar % resuelto igual que la extracción de catálogos.
 - **Sabor sin relación FK (E2-03/E9-01):** `Producto.sabor` es informativo (heurística de texto); el wizard de merma usa `/sabores` como catálogo independiente, no como validación cruzada contra el producto.
 - **Adopción en planta (transversal):** el diseño reduce el TRI en la medición controlada del experimento; la adopción real en la planta de Lima, con turnos D/N, depende de capacitación que no está en este backlog (fuera del alcance de la tesis, pero condiciona si el sistema se sostiene después del periodo experimental).
@@ -611,11 +706,11 @@ fuera de la base de cálculo del % de puntos.
 
 | Estado | Historias | % historias | Puntos | % puntos |
 | --- | --- | --- | --- | --- |
-| Hecho | 50 | 68,5 % | 301 | 77,0 % |
+| Hecho | 59 | 69,4 % | 335 | 75,6 % |
 | En curso | 0 | 0 % | 0 | 0 % |
-| Pendiente | 21 | 28,8 % | 90 | 23,0 % |
-| Descartada | 2 | 2,7 % | 5 (no computable) | — |
-| **Total** | **73** | **100 %** | **391** (computables) | **100 %** |
+| Pendiente | 24 | 28,2 % | 108 | 24,4 % |
+| Descartada | 2 | 2,4 % | 5 (no computable) | — |
+| **Total** | **85** | **100 %** | **443** (computables) | **100 %** |
 
 Historias `Descartada`: **E8-08** (Sedes: alta y edición, 3 pts) y **E12-01** (Agrupar filtro de líneas por proceso,
 2 pts) — ambas por la decisión del producto del 4-sep-2026 tarde (sin sedes, sin filtro de línea en tiempo real).
@@ -625,18 +720,18 @@ Historias `Descartada`: **E8-08** (Sedes: alta y edición, 3 pts) y **E12-01** (
 | Épica | Historias | Puntos (computables) | Hecho | En curso | Pendiente | Descartada |
 | --- | --- | --- | --- | --- | --- | --- |
 | E1 — Shell y Design System | 3 | 26 | 3 | 0 | 0 | 0 |
-| E2 — Tiempo real y captura | 8 | 50 | 7 | 0 | 1 | 0 |
+| E2 — Tiempo real y captura | 9 | 52 | 7 | 0 | 2 | 0 |
 | E3 — Órdenes de fabricación | 4 | 21 | 4 | 0 | 0 | 0 |
 | E4 — Reportes | 5 | 28 | 4 | 0 | 1 | 0 |
 | E5 — Alertas y motor de reglas | 4 | 21 | 4 | 0 | 0 | 0 |
 | E6 — Analítica IA | 5 | 36 | 4 | 0 | 1 | 0 |
-| E7 — Evidencia de tesis | 6 | 31 | 6 | 0 | 0 | 0 |
+| E7 — Evidencia de tesis | 17 | 81 | 15 | 0 | 2 | 0 |
 | E8 — Configuración y mantenedores | 10 | 51 | 8 | 0 | 1 | 1 |
 | E9 — Datos maestros reales y migración | 11 | 64 | 5 | 0 | 6 | 0 |
 | E10 — Backend, seguridad y calidad | 6 | 36 | 3 | 0 | 3 | 0 |
 | E11 — Despliegue y operación | 3 | 13 | 0 | 0 | 3 | 0 |
 | E12 — Mejoras UX detectadas | 8 | 14 | 2 | 0 | 5 | 1 |
-| **Total** | **73** | **391** | **50** | **0** | **21** | **2** |
+| **Total** | **85** | **443** | **59** | **0** | **24** | **2** |
 
 ---
 
@@ -649,31 +744,38 @@ Historias `Descartada`: **E8-08** (Sedes: alta y edición, 3 pts) y **E12-01** (
 | Registro de paradas | E2-02, E8-01, E8-03, E8-04 (mantenedor de líneas; el nivel máquina/equipo se descartó, ver nota de la épica E9) |
 | Registro de mermas | E2-03, E2-07, E8-02 |
 | Repositorio centralizado | E9-01 a E9-05, E3-04, E10-01 a E10-03 |
-| Dashboard en tiempo real | E1-01, E2-06, E2-08 |
+| Dashboard en tiempo real | E1-01, E2-06, E2-08, E2-09 (pendiente) |
 | Indicadores | E4-01 a E4-05 |
 | Analítica IA | E6-01 a E6-05 |
 | Alertas y predicciones | E5-01 a E5-04, E6-05, E8-07 |
 
-| KPI de tesis | Historias que lo sustentan |
-| --- | --- |
-| **TRI** (1,4 min, −51,7 %) | E2-02, E2-03, E2-04 (`tiempoRegistroSeg`), E7-01 |
-| **TCI** (93,3 %, 28/30) | E3-03, E7-02 |
-| **TSP** (84,2 %, 128/152) | E7-03 |
-| **CFS** (9/9) | E7-04 — depende del cumplimiento de las 9 funcionalidades de la tabla anterior en su conjunto |
-| **EP** (83,5 %, 137/164) | E5-03, E6-03, E7-05 |
+| KPI de tesis | Meta | Historias que lo sustentan |
+| --- | --- | --- |
+| **TRI** | Reducción ≥ 40 % vs. pretest (2,9 min) | E2-02, E2-03, E2-04 (`tiempoRegistroSeg`), E7-01, E7-07 (postest real), E7-15 (Home sin valor fijo) |
+| **TCI** | ≥ 90 % | E7-02 (enunciado original), E7-08 (importadores), **E7-09** (motor de validación vigente), E7-10 (overrides), E7-11 (tolerancias), E7-16/E7-17 (conectores en vivo, pendiente) |
+| **TSP** | ≥ 80 % de acuerdo | E7-03, E7-12 (invitaciones) |
+| **CFS** | 9 / 9 funcionalidades verificadas | E7-04, E7-13 (`verificadaEn`) — depende del cumplimiento de las 9 funcionalidades de la tabla anterior en su conjunto |
+| **EP** | ≥ 80 % | E5-03, E6-03, E7-05, E7-14 (excluye alertas de demostración) |
+
+Los 5 KPI arrancan en `sin_datos` desde `E7-07` (4-sep-2026 noche): la tabla anterior lista qué historia sustenta
+cada instrumento, no un valor ya alcanzado — ver la nota "Postest vacío por diseño" en `docs/api-contracts.md`.
 
 ---
 
-*Documento actualizado a partir del estado real del código en `feat/ajustes-configuracion` (sobre `feat/maestros-reales`,
-commits `2bb7f89`…`19172ce`, rama íntegramente commiteada salvo esta carpeta `docs/`) al 4-sep-2026 tarde, tras el
-cierre de la fase 2 "maestros reales" (mañana) y los ajustes de configuración y tiempo real (tarde, commit `19172ce`):
-sin nivel máquina/equipo (la parada llega hasta línea), pestaña Máquinas → Líneas con mantenedor completo, sin
-catálogo de sedes (única sede Lima), "Ver velocidades" en modal, tarjetas de tiempo real ampliadas y filtros
-simplificados, corrección de ⌘K. Las 8 historias que quedaban `En curso` al 3-sep-2026 se completaron y verificaron
-por la mañana (`pnpm typecheck` 7/7 · `pnpm lint` limpio · `pnpm build` 4/4 · `pnpm --filter @mes/api test:e2e`
-118/118 en 7 suites); los ajustes de la tarde bajaron la suite a **114/114** (−10 casos de máquinas/sedes, +6 de
-líneas) en verde. `docs/api-contracts.md`, `README.md` y `docs/BRIEF-agentes.md` se actualizaron por la tarea de
-código en el mismo commit; `docs/implementation-summary.md` y `docs/qa-report.md` se actualizaron en esta misma
-revisión de `docs/`. Ninguno de los documentos refleja ya el modelo anterior a la fase 2 (5 líneas + PT-01, turnos
-M/T/N, `/pasteurizacion` y `/personal` activos) ni el modelo intermedio del cierre de fase 2 (máquinas-equipo, 9
-sedes) que la tarde del 4-sep-2026 descartó.*
+*Documento actualizado a partir del estado real del código en `feat/evidencia-real` (sobre `feat/ajustes-configuracion`
+→ `feat/maestros-reales`, base `main` en `2bb7f89`) al **4-sep-2026, noche**, tras el cierre de la fase 2 "maestros
+reales" (mañana), los ajustes de configuración y tiempo real (tarde, commit `19172ce`) y la fase 3 "Evidencia real y
+validación de calidad TCI" (noche): postest hipotético retirado del módulo Evidencia (los 5 KPI arrancan en
+`sin_datos`, sólo se conserva el pretest del TRI), importadores de fuentes externas con plantillas XLSX/CSV, motor
+de validación TCI contra sensores/solicitudes/SAP, overrides por criterio, tolerancias configurables, invitaciones
+nominales al TSP, CFS con `verificadaEn`, EP sin las alertas de demostración, Home sin TRI fijo. Las 8 historias que
+quedaban `En curso` al 3-sep-2026 se completaron y verificaron la mañana del 4-sep (`pnpm typecheck` 7/7 ·
+`pnpm lint` limpio · `pnpm build` 4/4 · `pnpm --filter @mes/api test:e2e` 118/118 en 7 suites); los ajustes de la
+tarde bajaron la suite a 114/114 (−10 casos de máquinas/sedes, +6 de líneas); la fase 3 la subió a **131/131 en
+8 suites** (+1 suite nueva, `evidence-validacion.e2e-spec.ts`) — **98 endpoints** bajo `/api/v1`. `docs/api-contracts.md`,
+`README.md`, `docs/implementation-summary.md`, `docs/qa-report.md`, `docs/figma-map.md` y `docs/figma-specs-modulos.md`
+se actualizaron en esta misma revisión de `docs/`; `docs/qa-report.md` deja constancia de que la fase 3 todavía no
+tiene su pasada de QA de integración. Ninguno de los documentos refleja ya el modelo anterior a la fase 2 (5 líneas
++ PT-01, turnos M/T/N, `/pasteurizacion` y `/personal` activos), el modelo intermedio del cierre de fase 2
+(máquinas-equipo, 9 sedes) que la tarde del 4-sep-2026 descartó, ni el postest hipotético de Evidencia que la noche
+del 4-sep-2026 retiró.*

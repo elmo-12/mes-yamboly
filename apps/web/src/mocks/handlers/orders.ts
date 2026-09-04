@@ -248,7 +248,12 @@ export const ordersHandlers = [
     }
 
     /* El alta de la orden también cronometra el TRI (espejo de `OrdersService.crear`). */
-    registrarTri(`Inicio de ${orden.codigo}`, Number(body.tiempoRegistroSeg ?? 0), orden.fecha, orden.id);
+    registrarTri(
+      `Inicio de ${orden.codigo}`,
+      Number(body.tiempoRegistroSeg ?? 0),
+      orden.fecha,
+      `${orden.id}-inicio`
+    );
 
     return HttpResponse.json(enriquecerOrden(orden), { status: 201 });
   }),
@@ -284,7 +289,7 @@ export const ordersHandlers = [
       `Cierre de ${orden.codigo}`,
       Number(body.tiempoRegistroSeg ?? 0),
       orden.fin.slice(0, 10),
-      orden.id
+      `${orden.id}-cierre`
     );
 
     return HttpResponse.json(enriquecerOrden(orden));

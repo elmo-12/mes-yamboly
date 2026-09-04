@@ -30,6 +30,8 @@ import type {
 } from '@mes/types';
 import { TIPO_ALERTA_LABEL } from '@mes/types';
 import {
+  METAS_TESIS,
+  calcCfsOpcional,
   calcEp,
   calcEpOpcional,
   calcPromedioLikert,
@@ -410,13 +412,20 @@ export function tspActual(): {
 }
 
 /** CFS actual: funcionalidades marcadas como cumplidas / 9. */
-export function cfsActual(): { cumplidas: number; totales: number; porcentaje: number } {
+export function cfsActual(): {
+  cumplidas: number;
+  verificadas: number;
+  totales: number;
+  porcentaje: number | null;
+} {
   const cumplidas = store.verificacionesCfs.filter((v) => v.cumple).length;
+  const verificadas = store.verificacionesCfs.filter((v) => v.verificadaEn).length;
   const totales = store.verificacionesCfs.length;
   return {
     cumplidas,
+    verificadas,
     totales,
-    porcentaje: totales > 0 ? redondear((cumplidas / totales) * 100) : 0,
+    porcentaje: calcCfsOpcional(cumplidas, verificadas, totales || METAS_TESIS.CFS_TOTAL),
   };
 }
 

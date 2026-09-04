@@ -214,6 +214,7 @@ describe('ordenes (e2e)', () => {
         maquinistaId: 'USR-07',
         supervisorId: 'USR-03',
         operarios: 4,
+        tiempoRegistroSeg: 72,
       })
       .expect(201);
 
@@ -225,5 +226,12 @@ describe('ordenes (e2e)', () => {
       velocidadEstandar: 133.3,
       estado: 'en_curso',
     });
+
+    /* El cronómetro del wizard de inicio alimenta el postest del TRI. */
+    const tri = await request(app.getHttpServer()).get('/api/v1/evidencia/tri').set(auth()).expect(200);
+    const fila = tri.body.postest.find(
+      (r: { eventoRegistrado: string }) => r.eventoRegistrado === 'Inicio de OF-2026-9002',
+    );
+    expect(fila).toMatchObject({ id: 'TRI-PO-AUTO-ORD-9002-inicio', tiempoMin: 1.2, etapa: 'postest' });
   });
 });

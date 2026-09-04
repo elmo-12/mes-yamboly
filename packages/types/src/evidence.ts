@@ -286,6 +286,16 @@ export const COLUMNAS_FUENTE: Record<TipoFuenteExterna, readonly string[]> = {
 } as const;
 
 /**
+ * Columnas de {@link COLUMNAS_FUENTE} que pueden faltar en el archivo sin
+ * invalidar la importación; el resto son obligatorias y su ausencia es un 422.
+ */
+export const COLUMNAS_OPCIONALES_FUENTE: Record<TipoFuenteExterna, readonly string[]> = {
+  sensores: ['velocidad_unid_min'],
+  solicitudes: ['linea', 'descripcion'],
+  sap_mermas: ['tipo_merma', 'motivo'],
+} as const;
+
+/**
  * Mapeo opcional al importar: `{ columnaEsperada: cabeceraDelArchivo }`.
  * @example { fecha_hora: 'Timestamp', linea: 'Máquina' }
  */
@@ -381,13 +391,23 @@ export interface VerificacionCFS {
   observacion: string;
   /** Ruta de la pantalla que evidencia la funcionalidad. */
   ruta: string;
+  /**
+   * ISO-8601 de la última verificación del investigador; `null` mientras la
+   * funcionalidad no se haya revisado. Distingue «verificada y no cumple»
+   * (`cumple: false` con fecha) de «sin verificar» (`cumple: false` sin fecha),
+   * que es lo que deja el CFS en «sin datos».
+   */
+  verificadaEn?: string | null;
 }
 
 export interface EvidenciaCFS {
   items: VerificacionCFS[];
   cumplidas: number;
   totales: number;
-  porcentaje: number;
+  /** Funcionalidades ya revisadas (con `verificadaEn`), cumplan o no. */
+  verificadas: number;
+  /** `null` mientras no se haya verificado ninguna funcionalidad. */
+  porcentaje: number | null;
   meta: string;
   estado: EstadoKpi;
 }

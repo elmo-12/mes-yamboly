@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import {
   COLUMNAS_FUENTE,
+  COLUMNAS_OPCIONALES_FUENTE,
   ESTADOS_LECTURA_SENSOR,
   TIPOS_FUENTE_EXTERNA,
   TIPO_FUENTE_EXTERNA_LABEL,
@@ -210,7 +211,8 @@ function periodoAcumulado(tipo: TipoFuenteExterna): { desde: string; hasta: stri
 export function historialImportaciones(tipo: TipoFuenteExterna): ImportacionResumen[] {
   return getStore()
     .importaciones.filter((i) => i.tipo === tipo)
-    .sort((a, b) => b.importadoEn.localeCompare(a.importadoEn))
+    /* `importadoEn` tiene resolución de segundos: el id correlativo desempata. */
+    .sort((a, b) => b.importadoEn.localeCompare(a.importadoEn) || b.id.localeCompare(a.id))
     .map(aResumen);
 }
 
@@ -449,6 +451,13 @@ function guardar(tipo: TipoFuenteExterna, filas: FilaMock[]): void {
 /** El archivo no trae ninguna fila de datos bajo la cabecera. */
 export class ArchivoSinFilasError extends Error {}
 
+/** Al archivo le faltan columnas obligatorias (ni en la cabecera ni en el mapeo). */
+export class ColumnasFaltantesError extends Error {
+  constructor(readonly columnas: string[]) {
+    super(`Faltan columnas obligatorias: ${columnas.join(', ')}`);
+  }
+}
+
 /**
  * Lee el archivo, valida fila a fila y acumula las filas nuevas.
  * Los duplicados (misma clave natural) se ignoran; las filas con problemas se
@@ -463,6 +472,15 @@ export function importarFuente(
 ): ImportacionResultado {
   const tabla = leerTabla(buffer, esXlsx(nombreArchivo));
   if (tabla.filas.length === 0) throw new ArchivoSinFilasError();
+
+  /* Sin la columna obligatoria el archivo no es importable: rechazar fila a
+     fila daría N motivos «valor inválido» y ocultaría la causa real. */
+  const faltantes = COLUMNAS_FUENTE[tipo].filter((columna) => {
+    if (COLUMNAS_OPCIONALES_FUENTE[tipo].includes(columna)) return false;
+    const alias = mapeo[columna];
+    return !tabla.cabeceras.includes(alias ? normalizarCabecera(alias) : columna);
+  });
+  if (faltantes.length > 0) throw new ColumnasFaltantesError(faltantes);
 
   const id = siguienteId(tipo);
   const rechazos: RechazoFila[] = [];

@@ -6,9 +6,11 @@ import type {
   EvidenciaResumen,
   EvidenciaTRI,
   EvidenciaTSP,
+  ExportJob,
   InvitacionTSP,
   ItemEncuesta,
   KpiTesis,
+  KpiTesisId,
   RegistroTRI,
   TipoFuenteExterna,
   TipoRegistroTci,
@@ -16,7 +18,6 @@ import type {
 import { TIPOS_FUENTE_EXTERNA, TIPOS_REGISTRO_TCI } from '@mes/types';
 import {
   METAS_TESIS,
-  calcCfs,
   calcEpOpcional,
   calcTri,
   calcTriReduccion,
@@ -43,6 +44,7 @@ import {
 } from '../store';
 import {
   ArchivoSinFilasError,
+  ColumnasFaltantesError,
   archivoPlantilla,
   MAX_BYTES_TABLA,
   extensionAceptada,
@@ -58,7 +60,7 @@ import {
   validarTci,
 } from '../evidencia-validacion';
 import { API, ahoraIso, errores, hoyIso, listaQuery, numeroQuery, paginar, preludio } from './_utils';
-import { usuarioDesdeToken } from './auth';
+import { exigeRol, usuarioDesdeToken } from './auth';
 
 /* ------------------------------------------------------------------ */
 /* Derivaciones de cada instrumento                                    */
@@ -143,17 +145,13 @@ function evidenciaTsp(): EvidenciaTSP {
 
 function evidenciaCfs(): EvidenciaCFS {
   const items = getStore().verificacionesCfs;
-  const { cumplidas } = cfsActual();
-  const totales = items.length || METAS_TESIS.CFS_TOTAL;
   /* El instrumento fija FT = 9; sólo si la lista creciera se recalcula a mano. */
-  const porcentaje =
-    totales === METAS_TESIS.CFS_TOTAL
-      ? calcCfs(cumplidas)
-      : Math.round((cumplidas / totales) * 1000) / 10;
+  const { cumplidas, verificadas, porcentaje } = cfsActual();
   return {
     items,
     cumplidas,
     totales: items.length,
+    verificadas,
     porcentaje,
     meta: `${METAS_TESIS.CFS_TOTAL} / ${METAS_TESIS.CFS_TOTAL} funcionalidades`,
     estado: estadoCfs(porcentaje),
@@ -239,7 +237,10 @@ function kpisTesis(): KpiTesis[] {
       metaValor: 100,
       estado: cfs.estado,
       anexo: 'Anexo 05',
-      detalle: `${cfs.cumplidas} de ${cfs.totales} funcionalidades verificadas`,
+      detalle:
+        cfs.verificadas === 0
+          ? 'Se calcula al marcar cada funcionalidad en la lista de cotejo del Anexo 05'
+          : `${cfs.cumplidas} de ${cfs.totales} funcionalidades cumplen · ${cfs.verificadas} verificadas`,
     },
     {
       id: 'EP',
@@ -315,6 +316,8 @@ export const evidenceHandlers = [
   http.post(`${API}/evidencia/tri/pretest`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const prohibido = exigeRol(request, 'jefe', 'investigador');
+    if (prohibido) return prohibido;
     const store = getStore();
     const body = (await request.json()) as { registros?: Partial<RegistroTRI>[] };
     const registros = body.registros ?? [];
@@ -371,6 +374,8 @@ export const evidenceHandlers = [
   http.post(`${API}/evidencia/fuentes/:tipo/importar`, async ({ request, params }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const prohibido = exigeRol(request, 'jefe', 'investigador');
+    if (prohibido) return prohibido;
     const tipo = tipoFuente(String(params.tipo));
     if (!tipo) return errores.noEncontrado(`Fuente externa «${String(params.tipo)}»`);
 
@@ -406,6 +411,11 @@ export const evidenceHandlers = [
       if (error instanceof ArchivoSinFilasError) {
         return errores.validacion({ archivo: 'El archivo no tiene filas de datos bajo la cabecera' });
       }
+      if (error instanceof ColumnasFaltantesError) {
+        return errores.validacion({
+          archivo: `Faltan columnas obligatorias: ${error.columnas.join(', ')}. Descarga la plantilla o corrige el mapeo de columnas.`,
+        });
+      }
       throw error;
     }
   }),
@@ -425,6 +435,8 @@ export const evidenceHandlers = [
   http.post(`${API}/evidencia/tci/validar`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const prohibido = exigeRol(request, 'jefe', 'investigador');
+    if (prohibido) return prohibido;
     const body = (await request.json().catch(() => ({}))) as {
       desde?: string;
       hasta?: string;
@@ -477,6 +489,8 @@ export const evidenceHandlers = [
   http.patch(`${API}/evidencia/tci/:id`, async ({ request, params }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const prohibido = exigeRol(request, 'jefe', 'investigador', 'calidad');
+    if (prohibido) return prohibido;
     const fila = getStore().evaluacionesTci.find((e) => e.id === params.id);
     if (!fila) return errores.noEncontrado('Evaluación de calidad');
     const body = (await request.json()) as {
@@ -503,6 +517,8 @@ export const evidenceHandlers = [
   http.post(`${API}/evidencia/tsp/invitaciones`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const prohibido = exigeRol(request, 'jefe', 'investigador');
+    if (prohibido) return prohibido;
     const store = getStore();
     const body = (await request.json()) as { invitado?: string; rol?: string };
     const invitado = String(body.invitado ?? '').trim();
@@ -549,6 +565,8 @@ export const evidenceHandlers = [
   http.patch(`${API}/evidencia/cfs/:id`, async ({ request, params }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const prohibido = exigeRol(request, 'jefe', 'investigador');
+    if (prohibido) return prohibido;
     const item = getStore().verificacionesCfs.find((v) => v.id === params.id);
     if (!item) return errores.noEncontrado('Verificación funcional');
     const body = (await request.json()) as Record<string, unknown>;
@@ -560,6 +578,8 @@ export const evidenceHandlers = [
     }
     item.cumple = body.cumple;
     if (typeof body.observacion === 'string') item.observacion = body.observacion;
+    /* Marcarla desde la ficha ya cuenta como verificada, cumpla o no. */
+    item.verificadaEn = ahoraIso();
     return HttpResponse.json({ item, resumen: evidenciaCfs() });
   }),
 
@@ -572,8 +592,29 @@ export const evidenceHandlers = [
   http.post(`${API}/evidencia/exportar`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
-    await request.json().catch(() => ({}));
-    return HttpResponse.json({ id: nextId('EXPEV'), estado: 'generando' }, { status: 202 });
+    const body = (await request.json().catch(() => ({}))) as {
+      kpis?: KpiTesisId[];
+      formato?: ExportJob['formato'];
+      destino?: 'spss' | 'informe';
+    };
+    /* Espejo de `EvidenceExportService.exportar`: el trabajo queda en el
+       historial de Reportes › Exportaciones, no sólo en la pestaña Exportar. */
+    const job: ExportJob = {
+      id: nextId('EXP'),
+      nombre: `Evidencia ${(body.kpis ?? []).join(', ')} · ${body.destino === 'spss' ? 'SPSS' : 'informe'}`,
+      datasets: ['evidencia'],
+      formato: body.formato ?? 'xlsx',
+      solicitadoEn: ahoraIso(),
+      solicitadoPor: nombreUsuarioPeticion(request),
+      estado: 'generando',
+    };
+    getStore().exportaciones.unshift(job);
+    setTimeout(() => {
+      job.estado = 'listo';
+      job.tamano = '1,2 MB';
+      job.url = `/mock/exports/${job.id}.${job.formato}`;
+    }, 2500);
+    return HttpResponse.json({ id: job.id, estado: 'generando' }, { status: 202 });
   }),
 
   /* ---------------------------------------------------------------- */

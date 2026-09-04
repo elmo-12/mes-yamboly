@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import * as ExcelJS from 'exceljs';
 import {
   COLUMNAS_FUENTE,
+  COLUMNAS_OPCIONALES_FUENTE,
   ESTADOS_LECTURA_SENSOR,
   TIPOS_FUENTE_EXTERNA,
   TIPO_FUENTE_EXTERNA_LABEL,
@@ -180,9 +181,16 @@ export class EvidenceImportService {
     };
   }
 
-  /** Historial de importaciones de una fuente, de la más reciente a la más antigua. */
+  /**
+   * Historial de una fuente, de la más reciente a la más antigua. `importadoEn`
+   * tiene resolución de segundos: dos importaciones seguidas empatan, así que
+   * el `id` correlativo (`IMP-SEN-002`) desempata.
+   */
   async historial(tipo: TipoFuenteExterna): Promise<ImportacionResumen[]> {
-    const filas = await this.importaciones.find({ where: { tipo }, order: { importadoEn: 'DESC' } });
+    const filas = await this.importaciones.find({
+      where: { tipo },
+      order: { importadoEn: 'DESC', id: 'DESC' },
+    });
     return filas.map((f) => this.aResumen(f));
   }
 
@@ -190,7 +198,7 @@ export class EvidenceImportService {
   async ultimaImportacion(tipo: TipoFuenteExterna): Promise<ImportacionResumen | undefined> {
     const [fila] = await this.importaciones.find({
       where: { tipo },
-      order: { importadoEn: 'DESC' },
+      order: { importadoEn: 'DESC', id: 'DESC' },
       take: 1,
     });
     return fila ? this.aResumen(fila) : undefined;
@@ -273,6 +281,22 @@ export class EvidenceImportService {
       throw new ValidationException(
         { archivo: 'El archivo no tiene filas de datos bajo la cabecera' },
         'No se encontró ninguna fila para importar',
+      );
+    }
+
+    /* Sin la columna obligatoria el archivo no es importable: rechazar fila a
+       fila daría N motivos «valor inválido» y ocultaría la causa real. */
+    const faltantes = COLUMNAS_FUENTE[tipo].filter((columna) => {
+      if (COLUMNAS_OPCIONALES_FUENTE[tipo].includes(columna)) return false;
+      const alias = mapeo[columna];
+      return !tabla.cabeceras.includes(alias ? normalizarCabecera(alias) : columna);
+    });
+    if (faltantes.length > 0) {
+      throw new ValidationException(
+        {
+          archivo: `Faltan columnas obligatorias: ${faltantes.join(', ')}. Descarga la plantilla o corrige el mapeo de columnas.`,
+        },
+        'El archivo no tiene todas las columnas obligatorias',
       );
     }
 

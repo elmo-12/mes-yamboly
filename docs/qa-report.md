@@ -1,5 +1,17 @@
 # QA — MES Yamboly
 
+## QA fase 3 (pendiente de la pasada de integración)
+
+La fase 3 "Evidencia real y validación de calidad (TCI)" (rama `feat/evidencia-real`, 4-sep-2026: postest vaciado de
+datos hipotéticos, importadores de fuentes externas, motor de validación TCI, invitaciones TSP, CFS/EP reales) está
+commiteada pero **todavía no tiene su pasada de QA de integración**. Esa pasada corre en paralelo a esta revisión de
+`docs/` y su informe se añadirá aquí (recorrido ruta por ruta en modo `mock` y `api`, veredictos de fidelidad,
+responsive, consola del navegador) cuando esté lista — no se adelantan resultados en esta sección para no inventar
+un veredicto que aún no se hizo. Mientras tanto, el detalle funcional de la fase (decisiones, modelo, endpoints,
+UI, tests) vive en `docs/implementation-summary.md` § «Fase 3».
+
+---
+
 ## QA fase 2 · maestros reales y mantenedores (4-sep-2026)
 
 Fecha: 2026-09-04 · Verificado en ambos modos (`NEXT_PUBLIC_DATA_SOURCE=mock` y `api`, backend NestJS en `:4000`) ·
