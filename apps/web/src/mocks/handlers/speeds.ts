@@ -52,7 +52,7 @@ export const speedsHandlers = [
       tiempoRegistroSeg: Number(body.tiempoRegistroSeg ?? 0),
     };
     store.velocidades.unshift(registro);
-    registrarTri(`Velocidad ${registro.velocidadReal} u/min`, registro.tiempoRegistroSeg, registro.registradaEn.slice(0, 10));
+    registrarTri(`Velocidad ${registro.velocidadReal} u/min`, registro.tiempoRegistroSeg, registro.registradaEn.slice(0, 10), registro.id);
 
     const linea = store.lineaEstados.find((l) => l.lineaId === registro.lineaId);
     if (linea && linea.estado === 'produciendo') linea.velocidad = registro.velocidadReal;

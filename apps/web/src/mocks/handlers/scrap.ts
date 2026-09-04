@@ -164,7 +164,7 @@ export const scrapHandlers = [
     };
     store.mermas.unshift(merma);
     recalcularOrden(merma.ordenId);
-    registrarTri(`Merma ${merma.tipo} ${merma.cantidadKg} kg`, merma.tiempoRegistroSeg, merma.registradaEn.slice(0, 10));
+    registrarTri(`Merma ${merma.tipo} ${merma.cantidadKg} kg`, merma.tiempoRegistroSeg, merma.registradaEn.slice(0, 10), merma.id);
 
     const usuario = usuarioDesdeToken(request);
     registrarBitacora({

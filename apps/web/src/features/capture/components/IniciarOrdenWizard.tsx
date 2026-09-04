@@ -109,6 +109,7 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
       supervisorId: '',
       operarios: 1,
       colaboradorIds: [],
+      tiempoRegistroSeg: 0,
     },
   });
 
@@ -174,7 +175,7 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
   const guardar = form.handleSubmit(async (values) => {
     const segundos = tri.detener();
     try {
-      const orden = await crear.mutateAsync(values);
+      const orden = await crear.mutateAsync({ ...values, tiempoRegistroSeg: segundos });
       toast.success(`Orden ${orden.codigo} iniciada en ${formatTriCorto(segundos)}`);
       onOpenChange(false);
     } catch (e) {

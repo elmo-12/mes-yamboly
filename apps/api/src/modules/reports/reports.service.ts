@@ -31,6 +31,7 @@ import {
   ParadaAgregada,
   ParadaCategoria,
 } from '../../database/entities';
+import { diaOperativo } from '../../common/utils';
 import { etiquetaFecha, redondear, toList } from './reports.util';
 import type { PeriodoReporte, ReporteQueryDto } from './dto/reporte-query.dto';
 
@@ -80,7 +81,7 @@ export class ReportsService {
   /* ---------------------------------------------------------------- */
 
   async indicadores(query: ReporteQueryDto): Promise<IndicadoresResumen> {
-    const ventana = this.resolverVentana(query);
+    const ventana = await this.resolverVentana(query);
     const lineaIds = toList(query.lineaId);
     const turnosFiltro = toList(query.turno) as Turno[];
 
@@ -186,7 +187,7 @@ export class ReportsService {
   /* ---------------------------------------------------------------- */
 
   async paradasResumen(query: ReporteQueryDto): Promise<ParadasResumen> {
-    const ventana = this.resolverVentana(query);
+    const ventana = await this.resolverVentana(query);
     const filas = await this.paradas.find({ order: { minutos: 'DESC' } });
     const totalMinutos = filas.reduce((a, f) => a + f.minutos, 0);
 
@@ -237,7 +238,7 @@ export class ReportsService {
   /* ---------------------------------------------------------------- */
 
   async mermasResumen(query: ReporteQueryDto): Promise<MermasResumen> {
-    const ventana = this.resolverVentana(query);
+    const ventana = await this.resolverVentana(query);
     const lineaIds = toList(query.lineaId);
 
     const filasLinea = await this.mermasLinea.find({ order: { orden: 'ASC' } });
@@ -319,7 +320,19 @@ export class ReportsService {
     });
   }
 
-  private resolverVentana(query: ReporteQueryDto): Ventana {
+  /**
+   * Último día con indicadores diarios, o el día real si hay datos de hoy.
+   * Es el mismo criterio de «día operativo» que usan Órdenes y Tiempo real: los
+   * agregados están anclados a la fecha congelada del seed (`HOY`), así que
+   * fechar la ventana con el reloj del servidor devolvía rangos vacíos y
+   * fechas distintas a las del modo mock.
+   */
+  private async anclaVentana(): Promise<string> {
+    const filas = await this.diarios.find({ order: { fecha: 'ASC' } });
+    return diaOperativo(filas.map((f) => ({ fecha: f.fecha, estado: 'agregado' })));
+  }
+
+  private async resolverVentana(query: ReporteQueryDto): Promise<Ventana> {
     const periodo = PERIODO_CANONICO[query.periodo] ?? 'semana';
     const esCustom = periodo === 'personalizado';
     if (esCustom && query.desde && query.hasta) {
@@ -330,7 +343,7 @@ export class ReportsService {
       return { periodo, desde: query.desde, hasta: query.hasta, dias };
     }
     const dias = DIAS_POR_PERIODO[query.periodo] ?? 7;
-    const hasta = new Date();
+    const hasta = new Date(`${await this.anclaVentana()}T00:00:00`);
     const desde = new Date(hasta);
     desde.setDate(desde.getDate() - (dias - 1));
     const fmt = (d: Date) =>

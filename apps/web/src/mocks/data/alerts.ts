@@ -293,6 +293,10 @@ export const umbralesIniciales: Umbrales = {
   probabilidadMinima: 70,
   notificarN8n: true,
   mostrarTv: true,
+  /* Validación de calidad (TCI): ±5 min · ±5 % · ±1 día en la fecha SAP. */
+  tciToleranciaMin: 5,
+  tciToleranciaPct: 5,
+  tciToleranciaDiasSap: 1,
   actualizadoEn: iso(fechaMenos(3), '09:14'),
   actualizadoPor: 'Carlos Mendoza',
 };

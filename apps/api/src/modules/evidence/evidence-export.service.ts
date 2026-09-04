@@ -4,10 +4,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as ExcelJS from 'exceljs';
-import type { KpiTesisId } from '@mes/types';
+import type { ClaveCriterioTci, KpiTesisId } from '@mes/types';
 import { ahoraIso } from '../../common/utils';
 import { ExportJob } from '../../database/entities';
 import { EvidenceService } from './evidence.service';
+import { EvidenceValidationService } from './evidence-validation.service';
 import type { ExportEvidenciaDto } from './dto/evidence.dto';
 
 const DIRECTORIO_EXPORTS = resolve(process.cwd(), 'data', 'exports');
@@ -34,6 +35,7 @@ export class EvidenceExportService {
   constructor(
     @InjectRepository(ExportJob) private readonly jobs: Repository<ExportJob>,
     private readonly evidencia: EvidenceService,
+    private readonly validacion: EvidenceValidationService,
   ) {}
 
   async exportar(dto: ExportEvidenciaDto, solicitadoPor: string): Promise<{ id: string; estado: 'generando' }> {
@@ -110,18 +112,30 @@ export class EvidenceExportService {
         };
       }
       case 'TCI': {
-        const tci = await this.evidencia.tci();
+        const tci = await this.validacion.evidencia();
         return {
           columnas: [
             { header: 'N', width: 6 }, { header: 'Fecha', width: 12 }, { header: 'Turno', width: 8 },
-            { header: 'Registro', width: 42 }, { header: 'Completo', width: 10 },
-            { header: 'Preciso', width: 10 }, { header: 'Trazable', width: 10 },
-            { header: 'Válido', width: 9 }, { header: 'Observación', width: 52 },
+            { header: 'Tipo', width: 11 }, { header: 'Registro', width: 16 },
+            { header: 'Línea', width: 10 }, { header: 'Referencia', width: 38 },
+            { header: 'Completo', width: 10 }, { header: 'Sensor', width: 10 },
+            { header: 'Solicitud', width: 11 }, { header: 'SAP', width: 10 },
+            { header: 'Válido', width: 9 }, { header: 'Detalle', width: 72 },
+            { header: 'Observación', width: 52 },
           ],
-          filas: tci.registros.map((r): Fila => [
-            r.n, r.fecha, r.turno, r.registro,
-            bool(r.completo), bool(r.preciso), bool(r.trazable), bool(r.valido), r.observacion,
-          ]),
+          filas: tci.registros.map((r): Fila => {
+            const por = (clave: ClaveCriterioTci): string | number => {
+              const criterio = r.criterios.find((c) => c.clave === clave);
+              return criterio ? bool(criterio.cumple) : '';
+            };
+            return [
+              r.n, r.fecha, r.turno, r.tipoRegistro, r.registroId, r.lineaCodigo, r.referencia,
+              por('completo'), por('sensor'), por('solicitud'), por('sap'),
+              bool(r.valido),
+              r.criterios.map((c) => `${c.label}: ${c.detalle}`).join(' · '),
+              r.observacion ?? '',
+            ];
+          }),
         };
       }
       case 'TSP': {
@@ -131,7 +145,7 @@ export class EvidenceExportService {
             { header: 'Ítem', width: 7 }, { header: 'Enunciado', width: 76 },
             { header: 'Promedio', width: 11 }, { header: '% de acuerdo', width: 14 },
           ],
-          filas: tsp.items.map((i): Fila => [i.n, i.texto, i.promedio, i.pctAcuerdo]),
+          filas: tsp.items.map((i): Fila => [i.n, i.texto, i.promedio ?? '', i.pctAcuerdo ?? '']),
         };
       }
       case 'CFS': {

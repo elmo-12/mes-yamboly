@@ -22,24 +22,44 @@ function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+/**
+ * Un KPI del postest sin muestras vale `null`, no `0`: la vista debe mostrar
+ * «Sin datos» y explicar cómo se llena el instrumento.
+ */
+export function sinMuestras(valor: number | null | undefined): valor is null | undefined {
+  return valor === null || valor === undefined;
+}
+
 /* ------------------------------------------------------------------ */
 /* TRI — Tiempo de registro de información (Anexo 02)                  */
 /* ------------------------------------------------------------------ */
 
-/** TRI = ΣTR / n (minutos por registro). */
+/** TRI = ΣTR / n (minutos por registro). Sin registros devuelve `0`. */
 export function calcTri(tiemposMin: number[]): number {
   if (tiemposMin.length === 0) return 0;
   const suma = tiemposMin.reduce((acc, t) => acc + t, 0);
   return round1(suma / tiemposMin.length);
 }
 
-/** Variación porcentual del postest frente al pretest (negativa = mejora). */
-export function calcTriReduccion(pretestMin: number, postestMin: number): number {
-  if (pretestMin <= 0) return 0;
+/** TRI del postest: `null` cuando todavía no hay ninguna captura real. */
+export function calcTriOpcional(tiemposMin: number[]): number | null {
+  return tiemposMin.length === 0 ? null : calcTri(tiemposMin);
+}
+
+/**
+ * Variación porcentual del postest frente al pretest (negativa = mejora).
+ * `null` si falta cualquiera de los dos promedios.
+ */
+export function calcTriReduccion(
+  pretestMin: number | null,
+  postestMin: number | null,
+): number | null {
+  if (sinMuestras(pretestMin) || sinMuestras(postestMin) || pretestMin <= 0) return null;
   return round1(((postestMin - pretestMin) / pretestMin) * 100);
 }
 
-export function estadoTri(reduccionPct: number): EstadoKpi {
+export function estadoTri(reduccionPct: number | null | undefined): EstadoKpi {
+  if (sinMuestras(reduccionPct)) return 'sin_datos';
   const mejora = -reduccionPct;
   if (mejora >= METAS_TESIS.TRI_REDUCCION_PCT) return 'cumple';
   if (mejora >= METAS_TESIS.TRI_REDUCCION_PCT - 10) return 'en_riesgo';
@@ -50,23 +70,23 @@ export function estadoTri(reduccionPct: number): EstadoKpi {
 /* TCI — Tasa de calidad de la información (Anexo 03)                  */
 /* ------------------------------------------------------------------ */
 
-/** TCI = RC / RT × 100 (registros correctos sobre registros totales). */
-export function calcTci(registrosCorrectos: number, registrosTotales: number): number {
-  if (registrosTotales <= 0) return 0;
+/** TCI = RC / RT × 100; `null` mientras no se haya evaluado ningún registro. */
+export function calcTci(registrosCorrectos: number, registrosTotales: number): number | null {
+  if (registrosTotales <= 0) return null;
   return round1((registrosCorrectos / registrosTotales) * 100);
 }
 
-/** Un registro es correcto si es completo, preciso, trazable y válido. */
-export function esRegistroCorrecto(criterios: {
-  completo: boolean;
-  preciso: boolean;
-  trazable: boolean;
-  valido: boolean;
-}): boolean {
-  return criterios.completo && criterios.preciso && criterios.trazable && criterios.valido;
+/**
+ * Un registro es correcto cuando **todos** los criterios de su tipo se cumplen
+ * (parada: completo + sensor + solicitud · merma: completo + sap + solicitud ·
+ * velocidad: completo + sensor).
+ */
+export function esRegistroValidoTci(criterios: readonly { cumple: boolean }[]): boolean {
+  return criterios.length > 0 && criterios.every((c) => c.cumple);
 }
 
-export function estadoTci(pct: number): EstadoKpi {
+export function estadoTci(pct: number | null | undefined): EstadoKpi {
+  if (sinMuestras(pct)) return 'sin_datos';
   if (pct >= METAS_TESIS.TCI_PCT) return 'cumple';
   if (pct >= METAS_TESIS.TCI_PCT - 5) return 'en_riesgo';
   return 'no_cumple';
@@ -76,16 +96,19 @@ export function estadoTci(pct: number): EstadoKpi {
 /* TSP — Tasa de satisfacción del personal (Anexo 04)                  */
 /* ------------------------------------------------------------------ */
 
-/** Promedio Likert 1–5 de una lista de respuestas. */
-export function calcPromedioLikert(respuestas: number[]): number {
-  if (respuestas.length === 0) return 0;
+/** Promedio Likert 1–5 de una lista de respuestas; `null` sin respuestas. */
+export function calcPromedioLikert(respuestas: number[]): number | null {
+  if (respuestas.length === 0) return null;
   const suma = respuestas.reduce((acc, r) => acc + r, 0);
   return Math.round((suma / respuestas.length) * 100) / 100;
 }
 
-/** TSP = PO / PT × 100 (respuestas "de acuerdo" 4–5 sobre respuestas totales). */
-export function calcTsp(respuestasDeAcuerdo: number, respuestasTotales: number): number {
-  if (respuestasTotales <= 0) return 0;
+/**
+ * TSP = PO / PT × 100 (respuestas «de acuerdo» 4–5 sobre respuestas totales).
+ * `null` mientras nadie haya respondido la encuesta.
+ */
+export function calcTsp(respuestasDeAcuerdo: number, respuestasTotales: number): number | null {
+  if (respuestasTotales <= 0) return null;
   return round1((respuestasDeAcuerdo / respuestasTotales) * 100);
 }
 
@@ -102,7 +125,8 @@ export function contarDeAcuerdo(matriz: number[][]): { deAcuerdo: number; total:
   return { deAcuerdo, total };
 }
 
-export function estadoTsp(pct: number): EstadoKpi {
+export function estadoTsp(pct: number | null | undefined): EstadoKpi {
+  if (sinMuestras(pct)) return 'sin_datos';
   if (pct >= METAS_TESIS.TSP_PCT) return 'cumple';
   if (pct >= METAS_TESIS.TSP_PCT - 5) return 'en_riesgo';
   return 'no_cumple';
@@ -113,12 +137,29 @@ export function estadoTsp(pct: number): EstadoKpi {
 /* ------------------------------------------------------------------ */
 
 /** CFS = FV / FT × 100 (funcionalidades verificadas sobre 9). */
-export function calcCfs(funcionalidadesVerificadas: number, total = METAS_TESIS.CFS_TOTAL): number {
+export function calcCfs(
+  funcionalidadesVerificadas: number,
+  total: number = METAS_TESIS.CFS_TOTAL,
+): number {
   if (total <= 0) return 0;
   return round1((funcionalidadesVerificadas / total) * 100);
 }
 
-export function estadoCfs(pct: number): EstadoKpi {
+/**
+ * CFS del Anexo 05: `null` mientras el investigador no haya verificado ninguna
+ * de las 9 funcionalidades. Una funcionalidad sin verificar no es lo mismo que
+ * una verificada que no cumple, así que el KPI arranca en «sin datos».
+ */
+export function calcCfsOpcional(
+  funcionalidadesCumplidas: number,
+  funcionalidadesVerificadas: number,
+  total: number = METAS_TESIS.CFS_TOTAL,
+): number | null {
+  return funcionalidadesVerificadas <= 0 ? null : calcCfs(funcionalidadesCumplidas, total);
+}
+
+export function estadoCfs(pct: number | null | undefined): EstadoKpi {
+  if (sinMuestras(pct)) return 'sin_datos';
   if (pct >= 100) return 'cumple';
   if (pct >= 80) return 'en_riesgo';
   return 'no_cumple';
@@ -128,13 +169,26 @@ export function estadoCfs(pct: number): EstadoKpi {
 /* EP — Exactitud de las predicciones (Anexo 06)                       */
 /* ------------------------------------------------------------------ */
 
-/** EP = PCC / PTG × 100 (predicciones correctas sobre predicciones generadas). */
+/**
+ * EP = PCC / PTG × 100 (predicciones correctas sobre predicciones confirmadas).
+ * Sin confirmaciones devuelve `0`: es la forma que consume el header de Alertas.
+ * Para el instrumento del Anexo 06 usa {@link calcEpOpcional}.
+ */
 export function calcEp(prediccionesCorrectas: number, prediccionesTotales: number): number {
   if (prediccionesTotales <= 0) return 0;
   return round1((prediccionesCorrectas / prediccionesTotales) * 100);
 }
 
-export function estadoEp(pct: number): EstadoKpi {
+/** EP del Anexo 06: `null` mientras no se haya confirmado ninguna alerta. */
+export function calcEpOpcional(
+  prediccionesCorrectas: number,
+  prediccionesTotales: number,
+): number | null {
+  return prediccionesTotales <= 0 ? null : calcEp(prediccionesCorrectas, prediccionesTotales);
+}
+
+export function estadoEp(pct: number | null | undefined): EstadoKpi {
+  if (sinMuestras(pct)) return 'sin_datos';
   if (pct >= METAS_TESIS.EP_PCT) return 'cumple';
   if (pct >= METAS_TESIS.EP_PCT - 5) return 'en_riesgo';
   return 'no_cumple';

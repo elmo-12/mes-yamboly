@@ -20,4 +20,8 @@ export class EncuestaSesion {
 
   @Column('text', { nullable: true })
   respondidaEn?: string | null;
+
+  /** ISO-8601 en que el investigador emitió la invitación. */
+  @Column('text', { default: '' })
+  creadaEn!: string;
 }

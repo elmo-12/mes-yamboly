@@ -1,5 +1,99 @@
 # QA — MES Yamboly
 
+## QA fase 3 · Evidencia real y validación TCI (4-sep-2026, noche)
+
+Fecha: 2026-09-04 (noche) · Rama `feat/evidencia-real` (commit `188874e`, sobre `feat/ajustes-configuracion`) ·
+Referencia: `docs/implementation-summary.md` § «Fase 3», `docs/api-contracts.md` y el brief funcional de la fase.
+
+**Método.** QA de integración de la fase "Evidencia real y validación de calidad (TCI)": vaciado del postest
+hipotético, TRI automático desde cada captura, importación de 3 fuentes externas (sensores, solicitudes,
+transferencias SAP), motor de validación TCI con criterios por tipo de registro y override manual, invitaciones TSP
+con encuesta pública, CFS editable y EP desde alertas confirmadas. Se hizo un recorrido funcional flujo por flujo
+comparando **modo `api`** (backend NestJS real, seeds de tesis) y **modo `mock`** (MSW en el navegador, misma lógica
+replicada) con las mismas 6 fixtures XLSX del scratchpad (3 "del día" 2026-09-02→2026-09-04 y 3 ancladas al
+28-ago-2026 para casar con la fecha congelada de los seeds), más una pasada visual en el navegador (ver más abajo).
+
+### Correcciones aplicadas en esta fase
+
+| # | Corrección | Archivo(s) |
+|---|---|---|
+| 1 | TRI también se registra al **iniciar y cerrar la orden** (antes solo paradas/mermas/velocidades); nuevo campo `tiempoRegistroSeg` en el DTO y el contrato | `apps/api/src/modules/orders/orders.service.ts`, `apps/api/src/modules/orders/dto/orden-mutations.dto.ts`, `apps/web/src/features/capture/components/FinalizarOrdenModal.tsx`, `apps/web/src/features/orders/components/NuevaOrdenModal.tsx`, `packages/types/src/orders.ts` |
+| 2 | CFS con `verificadaEn`: sin ninguna funcionalidad marcada el KPI es "sin datos" (no 0 %); el resumen y la ficha distinguen `cumplidas` de `verificadas` | `apps/api/src/modules/evidence/entities/verificacion-funcional.entity.ts`, `apps/web/src/features/evidence/components/CfsTab.tsx`, `apps/web/src/mocks/handlers/evidence.ts` |
+| 3 | Fechas de los seeds de tesis ancladas al **día operativo congelado** (`HOY` de `data/seed.ts`) en vez del reloj real, para que API y mock den las mismas cifras | `apps/api/src/database/seeds/thesis-seed.util.ts` |
+| 4 | `pageSize` máximo 100 espejado en el mock (422 si se supera, igual que `PaginationDto` de la API) y el filtro "con paradas" de Órdenes bajó su página amplia de 200 a 100 | `apps/web/src/mocks/handlers/_utils.ts`, `apps/web/src/features/orders/use-ordenes-filtros.ts` |
+| 5 | Detalle del criterio "N.º de solicitud" cuando el número se registra **sin que la causa lo exija**: pasa a explicar que se verificó igual, en vez de tratarlo como si fuera obligatorio | `apps/api/src/modules/evidence/evidence.rules.ts` |
+| 6 | Importación de fuentes devuelve **422 con las columnas obligatorias faltantes** en vez de rechazar fila a fila con un motivo genérico | `apps/api/src/modules/evidence/evidence-import.service.ts`, `apps/web/src/mocks/evidencia-fuentes.ts` |
+| 7 | `ultimaImportacion` desempata por **id correlativo** cuando dos importaciones caen en el mismo segundo | `apps/api/src/modules/evidence/evidence-import.service.ts`, `apps/web/src/mocks/evidencia-fuentes.ts` |
+| 8 | Roles espejados en el mock: `exigeRol()` replica los `@Roles` de la API (403 para `maquinista` en validar TCI, importar fuentes y PATCH de CFS) | `apps/web/src/mocks/handlers/auth.ts`, `apps/web/src/mocks/handlers/evidence.ts` |
+| 9 | El export job del mock pasa a tener estado real (`generando` → `listo`) en vez de responder siempre "listo", espejando `EvidenceExportService` | `apps/web/src/mocks/handlers/evidence.ts` |
+
+### Veredictos por flujo
+
+| # | Flujo | Resultado | Nota |
+|---|---|---|---|
+| 1 | Resumen inicial (sin datos) | OK | Los 5 KPI muestran "Sin datos"; pretest TRI = 2,9 min (10 registros); `comparativaTri` con postest `null` |
+| 2 | Capturas en tiempo real → TRI automático | OK | Parada + merma + velocidad + cierre de orden generan 4 filas de postest; promedio 0,8 min (−72,4 % vs. 2,9 min de pretest) |
+| 3 | Plantillas descargables (sensores, solicitudes, SAP) | OK | 3 XLSX con cabecera y fila de ejemplo; tipo inválido → 404 |
+| 4 | Importación de las 3 fuentes | OK | 180 + 5 + 5 filas aceptadas en el lote del día; 1 fila rechazada ("Falta el n.º de documento SAP"); reimportar el mismo archivo SAP → 0 filas nuevas, 1 rechazada, 6 duplicadas; mapeo sin la columna obligatoria → 422 "Faltan columnas obligatorias: fecha_hora" |
+| 5 | Validación TCI (28-ago → hoy) | OK | 33 registros evaluados (7 paradas, 3 mermas, 23 velocidades) → 5/33 correctos, TCI 15,2 % `no_cumple`; detalle de criterios (campos, sensor, SAP, solicitud) coherente con las fixtures cargadas |
+| 6 | Filtros de la tabla TCI y `pageSize` | OK | `tipo=parada` → 7 filas, `resultado=invalido` → 28, `resultado=valido` → 5; `pageSize=200` → 422 (tope 100) en ambos modos |
+| 7 | Override manual de un criterio | OK | Override "válido" sobre `TCI-MER-0815-02` (criterio SAP) con justificación → TCI sube de 15,2 % a 18,2 % (6/33) y el override se conserva al revalidar |
+| 8 | TSP — invitación + encuesta pública | OK | Invitación crea token y URL pública; encuesta responde 8 ítems → 87,5 % de acuerdo, promedio 4,25; segundo envío con el mismo token → 409 |
+| 9 | CFS — marcar funcionalidades | OK | 3 de 9 marcadas cumplidas y verificadas → 33,3 % `no_cumple` (meta 9/9); el resumen deja el estado "sin datos" en cuanto hay 1 verificada |
+| 10 | EP — confirmar alertas | OK | 1 acierto + 1 fallo confirmados → 50 % (1/2) `no_cumple` |
+| 11 | Umbrales · tolerancia TCI | OK | `PUT /alertas/umbrales` con `tciToleranciaMin` 5→10 min aceptado en ambos modos; al revalidar el TCI se mantiene en 18,2 % (6/33) porque los criterios que fallan son ausencia de lectura de sensor, no el margen de tolerancia |
+| 12 | Exportar evidencia (XLSX, 5 anexos) | **OK (mock) / bug (api)** | Mock: `POST /evidencia/exportar` → `202 generando`, descarga `200` con 5 hojas (TRI 15 filas, TCI 34, TSP 9, CFS 10, EP 3). API: la descarga del mismo job devuelve `500` — ver pendientes |
+| 13 | Roles | OK | `maquinista` → 403 en validar TCI, importar fuente y PATCH de CFS; `GET /evidencia/resumen` **sí** responde 200 para `maquinista` (ver pendientes: los `GET` de Evidencia no tienen `@Roles`) |
+| 14 | Paginación general (tope 100) | OK | `/ordenes?pageSize=200` y `/paradas?pageSize=101` → 422; `/alertas?pageSize=100` → 200; `/evidencia/tci?page=0` → 422 |
+| 15 | Resumen final de los 5 KPI | OK | TRI 0,8 min (cumple) · TCI 18,2 % (no cumple) · TSP 87,5 % (cumple) · CFS 33,3 % (no cumple) · EP 50 % (no cumple) — paridad exacta entre `api` y `mock` en los 15 flujos anteriores |
+
+### KPIs observados (tras el recorrido, ambos modos)
+
+| KPI | Meta | Valor observado |
+|---|---|---|
+| TRI | Reducción ≥ 40 % vs. pretest | **0,8 min (−72,4 % vs. 2,9 min)** — cumple |
+| TCI | ≥ 90 % | **18,2 % (6/33)** — no cumple (dataset de QA deliberadamente mixto: sensores incompletos y SAP con desfase) |
+| TSP | ≥ 80 % de acuerdo | **87,5 %** — cumple (1 de 1 encuestado respondido en esta pasada) |
+| CFS | 9/9 | **33,3 % (3/9)** — no cumple (solo 3 funcionalidades marcadas en esta pasada) |
+| EP | ≥ 80 % | **50 % (1/2)** — no cumple (solo 2 alertas confirmadas en esta pasada) |
+
+Los 4 KPI por debajo de meta (TCI, CFS, EP y, de repetirse sin más respuestas, TSP) son consecuencia del volumen de
+evidencia generado durante el propio QA (33 registros, 3 funcionalidades, 2 alertas, 1 encuestado), no de un techo
+del sistema: cada instrumento sube según se acumule uso real y verificación en planta.
+
+### Pasada visual (modo mock, `:3070`)
+
+**Bloqueada.** El servidor de desarrollo se levantó correctamente (`NEXT_PUBLIC_DATA_SOURCE=mock NEXT_DIST_DIR=.next-vis
+pnpm --filter @mes/web dev -p 3070`; `curl -s -o /dev/null -w '%{http_code}' localhost:3070/login` → `200`, confirmado
+también por HTTP en `127.0.0.1:3070/login` → `200`), pero Chrome no pudo cargar la app en ninguna de las 3 formas de
+host indicadas (`localhost`, `127.0.0.1`, `[::1]`) ni en una pestaña nueva: la herramienta devolvió "Frame with ID 0 is
+showing error page" y, en el último intento, "Can't interact with browser-internal or unparseable URLs" — el mismo
+bloqueo que reportó una tarea anterior. Con el navegador inaccesible no se pudieron tomar `qa3-tci.jpg`, `qa3-resumen.jpg`
+ni `qa3-revisar.jpg`, ni medir `scrollWidth`/consola dentro de un iframe a 1440/1024/390, ni subir
+`qa3-sensores-0828.xlsx` con `file_upload`. Lo verificable por HTTP se limitó a confirmar que las 7 rutas de Evidencia
+(`/evidencia` y sus 6 `?tab=`) y `/configuracion?tab=umbrales` responden `200` en modo mock — no permite evaluar
+desbordes, tipografía ni consola del navegador. No se tocó ningún archivo de `apps/web/src/features/evidence/**`, así
+que no aplica volver a correr `typecheck`/`lint` sobre esa carpeta. El servidor se detuvo, se borró `.next-vis` y se
+revirtió el `tsconfig.json` que Next reescribe al arrancar (`git status` queda limpio).
+
+### Pendientes no corregidos en esta fase
+
+| # | Pendiente | Nota |
+|---|---|---|
+| 1 | `GET /evidencia/*` no tiene `@Roles` (solo las mutaciones lo tienen) | Cualquier usuario autenticado —incluido `maquinista`— puede leer `/evidencia/resumen`, `/tri`, `/tci`, `/tsp`, `/cfs`, `/ep` por API directa aunque la UI se lo oculte; queda así porque el Home del jefe/supervisor consume `/evidencia/resumen` para el card de TRI, pero falta decidir el cierre fino por rol |
+| 2 | ~~El pretest TRI (`fechaMenos(30+i)` sobre `hoy()` real) cae fuera de la ventana declarada `pretestDesde`/`pretestHasta`~~ **Resuelto**: las 10 filas ahora usan `fechaMenos(4 - Math.floor(i/2))`, 2 por día entre 24 y 28-ago-2026 (dentro de la ventana), en `thesis-evidence.seed.ts` y su espejo `apps/web/src/mocks/data/evidence.ts` | `apps/api/src/database/seeds/thesis-evidence.seed.ts`, `apps/web/src/mocks/data/evidence.ts` |
+| 3 | ~~Descarga del export de evidencia devolvía `500`~~ **Revisado**: no se pudo reproducir el 500 (curl manual y el e2e existente `evidence-validacion.e2e-spec.ts` bajan el XLSX en `200` con datos vacíos, parciales y completos); se reforzó igualmente la paridad con el mock (ver #4) | `apps/api/src/modules/evidence/evidence-export.service.ts`, `apps/api/src/modules/reports/reports-export.service.ts` |
+| 4 | ~~`GET /reportes/exportaciones/:id/descargar` no estaba implementado en el mock~~ **Resuelto**: nuevo handler que sirve un XLSX (una hoja por dataset/anexo) desde `getStore().exportaciones` | `apps/web/src/mocks/handlers/reports.ts` |
+| 5 | Los fixtures del scratchpad usan la fecha real de ejecución (`2026-09-02`→`2026-09-04`) para el lote "del día", mientras los seeds de tesis quedan anclados al 28-ago-2026; se generaron 3 fixtures adicionales fechadas al 28-ago (`qa3-sensores-0828.xlsx`, `qa3-solicitudes-0828.xlsx`, `qa3-sap-0828.xlsx`) para que la validación TCI tuviera contraste sobre el mismo día que los seeds | scratchpad, no código de producto |
+| 6 | Sin conector de sensores en vivo: la fuente "sensores" solo se alimenta por importación XLSX manual, sin integración en tiempo real con PLC/SCADA | Fuera de alcance de esta fase (decisión ya documentada en el brief) |
+
+### Gates
+
+`pnpm typecheck` **7/7** · `pnpm lint` verde · `pnpm build` **4/4** · `pnpm --filter @mes/api test:e2e` **132/132**
+en 8 suites.
+
+---
+
 ## QA fase 2 · maestros reales y mantenedores (4-sep-2026)
 
 Fecha: 2026-09-04 · Verificado en ambos modos (`NEXT_PUBLIC_DATA_SOURCE=mock` y `api`, backend NestJS en `:4000`) ·

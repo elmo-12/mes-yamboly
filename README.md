@@ -118,10 +118,28 @@ Rutas: `/login`, `/` (Home por rol), `/tiempo-real` (+ captura rápida: parada, 
 | Usuarios | Directorio de personas (alta, edición, activar/desactivar, restablecer contraseña) | `UsuariosTab` / `UsuarioDrawer` / `RestablecerPasswordModal` |
 
 ## Backend
-12 módulos (auth, users, catalogs, orders, downtimes, scrap, speeds, realtime, reports, alerts, analytics, evidence) bajo `/api/v1`, respuestas `{ data, meta }` para colecciones y errores `{ statusCode, code, message, details }`. Contrato completo en `docs/api-contracts.md`; Swagger en `/docs`.
+12 módulos (auth, users, catalogs, orders, downtimes, scrap, speeds, realtime, reports, alerts, analytics, evidence — este último con 2 controllers, `evidence` + `survey` para la encuesta pública) en **13 archivos `*.controller.ts`** con **98 endpoints** bajo `/api/v1` (`grep -c -E "@(Get|Post|Patch|Delete|Put)\(" apps/api/src/modules/**/*.controller.ts`), respuestas `{ data, meta }` para colecciones y errores `{ statusCode, code, message, details }`. **131 pruebas e2e en 8 suites** (`pnpm --filter @mes/api test:e2e`). Contrato completo en `docs/api-contracts.md`; Swagger en `/docs`.
 
 ## Mocks
-`apps/web/src/mocks/{data,handlers,store.ts}`: mismos datos que los seeds del backend (maestro real: 9 líneas, 41 sabores, 201 productos, 333 velocidades, causas de parada y de merma en árbol, turnos `D`/`N`, alertas, modelo v3.2, instrumentos TRI/TCI/TSP/CFS/EP). Errores simulables con `?__error=500` en cualquier llamada.
+`apps/web/src/mocks/{data,handlers,store.ts}`: mismos datos que los seeds del backend (maestro real: 9 líneas, 41 sabores, 201 productos, 333 velocidades, causas de parada y de merma en árbol, turnos `D`/`N`, alertas, modelo v3.2, instrumentos TRI/TCI/TSP/CFS/EP — postest vacío por diseño, ver "Evidencia de tesis" abajo). Errores simulables con `?__error=500` en cualquier llamada.
+
+## Evidencia de tesis
+
+`/evidencia` (`apps/web/src/features/evidence`) sustenta los 5 KPI del experimento (TRI/TCI/TSP/CFS/EP, Anexos 02–06). Desde la fase 3 (4-sep-2026) el **postest** ya no se siembra con datos hipotéticos: cada instrumento arranca vacío (`estado: 'sin_datos'`, `valor: null`) y se llena con uso real del sistema. Sólo se conserva el **pretest** del TRI (10 registros medidos a mano, 2,9 min).
+
+| KPI | Cómo se llena | Endpoint clave |
+|---|---|---|
+| **TRI** | Automático: cada captura (parada, merma, velocidad, orden) emite `evidence.tri.registro` y agrega una fila al postest. El pretest se carga aparte. | `GET /evidencia/tri` · `POST /evidencia/tri/pretest` |
+| **TCI** | Validación contra 3 fuentes externas **importadas** (sensores, solicitudes, transferencias SAP; sin integración en vivo): campos completos, coherencia con sensores, n.º de solicitud, transferencia SAP, según el tipo de registro. Override manual por criterio con justificación. | `POST /evidencia/tci/validar` · `GET /evidencia/tci` · `PATCH /evidencia/tci/:id` |
+| **TSP** | Invitaciones nominales con token de un solo uso → encuesta pública `/encuesta/[token]` (8 ítems Likert 1–5), fuera del shell y sin JWT. | `POST /evidencia/tsp/invitaciones` · `GET/POST /encuesta/:token` |
+| **CFS** | Checklist de 9 funcionalidades que el investigador marca a mano en la web, viendo la pantalla que evidencia cada requisito. | `PATCH /evidencia/cfs/:id` |
+| **EP** | Se crea al confirmar una alerta en `/alertas` (acertó o no); las alertas «confirmadas» de demostración del seed no cuentan como evidencia. | `POST /alertas/:id/confirmar` |
+
+**Importadores y plantillas** (`ImportarFuenteModal.tsx`, `ValidarTciModal.tsx`, `RevisarEvaluacionDrawer.tsx`): se descarga una plantilla XLSX por fuente (`plantilla-sensores.xlsx`, `plantilla-solicitudes.xlsx`, `plantilla-transferencias-sap.xlsx`, generadas con `exceljs`; en mock con `xlsx`/SheetJS en el navegador), se llena y se sube (.xlsx/.csv ≤ 5 MB). Cada importación **acumula** filas —no reemplaza—, ignora duplicados exactos y registra quién/cuándo/archivo/filas ok-rechazadas. Fechas y números se leen en varios formatos (Excel, ISO, latina dd/mm/aaaa; coma o punto decimal); las filas con problema se listan con el motivo y el n.º de fila.
+
+**Tolerancias** de la validación TCI (± minutos en tiempos, ± % en cantidades/velocidad, ± días en fecha SAP; por defecto 5 min / 5 % / 1 día) se editan en Configuración › Umbrales de alerta › sección "Validación de calidad (TCI)".
+
+Contrato completo (endpoints, modelo `EvaluacionTCI`/`CriterioTCI`, reglas con ejemplos, columnas de cada plantilla): `docs/api-contracts.md` (sección "evidence").
 
 ## Decisiones de arquitectura
 - **Design System en código antes que las vistas** (`@mes/ui`), tokens 1:1 con las variables de Figma; reglas MDS codificadas (la página es el contenedor, cards solo funcionales, sombras solo en flotantes, un Primary por pantalla, Danger con confirmación).

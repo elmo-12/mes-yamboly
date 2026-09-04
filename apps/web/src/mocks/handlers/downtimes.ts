@@ -82,7 +82,7 @@ export const downtimesHandlers = [
     store.paradas.unshift(parada);
     recalcularOrden(parada.ordenId);
     sincronizarTiempoReal(parada);
-    registrarTri(`Parada ${textoCausa(causaId)}`, parada.tiempoRegistroSeg, parada.inicio.slice(0, 10));
+    registrarTri(`Parada ${textoCausa(causaId)}`, parada.tiempoRegistroSeg, parada.inicio.slice(0, 10), parada.id);
 
     const usuario = usuarioDesdeToken(request);
     registrarBitacora({
@@ -186,7 +186,7 @@ export const downtimesHandlers = [
     deteccion.paradaId = parada.id;
     recalcularOrden(parada.ordenId);
     sincronizarTiempoReal(parada);
-    registrarTri(`Parada IoT ${textoCausa(causa.id)}`, parada.tiempoRegistroSeg, parada.inicio.slice(0, 10));
+    registrarTri(`Parada IoT ${textoCausa(causa.id)}`, parada.tiempoRegistroSeg, parada.inicio.slice(0, 10), parada.id);
     registrarBitacora({
       ordenId: parada.ordenId,
       fecha: ahoraIso(),

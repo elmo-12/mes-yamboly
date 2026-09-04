@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import * as XLSX from 'xlsx';
 import type {
   ExportJob,
   IndicadoresResumen,
@@ -112,5 +113,36 @@ export const reportsHandlers = [
       job.url = `/mock/exports/${job.id}.${formato}`;
     }, 2500);
     return HttpResponse.json(job, { status: 202 });
+  }),
+
+  /* Paridad con `ReportsExportService.descargar`: sirve el mismo trabajo que
+     crean tanto `POST /reportes/exportar` como `POST /evidencia/exportar`
+     (ambos escriben en `getStore().exportaciones`). Genera un XLSX mínimo
+     con una hoja por dataset/anexo en vez de reproducir el archivo real. */
+  http.get(`${API}/reportes/exportaciones/:id/descargar`, async ({ request, params }) => {
+    const simulado = await preludio(request);
+    if (simulado) return simulado;
+    const job = getStore().exportaciones.find((j) => j.id === params.id);
+    if (!job) {
+      return HttpResponse.json({ message: `No se encontró el trabajo de exportación «${String(params.id)}»` }, { status: 404 });
+    }
+    const libro = XLSX.utils.book_new();
+    for (const dataset of job.datasets.length > 0 ? job.datasets : ['evidencia' as const]) {
+      const hoja = XLSX.utils.aoa_to_sheet([
+        [DATASET_EXPORT_LABEL[dataset] ?? dataset],
+        ['Archivo', job.nombre],
+        ['Solicitado por', job.solicitadoPor],
+        ['Solicitado en', job.solicitadoEn],
+      ]);
+      XLSX.utils.book_append_sheet(libro, hoja, (DATASET_EXPORT_LABEL[dataset] ?? dataset).slice(0, 31));
+    }
+    const buffer = XLSX.write(libro, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+    return new HttpResponse(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${job.id}.xlsx"`,
+      },
+    });
   }),
 ];

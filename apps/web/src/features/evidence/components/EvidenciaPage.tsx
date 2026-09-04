@@ -20,7 +20,6 @@ import {
   useEvidenciaCfs,
   useEvidenciaEp,
   useEvidenciaResumen,
-  useEvidenciaTci,
   useEvidenciaTri,
   useEvidenciaTsp,
   useExportarEvidencia,
@@ -47,6 +46,9 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]['value'];
+
+/** Pestañas cuyo contenido ya tiene su propio `Button variant="primary"`. */
+const PESTANAS_CON_PRIMARY = new Set<TabId>(['tci', 'tsp', 'exportar']);
 
 /**
  * `Evidencia / Resumen` y anexos — Figma 2156:5682, 2163:4263, 2163:10456,
@@ -129,7 +131,9 @@ export function EvidenciaPage() {
             >
               Exportar para SPSS
             </Button>
-            {tabValida !== 'exportar' && (
+            {/* Un solo Primary por pantalla: las pestañas con acción propia
+                (validar TCI, invitar al TSP, generar el paquete) se quedan con él. */}
+            {!PESTANAS_CON_PRIMARY.has(tabValida) && (
               <Button variant="primary" onClick={generarInforme} loading={exportar.isPending}>
                 Generar informe
               </Button>
@@ -158,7 +162,7 @@ export function EvidenciaPage() {
         </TabsContent>
 
         <TabsContent value="tri">{tabValida === 'tri' && <PanelTri />}</TabsContent>
-        <TabsContent value="tci">{tabValida === 'tci' && <PanelTci />}</TabsContent>
+        <TabsContent value="tci">{tabValida === 'tci' && <TciTab />}</TabsContent>
         <TabsContent value="tsp">{tabValida === 'tsp' && <PanelTsp />}</TabsContent>
         <TabsContent value="cfs">{tabValida === 'cfs' && <PanelCfs />}</TabsContent>
         <TabsContent value="ep">{tabValida === 'ep' && <PanelEp />}</TabsContent>
@@ -179,13 +183,6 @@ function PanelTri() {
   if (isPending) return <AnexoSkeleton />;
   if (isError || !data) return <AnexoError anexo="Anexo 02 (TRI)" onRetry={() => void refetch()} />;
   return <TriTab tri={data} />;
-}
-
-function PanelTci() {
-  const { data, isPending, isError, refetch } = useEvidenciaTci();
-  if (isPending) return <AnexoSkeleton />;
-  if (isError || !data) return <AnexoError anexo="Anexo 03 (TCI)" onRetry={() => void refetch()} />;
-  return <TciTab tci={data} />;
 }
 
 function PanelTsp() {

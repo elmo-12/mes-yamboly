@@ -32,10 +32,15 @@ export const homeKpis: KpiValor[] = [
   { id: 'calidad', label: 'Calidad', valor: 96.9, unidad: '%' },
 ];
 
+/**
+ * Segunda fila de KPI del Home. El TRI **no** vive aquí: el Home lo compone
+ * desde `GET /evidencia/resumen` (`useResumenJefe`), que lo deriva de los
+ * registros postest reales del store y devuelve `null` mientras no haya
+ * capturas. Un valor fijo aquí sería información hipotética de postest.
+ */
 export const homeKpisSecundarios: KpiValor[] = [
   { id: 'merma', label: 'Merma', valor: 2.3, unidad: '%', delta: { valor: -0.4, unidad: 'pp', favorableSiSube: false, referencia: 'vs ayer' } },
   { id: 'paradas_no_programadas', label: 'Paradas no programadas', valor: 7, unidad: '', meta: 42 },
-  { id: 'tri', label: 'Tiempo medio de registro', valor: 1.4, unidad: 'min', delta: { valor: -48, unidad: '%', favorableSiSube: false, referencia: 'vs pretest' } },
 ];
 
 /** Minutos de las paradas no programadas del día (7 paradas · 42 min). */

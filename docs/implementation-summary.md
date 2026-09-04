@@ -1,6 +1,6 @@
-# Resumen de implementación — MES Yamboly (28 ago 2026 · fase 2: 3–4 sep 2026 · fase 2b: 4 sep 2026 tarde)
+# Resumen de implementación — MES Yamboly (28 ago 2026 · fase 2: 3–4 sep 2026 · fase 2b: 4 sep 2026 tarde · fase 3: 4 sep 2026 noche)
 
-Implementación en código del rediseño Figma (`WOfwZEmPx1Hcw7ehaIsnpx`, sección `MES · YAMBOLY`) siguiendo la skill `figma-design-to-code` (`get_design_context` por frame, gates G1/G2–G4/G5). Estado tras la fase 1 (28-ago-2026): **`pnpm typecheck` · `lint` · `build` · `test:e2e` (55/55) en verde**. Estado tras la fase 2 "maestros reales" (4-sep-2026 mañana, ver sección al final de este documento): **`pnpm typecheck` (7/7) · `lint` limpio · `build` (4/4) · `pnpm --filter @mes/api test:e2e` (118/118 en 7 suites) en verde**. Estado tras la fase 2b — ajustes de configuración y tiempo real (4-sep-2026 tarde, sin máquina/equipo ni sedes; ver «Fase 2b» al final): **`pnpm typecheck` en verde · `lint` limpio · `build` en verde · `pnpm --filter @mes/api test:e2e` (114/114 en 7 suites) en verde; `pnpm dev` levanta web (:3000) y api (:4000)**.
+Implementación en código del rediseño Figma (`WOfwZEmPx1Hcw7ehaIsnpx`, sección `MES · YAMBOLY`) siguiendo la skill `figma-design-to-code` (`get_design_context` por frame, gates G1/G2–G4/G5). Estado tras la fase 1 (28-ago-2026): **`pnpm typecheck` · `lint` · `build` · `test:e2e` (55/55) en verde**. Estado tras la fase 2 "maestros reales" (4-sep-2026 mañana, ver sección al final de este documento): **`pnpm typecheck` (7/7) · `lint` limpio · `build` (4/4) · `pnpm --filter @mes/api test:e2e` (118/118 en 7 suites) en verde**. Estado tras la fase 2b — ajustes de configuración y tiempo real (4-sep-2026 tarde, sin máquina/equipo ni sedes; ver «Fase 2b» al final): **`pnpm typecheck` en verde · `lint` limpio · `build` en verde · `pnpm --filter @mes/api test:e2e` (114/114 en 7 suites) en verde; `pnpm dev` levanta web (:3000) y api (:4000)**. Estado tras la fase 3 — evidencia real y validación de calidad TCI (4-sep-2026 noche, ver «Fase 3» al final): postest de tesis vaciado de datos hipotéticos, importadores de fuentes externas y motor de validación TCI, invitaciones TSP; **`pnpm typecheck`/`lint`/`build` en verde · `pnpm --filter @mes/api test:e2e` 131/131 en 8 suites** (7 suites de la fase 2b + `evidence-validacion.e2e-spec.ts` nueva; `thesis.e2e-spec.ts` reescrita al flujo real), **98 endpoints** bajo `/api/v1`, **37 entidades** TypeORM.
 
 ## 1. Figma
 
@@ -25,14 +25,14 @@ Implementación en código del rediseño Figma (`WOfwZEmPx1Hcw7ehaIsnpx`, secci�
 
 ## 3. Backend (`apps/api`, NestJS 11 + TypeORM + SQLite)
 
-- **Módulos (12):** auth, users, catalogs, orders, downtimes, scrap, speeds, realtime, reports, alerts, analytics, evidence. Estructura `module / controller / service / dto / mappers`, entidades en `database/entities` (**33**, antes 34/35 con `Maquina` y `Sede` — ambas retiradas en fase 2b), seeds ordenados (`SEEDERS`) que reproducen los mocks y se ejecutan al arrancar si la BD está vacía (`pnpm seed` la regenera).
-- **Endpoints:** **91** rutas bajo `/api/v1` (95 al cierre de la fase 2, 79 antes de la fase 2; contrato en `docs/api-contracts.md`) — fase 2b retira `/sedes` (3 rutas) y `/maquinas` (4 rutas) y añade `POST/PATCH/DELETE /lineas` (3 rutas): 95 − 3 − 4 + 3 = 91, verificado contando `@Get|@Post|@Patch|@Delete|@Put` en los 13 `*.controller.ts` de `apps/api/src/modules/**`. Colecciones `{data, meta}`, errores `{statusCode, code, message, details}` (422 con `campo → mensaje`), SSE `/tiempo-real/stream`, descarga de XLSX reales (exceljs) en reportes y evidencia (una hoja por anexo 02–06), encuesta pública con token de un solo uso.
-- **Validación:** DTOs con class-validator/transformer (18 archivos DTO), `ValidationPipe` whitelist, excepciones de negocio tipadas (`BUSINESS_RULE`, `CONFLICT`, `NOT_FOUND`).
+- **Módulos (12):** auth, users, catalogs, orders, downtimes, scrap, speeds, realtime, reports, alerts, analytics, evidence (2 controllers: `evidence` + `survey`, la encuesta pública). Estructura `module / controller / service / dto / mappers`, entidades en `database/entities` (**37** vigentes desde la fase 3 — 4 nuevas: `importacion_fuente`, `lectura_sensor`, `solicitud_externa`, `transferencia_sap`; 33 al cierre de la fase 2b, antes 34/35 con `Maquina` y `Sede`, ambas retiradas en fase 2b), seeds ordenados (`SEEDERS`) que reproducen los mocks y se ejecutan al arrancar si la BD está vacía (`pnpm seed` la regenera).
+- **Endpoints:** **98** rutas bajo `/api/v1` vigentes desde la fase 3 (91 al cierre de la fase 2b, 95 al cierre de la fase 2, 79 antes de la fase 2; contrato en `docs/api-contracts.md`) — la fase 3 suma 7 rutas nuevas en `evidence.controller.ts` (fuentes externas: listar, plantilla, importar, historial de importaciones — 4; TCI: validar, resumen — 2, `PATCH /evidencia/tci/:id` ya existía y se adaptó al nuevo modelo de criterios; `POST /evidencia/tsp/invitaciones` — 1), verificado contando `@Get|@Post|@Patch|@Delete|@Put` en los 13 `*.controller.ts` de `apps/api/src/modules/**` (17 en `evidence.controller.ts` + 2 en `survey.controller.ts`, antes 10 + 2). Colecciones `{data, meta}`, errores `{statusCode, code, message, details}` (422 con `campo → mensaje`), SSE `/tiempo-real/stream`, descarga de XLSX reales (exceljs) en reportes y evidencia (una hoja por anexo 02–06, más 3 plantillas de fuentes externas), encuesta pública con token de un solo uso.
+- **Validación:** DTOs con class-validator/transformer (21 archivos DTO), `ValidationPipe` whitelist, excepciones de negocio tipadas (`BUSINESS_RULE`, `CONFLICT`, `NOT_FOUND`).
 - **Seguridad (P0/P1 del diagnóstico):** JWT (`JwtAuthGuard` global + `@Public()`), `RolesGuard` por endpoint (6 roles), contraseñas bcrypt, sin claves en el cliente, CORS restringido, autorización en servidor (no solo en front).
-- **IA (RF8/RF9):** `AlertsEngineService` (reglas de umbral) + `PredictionProvider` inyectable: `RuleBasedPredictionProvider` (activo) y `PythonHttpPredictionProvider` (stub para el microservicio scikit-learn vía `PREDICTION_SERVICE_URL`, con fallback). Evento `evidence.tri.registro` alimenta TRI automáticamente desde cada captura.
+- **IA (RF8/RF9):** `AlertsEngineService` (reglas de umbral) + `PredictionProvider` inyectable: `RuleBasedPredictionProvider` (activo) y `PythonHttpPredictionProvider` (stub para el microservicio scikit-learn vía `PREDICTION_SERVICE_URL`, con fallback). Evento `evidence.tri.registro` alimenta TRI automáticamente desde cada captura; desde la fase 3 el TCI (Anexo 03) deja de depender de la validación de orden y se valida con un motor de reglas propio contra fuentes externas importadas (ver «Fase 3» al final).
 - **Swagger:** `http://localhost:4000/docs` (12 tags, bearer auth, DTOs y errores documentados).
-- **Tests:** 7 suites e2e (auth, orders, downtimes, realtime, thesis, catalogs-crud, users) — **114/114** (118/118 al cierre de la fase 2, 55/55 al cierre de la fase 1); fase 2b resta ~10 casos de máquinas/sedes y suma ~6 de líneas, ver «Fase 2b» al final.
-- **Pendiente backend:** microservicio Python real; exportación CSV/PDF (solo XLSX). `/pasteurizacion` y `/personal` se retiraron en la fase 2 (ya no aplican como pendiente, ver sección **Fase 2** al final de este documento).
+- **Tests:** **8 suites e2e** (auth, orders, downtimes, realtime, thesis, catalogs-crud, users, `evidence-validacion` nueva de la fase 3) — **131/131** (114/114 al cierre de la fase 2b, 118/118 al cierre de la fase 2, 55/55 al cierre de la fase 1); ver «Fase 3» al final para el detalle por archivo.
+- **Pendiente backend:** microservicio Python real; exportación CSV/PDF (solo XLSX); conector en vivo con sensores/SAP (hoy sólo importación XLSX/CSV manual, ver «Fase 3»). `/pasteurizacion` y `/personal` se retiraron en la fase 2 (ya no aplican como pendiente, ver sección **Fase 2** al final de este documento).
 
 ## 4. Integración
 
@@ -55,7 +55,7 @@ Cambio de modo: `NEXT_PUBLIC_DATA_SOURCE=mock|api` en `apps/web/.env.local` (por
 | ¿Formularios funcionan? | Sí: react-hook-form + zod compartido con el backend; 422 del servidor mapeado a campos |
 | ¿Estados loading/error/empty cubiertos? | Sí en todas las rutas (`loading.tsx`, `error.tsx`, EmptyState por vista) |
 | ¿Frontend desacoplado de mocks? | Sí: las vistas solo usan hooks; el adapter se elige por variable de entorno |
-| ¿Backend NestJS funciona? | Sí: 91 endpoints (95 al cierre de la fase 2, 79 al cierre de la fase 1), seeds con maestros reales, 114 e2e en 7 suites (118 al cierre de la fase 2, 55 al cierre de la fase 1), Swagger |
+| ¿Backend NestJS funciona? | Sí: **98 endpoints** (91 al cierre de la fase 2b, 95 al cierre de la fase 2, 79 al cierre de la fase 1), seeds con maestros reales + evidencia real, **131 e2e en 8 suites** (114 al cierre de la fase 2b, 118 al cierre de la fase 2, 55 al cierre de la fase 1), Swagger |
 | ¿Endpoints documentados? | Sí: Swagger + `docs/api-contracts.md` |
 | ¿Contratos coherentes front↔back? | Sí: `@mes/types` compartido; 11 divergencias corregidas en integración |
 | ¿Compila? | Sí: `pnpm typecheck`, `lint`, `build` en verde (4 paquetes) |
@@ -236,3 +236,67 @@ vez de reescribirse.
 - `DashboardMaquinista` en revisión (pendiente de verificar contra la `LineCard` ampliada).
 
 Detalle completo en «QA fase 2b (4-sep-2026 tarde)» en `docs/qa-report.md`.
+
+---
+
+## Fase 3 — Evidencia real y validación TCI (4-sep-2026, noche)
+
+Cuarta fase de implementación, en la rama `feat/evidencia-real` (sobre `main`, que ya incluye la fase 2b). El
+producto decidió que el módulo Evidencia de tesis dejara de sembrar un **postest hipotético** (los valores fijos
+TRI 1,4 min / TCI 93,3 % / TSP 84,2 % / CFS 100 % / EP 83,5 % de las fases anteriores) y pasara a llenarse con **uso
+real del sistema**: capturas para el TRI, una encuesta pública para el TSP, un checklist manual para el CFS,
+confirmaciones de alertas para la EP, y — la pieza nueva de esta fase — un motor de **validación de calidad (TCI)**
+que contrasta cada registro contra 3 fuentes externas importadas (sensores, solicitudes, transferencias SAP), sin
+integración en vivo. Estado final verificado: `pnpm --filter @mes/types build && pnpm typecheck && pnpm lint &&
+pnpm build` en verde · `pnpm --filter @mes/api test:e2e` **131/131 en 8 suites**.
+
+### Decisiones
+
+| Decisión | Detalle |
+| --- | --- |
+| Vaciar el postest hipotético | Los seeds de tesis dejan de sembrar TRI postest, evaluaciones TCI, respuestas TSP y registros EP; sólo se conserva el **pretest** del TRI (10 filas medidas a mano, 2,9 min, `ThesisEvidenceSeeder`). Los 5 KPI arrancan en `estado: 'sin_datos'`, `valor: null`. |
+| TRI automático desde cada captura | Cada parada, merma, velocidad u orden emite `evidence.tri.registro` con `tiempoRegistroSeg`; el listener agrega una fila al Anexo 02 postest — sin cambios respecto a fases anteriores, pero ahora es la **única** fuente del postest (antes convivía con el seed hipotético). |
+| TCI contra fuentes externas importadas, no contra la validación de orden | El Anexo 03 dejaba de calcularse con `E3-03` (validar orden); ahora un motor de reglas propio (`evidence.rules.ts` en la API, `evidencia-validacion.ts` en el mock) evalúa cada parada/merma/velocidad contra sensores, solicitudes y transferencias SAP subidas por archivo. |
+| Sin integración en vivo con sensores ni SAP | Las 3 fuentes se cargan por **XLSX/CSV** con plantilla propia, descargada desde la web y llenada a mano con lo que exporta el sistema de origen; no hay conector automático (queda como pendiente, ver abajo). |
+| Tolerancias configurables | ±5 min en tiempos, ±5 % en cantidad/velocidad, ±1 día en fecha SAP — nuevos campos en `Umbrales`, editables en Configuración › Umbrales › «Validación de calidad (TCI)». |
+| TSP con invitaciones nominales | En vez de un enlace único compartido, cada invitado recibe un token de un solo uso (`POST /evidencia/tsp/invitaciones`); el Anexo 04 agrega respondidas/pendientes por invitación. |
+| CFS y EP sin seed de datos | CFS arranca con las 9 funcionalidades sin verificar (`cumple: false`, sin `verificadaEn`); EP no siembra `registro_ep` — se crea al confirmar una alerta real, y las 7 alertas «confirmadas» de demostración del seed **no** cuentan como evidencia. |
+
+### Modelo de datos
+
+- **`EvaluacionTCI`/`CriterioTCI`** (`packages/types/src/evidence.ts`) — reemplazan el modelo anterior de 4 columnas fijas de verificación. Cada evaluación referencia un registro operativo (`tipoRegistro: 'parada'|'merma'|'velocidad'`, `registroId`) y trae de 2 a 3 `CriterioTCI` según el tipo (`completo` siempre; `sensor`+`solicitud` en parada; `sap`+`solicitud` en merma; `sensor` en velocidad), cada uno con `cumple`, `detalle` legible y un `override` opcional. `valido` = todos los criterios cumplidos.
+- **Entidades nuevas** (`apps/api/src/database/entities`): `importacion_fuente` (id, tipo, archivo, importadoEn/Por, filasOk/Rechazadas, desde/hasta), `lectura_sensor` (línea, fechaHora, estado, velocidadUnidMin), `solicitud_externa` (numero único, fecha, línea opcional, tipo, estado), `transferencia_sap` (documento único, fecha, línea, productoCodigo de 7 dígitos, cantidadKg, tipoMerma opcional). `evaluacion_calidad` se reescribió al nuevo modelo de criterios (simple-json).
+- **`Umbrales`** (`packages/types/src/alerts.ts`) suma `tciToleranciaMin` (5), `tciToleranciaPct` (5) y `tciToleranciaDiasSap` (1).
+- **`EvidenciaCFS`** distingue ahora «verificada y no cumple» de «sin verificar»: `VerificacionCFS.verificadaEn` (ISO-8601 o `null`) y `EvidenciaCFS.verificadas`/`porcentaje: number | null` — el KPI CFS también puede estar en `sin_datos` hasta la primera verificación.
+- **`KpiTesis.estado`** gana el valor `'sin_datos'` (con `valor: null`) para los 5 instrumentos mientras no exista ninguna muestra real; `EvidenciaResumen.comparativaTri` devuelve la barra `Postest` con `minutos: null` en ese caso.
+
+### Endpoints (`apps/api/src/modules/evidence`)
+
+7 rutas nuevas en `evidence.controller.ts` (10 → 17) más las 2 ya existentes de `survey.controller.ts` sin cambios: fuentes externas (`GET /evidencia/fuentes`, `GET /evidencia/fuentes/:tipo/plantilla`, `POST /evidencia/fuentes/:tipo/importar`, `GET /evidencia/fuentes/:tipo/importaciones`), TCI (`POST /evidencia/tci/validar`, `GET /evidencia/tci/resumen`) y TSP (`POST /evidencia/tsp/invitaciones`); `GET /evidencia/tci` se reescribió de una lista simple a `ListadoTCI` paginado con filtros (`tipo`, `resultado`, `desde`, `hasta`) y `PATCH /evidencia/tci/:id` se adaptó al nuevo modelo de criterios (override por clave + observación). Servicios nuevos: `EvidenceImportService` (plantillas + importación tolerante XLSX/CSV, `tabla.util.ts`) y `EvidenceValidationService` (motor de reglas, `evidence.rules.ts`). Contrato completo, ejemplos de `detalle` por criterio y motivos de rechazo de cada plantilla: `docs/api-contracts.md` § **evidence**.
+
+### Frontend
+
+- **Pestañas de Evidencia (7, sin cambio de conteo):** Resumen · TRI · **TCI** (rediseñada) · **TSP** (con invitaciones) · CFS · EP · Exportar, todas bajo `?tab=` en `EvidenciaPage.tsx`.
+- **Componentes nuevos** (`apps/web/src/features/evidence/components`): `ImportarFuenteModal.tsx` (sube XLSX/CSV ≤ 5 MB con vista previa de filas y mapeo de columnas), `ValidarTciModal.tsx` (lanza `POST /evidencia/tci/validar` por rango/tipo, advierte que reemplaza las evaluaciones del rango), `RevisarEvaluacionDrawer.tsx` (detalle de una evaluación: cada criterio con su explicación y un switch para forzar el resultado, exige justificación), `NuevaInvitacionModal.tsx` (invitación nominal a la encuesta TSP, token de un solo uso, copia el enlace).
+- **Configuración › Umbrales** (`UmbralesTab.tsx`) gana la sección «Validación de calidad (TCI)» con los 3 campos de tolerancia; `UmbralesDrawer.tsx` (el de Alertas) no la muestra pero reenvía esos 3 campos tal cual en cada `PUT` para no perderlos (comentario explícito en el componente).
+- **Capa de datos:** `features/evidence/api.ts` ampliado con los métodos de fuentes/TCI/invitaciones; `apps/web/package.json` suma la dependencia `xlsx` (SheetJS) para generar las plantillas y leer el archivo subido en el navegador cuando `NEXT_PUBLIC_DATA_SOURCE=mock`.
+
+### Mocks (paridad literal con la API)
+
+- **`apps/web/src/mocks/evidencia-validacion.ts`** es un **espejo literal** de `evidence.rules.ts` + `EvidenceValidationService`: mismas funciones (`construirTramos`, `criterioCompleto`, `criterioSensorParada`, `criterioSensorVelocidad`, `criterioSolicitud`, `criterioSapMerma`), mismo orden de criterios por tipo, mismos textos de `detalle` — el comentario de cabecera del archivo lo declara así explícitamente.
+- **`apps/web/src/mocks/evidencia-fuentes.ts`** / **`evidencia-tabla.ts`** generan y leen las plantillas XLSX en el navegador con **SheetJS** (`xlsx`), replicando `tabla.util.ts` (normalización de cabeceras, fechas Excel/ISO/latina, números con coma decimal, deduplicación por clave natural).
+- Store mutable (`apps/web/src/mocks/store.ts`): `ImportacionFuenteMock`, `LecturaSensorMock`, `SolicitudExternaMock`, `TransferenciaSapMock` — importar en modo mock acumula en el store de la sesión igual que la API en SQLite.
+- Los seeds de tesis del mock (`apps/web/src/mocks/data/evidence.ts`) se vaciaron de postest igual que `thesis-evidence.seed.ts`: sólo pretest TRI y las 9 verificaciones CFS sin verificar.
+
+### Tests
+
+- **8 suites e2e** (antes 7): `evidence-validacion.e2e-spec.ts` **nueva** (15 pruebas — genera fixtures XLSX/CSV en el propio test, importa, valida y verifica cada criterio, overrides, tolerancias) y `thesis.e2e-spec.ts` **reescrita** al flujo real (26 pruebas: estado vacío → capturas → importaciones → validación TCI → encuesta → TSP → CFS `PATCH` → alerta confirmada → EP), antes 25.
+- **131/131** pruebas en verde: auth 5 · orders 11 · downtimes 6 · realtime 11 · thesis 26 · catalogs-crud 39 · users 17 · evidence-validacion 16 (`grep -c "it(" apps/api/test/*.ts`).
+
+### Pendientes
+
+- **Conector en vivo con sensores/ERP-SAP** (no forma parte del alcance de esta fase): hoy sólo importación manual por XLSX/CSV; un conector automático reemplazaría el paso de "descargar plantilla → llenar → subir" por lecturas en tiempo real, con el mismo motor de reglas de `evidence.rules.ts` como validador.
+- **`LineaEstado.oeeTurnoPct`** sigue sin existir en el contrato (heredado de la fase 2b, no tocado en esta fase).
+- **Evidencia fotográfica de merma** (`Merma.evidenciaUrl` sin persistir) sigue pendiente, sin relación con esta fase (ver `E2-07` en `docs/product-backlog.md`).
+- **QA de integración de la fase 3** todavía no corrió (recorrido ruta por ruta en `mock`/`api`, fidelidad, responsive, consola); ver `docs/qa-report.md` § «QA fase 3 (pendiente de la pasada de integración)».
+- **Plantillas de evidencia sin frame Figma propio**: el flujo de importación (modal, vista previa, mapeo de columnas) y el drawer de revisión de criterios se diseñaron en código sobre los patrones MDS existentes, sin una lectura de Figma dedicada (ver `docs/figma-map.md` / `docs/figma-specs-modulos.md` § «Desviaciones respecto a Figma»).

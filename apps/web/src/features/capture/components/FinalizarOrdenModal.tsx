@@ -51,7 +51,7 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
   const form = useForm<FinalizeOrdenInput>({
     resolver: zodResolver(finalizeOrdenSchema),
     mode: 'onTouched',
-    defaultValues: { producido: 0, conteoCodificadora: 0, comentario: '' },
+    defaultValues: { producido: 0, conteoCodificadora: 0, comentario: '', tiempoRegistroSeg: 0 },
   });
 
   const producidoRef = React.useRef(contexto.producido);
@@ -65,6 +65,7 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
       producido: producidoRef.current,
       conteoCodificadora: producidoRef.current,
       comentario: '',
+      tiempoRegistroSeg: 0,
     });
   }, [abierto, form]);
 
@@ -95,6 +96,7 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
         ...values,
         comentario: values.comentario || undefined,
         evidenciaUrl: fotoNombre ? `evidencia/${fotoNombre}` : undefined,
+        tiempoRegistroSeg: segundos,
       });
       toast.success(
         `Orden ${contexto.ordenCodigo ?? ''} finalizada en ${formatTriCorto(segundos)}`.trim(),

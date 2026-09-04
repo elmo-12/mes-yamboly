@@ -3,9 +3,22 @@ import type { AlertasResumen, Alerta } from '@mes/types';
 import { confirmarAcierto, epActual, getStore } from '../store';
 import { API, ahoraIso, errores, listaQuery, normalizar, numeroQuery, paginar, preludio } from './_utils';
 
+/**
+ * «Día operativo» de la bandeja, espejo de `diaOperativo` en la API: si hay
+ * alertas del día real ese es el día; si no, el más reciente con actividad.
+ * Sin esta regla el juego de datos congelado dejaba «Atendidas hoy» en 0.
+ */
+function diaOperativoAlertas(alertas: readonly Alerta[]): string {
+  const hoyReal = ahoraIso().slice(0, 10);
+  const fechas = alertas.map((a) => (a.atendidaEn ?? a.generadaEn).slice(0, 10));
+  if (fechas.includes(hoyReal)) return hoyReal;
+  const masReciente = fechas.reduce((mejor, f) => (f > mejor ? f : mejor), '');
+  return masReciente || hoyReal;
+}
+
 function resumen(): AlertasResumen {
   const store = getStore();
-  const hoy = ahoraIso().slice(0, 10);
+  const hoy = diaOperativoAlertas(store.alertas);
   return {
     activas: store.alertas.filter((a) => a.estado === 'activa').length,
     atendidasHoy: store.alertas.filter(
@@ -58,6 +71,11 @@ export const alertsHandlers = [
       probabilidadMinima: Number(body.probabilidadMinima ?? store.umbrales.probabilidadMinima),
       notificarN8n: Boolean(body.notificarN8n),
       mostrarTv: Boolean(body.mostrarTv),
+      tciToleranciaMin: Number(body.tciToleranciaMin ?? store.umbrales.tciToleranciaMin),
+      tciToleranciaPct: Number(body.tciToleranciaPct ?? store.umbrales.tciToleranciaPct),
+      tciToleranciaDiasSap: Number(
+        body.tciToleranciaDiasSap ?? store.umbrales.tciToleranciaDiasSap
+      ),
       actualizadoEn: ahoraIso(),
       actualizadoPor: 'Carlos Mendoza',
     };
@@ -136,8 +154,11 @@ export const alertsHandlers = [
     if (typeof body.ocurrio !== 'boolean') {
       return errores.validacion({ ocurrio: 'Indica si el evento ocurrió' });
     }
-    confirmarAcierto(alerta, body.ocurrio);
-    if (typeof body.observacion === 'string') alerta.observacion = body.observacion;
+    confirmarAcierto(
+      alerta,
+      body.ocurrio,
+      typeof body.observacion === 'string' ? body.observacion : undefined
+    );
     return HttpResponse.json({ alerta, resumen: resumen(), ep: epActual() });
   }),
 
@@ -154,9 +175,8 @@ export const alertsHandlers = [
     const actualizadas: Alerta[] = [];
     for (const c of confirmaciones) {
       const alerta = buscar(c.alertaId);
-      if (!alerta || alerta.acierto !== null) continue;
-      confirmarAcierto(alerta, c.ocurrio);
-      if (c.observacion) alerta.observacion = c.observacion;
+      if (!alerta || alerta.estado === 'confirmada') continue;
+      confirmarAcierto(alerta, c.ocurrio, c.observacion);
       actualizadas.push(alerta);
     }
     return HttpResponse.json({ data: actualizadas, resumen: resumen(), ep: epActual() });

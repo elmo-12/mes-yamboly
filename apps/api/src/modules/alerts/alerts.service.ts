@@ -10,7 +10,7 @@ import type {
 } from '@mes/types';
 import { TIPO_ALERTA_LABEL } from '@mes/types';
 import { ConflictoException, NoEncontradoException } from '../../common/exceptions';
-import { ahoraIso, hoyIso, normalizar, paginate, toList } from '../../common/utils';
+import { ahoraIso, diaOperativo, hoyIso, normalizar, paginate, toList } from '../../common/utils';
 import { Alerta, RegistroEp, Umbrales } from '../../database/entities';
 import { aAlertaDto } from './alerts.mapper';
 import type { AlertaQueryDto } from './dto/alerta-query.dto';
@@ -85,7 +85,12 @@ export class AlertsService {
 
   async resumen(): Promise<AlertasResumen> {
     const filas = await this.alertas.find();
-    const hoy = hoyIso();
+    /* Mismo criterio de «día operativo» que el resto de módulos: con el juego de
+     * datos congelado en `HOY`, comparar con el reloj real dejaba «Atendidas
+     * hoy» en 0 aunque la bandeja mostrara 9 alertas atendidas ese día. */
+    const hoy = diaOperativo(
+      filas.map((a) => ({ fecha: (a.atendidaEn ?? a.generadaEn).slice(0, 10), estado: a.estado })),
+    );
     return {
       activas: filas.filter((a) => a.estado === 'activa').length,
       atendidasHoy: filas.filter(
@@ -194,7 +199,11 @@ export class AlertsService {
     const fila =
       (await this.umbrales.findOne({ where: { id: UMBRALES_ID } })) ??
       this.umbrales.create({ id: UMBRALES_ID });
-    Object.assign(fila, dto, { actualizadoEn: ahoraIso(), actualizadoPor: usuario });
+    /* Las tolerancias TCI son opcionales: si no vienen, se conservan las vigentes. */
+    const cambios = Object.fromEntries(
+      Object.entries(dto).filter(([, valor]) => valor !== undefined),
+    );
+    Object.assign(fila, cambios, { actualizadoEn: ahoraIso(), actualizadoPor: usuario });
     await this.umbrales.save(fila);
     return this.aUmbralesDto(fila);
   }
@@ -206,6 +215,9 @@ export class AlertsService {
       probabilidadMinima: fila.probabilidadMinima,
       notificarN8n: fila.notificarN8n,
       mostrarTv: fila.mostrarTv,
+      tciToleranciaMin: fila.tciToleranciaMin,
+      tciToleranciaPct: fila.tciToleranciaPct,
+      tciToleranciaDiasSap: fila.tciToleranciaDiasSap,
       actualizadoEn: fila.actualizadoEn,
       actualizadoPor: fila.actualizadoPor,
     };

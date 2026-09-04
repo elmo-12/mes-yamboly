@@ -293,7 +293,9 @@ Datasets válidos: `ordenes`, `paradas`, `mermas`, `velocidades`, `indicadores`,
 | `/alertas/:id/confirmar` | POST | `ConfirmarEvento { ocurrio, observacion? }` | `{ alerta, resumen, ep: number }` — `ep` es la EP acumulada en % | 404 · 409 ya confirmada · 422 |
 | `/alertas/confirmar-lote` | POST | `{ confirmaciones: [{ alertaId, ocurrio, observacion? }] }` | `{ data: Alerta[], resumen, ep: number }` | 422 lista vacía |
 | `/alertas/umbrales` | GET | — | `Umbrales` | 401 |
-| `/alertas/umbrales` | PUT | `Umbrales { velocidadBajoEstandarPct, oeeMinimo, probabilidadMinima, notificarN8n, mostrarTv }` | `Umbrales` | 403 solo `jefe` · 422 |
+| `/alertas/umbrales` | PUT | `Umbrales { velocidadBajoEstandarPct, oeeMinimo, probabilidadMinima, notificarN8n, mostrarTv, tciToleranciaMin, tciToleranciaPct, tciToleranciaDiasSap }` | `Umbrales` | 403 solo `jefe` · 422 |
+
+Desde la fase 3 (evidencia real), `Umbrales` suma 3 campos que sólo alimentan la validación de calidad (TCI, ver sección **evidence**): `tciToleranciaMin` (± minutos al comparar horas contra sensores, por defecto 5), `tciToleranciaPct` (± % en cantidades kg y velocidades u/min, por defecto 5) y `tciToleranciaDiasSap` (± días entre la merma y su transferencia SAP, por defecto 1). Se editan en Configuración › Umbrales de alerta › sección «Validación de calidad (TCI)» (`UmbralesTab.tsx`); el drawer de alertas (`UmbralesDrawer.tsx`) no expone estos 3 campos pero los reenvía tal cual en cada `PUT` para no perderlos.
 
 **Tipos:** `parada_prevista` · `merma_prevista` · `velocidad_baja` · `oee_bajo`.
 **Severidades:** `critica` · `alta` · `media`. **Estados:** `activa` · `atendida` · `vencida` · `confirmada` · `descartada`.
@@ -316,31 +318,159 @@ Datasets válidos: `ordenes`, `paradas`, `mermas`, `velocidades`, `indicadores`,
 
 ## evidence
 
-| Endpoint | Método | Query / Body | Response | Errores |
-| --- | --- | --- | --- | --- |
-| `/evidencia/resumen` | GET | — | `EvidenciaResumen { pretestDesde…postestHasta, kpis: KpiTesis[5], comparativaTri }` | 401 |
-| `/evidencia/tri` | GET | — | `EvidenciaTRI { postest, pretest, promedioPostest, promedioPretest, reduccionPct, meta, estado }` | 401 |
-| `/evidencia/tri/pretest` | POST | `{ registros: [{ fecha, eventoRegistrado, horaInicioRegistro, tiempoMin }] }` (carga de hoja) | `{ data, promedioPretest }` (201) | 422 lista vacía |
-| `/evidencia/tci` | GET | — | `EvidenciaTCI { registros, registrosCorrectos, registrosTotales, porcentaje, meta, estado }` | 401 |
-| `/evidencia/tsp` | GET | — | `EncuestaTSP { items[8], respuestas, invitados, promedio, pctAcuerdo, meta, estado, enlace }` | 401 |
-| `/evidencia/cfs` | GET | — | `EvidenciaCFS { items[9], cumplidas, totales, porcentaje, meta, estado }` | 401 |
-| `/evidencia/cfs/:id` | PATCH | `{ cumple, observacion }` | `{ item, resumen }` | 404 · 422 |
-| `/evidencia/ep` | GET | — | `EvidenciaEP { registros, prediccionesCorrectas, prediccionesTotales, porcentaje, meta, estado }` | 401 |
-| `/evidencia/exportar` | POST | `ExportEvidencia { kpis[], formato, destino (spss\|informe) }` | `{ id, estado: 'generando' }` (202) | 422 |
-| `/encuesta/:token` | GET **público** | — | `EncuestaPublica { token, titulo, descripcion, items[8], respondida }` | 404 token inválido |
-| `/encuesta/:token` | POST **público** | `EncuestaRespuesta { token, respuestas: number[8] (1–5), comentario? }` | `{ recibido, respuestas, pctAcuerdo }` (201) — recalcula TSP | 404 · 422 respuestas fuera de rango |
+Desde la fase 3 (rama `feat/evidencia-real`, 4-sep-2026) el módulo Evidencia dejó de sembrar datos hipotéticos de
+**postest**: los 5 instrumentos (Anexos 02–06) arrancan vacíos y se llenan con el uso real del sistema. Sólo se
+conserva el **pretest** del TRI (línea base medida a mano). Ver la nota **"Postest vacío por diseño"** al final de
+esta sección.
 
-### KPI de la tesis y sus fórmulas
+### Endpoints
 
-| KPI | Fórmula | Meta | Valor del mock | Anexo |
-| --- | --- | --- | --- | --- |
-| TRI | `ΣTR / n` | reducción ≥ 40 % vs pretest | 1,4 min (−51,7 % vs 2,9 min) | 02 |
-| TCI | `RC / RT × 100` | ≥ 90 % | 93,3 % (28/30) | 03 |
-| TSP | `PO / PT × 100` | ≥ 80 % de acuerdo | 84,2 % (128/152, 19 respuestas) | 04 |
-| CFS | `FV / FT × 100` | 9 / 9 | 100 % | 05 |
-| EP | `PCC / PTG × 100` | ≥ 80 % | 83,5 % (137/164) | 06 |
+| Endpoint | Método | Roles | Query / Body | Response | Errores |
+| --- | --- | --- | --- | --- | --- |
+| `/evidencia/resumen` | GET | cualquier rol autenticado | — | `EvidenciaResumen { pretestDesde…postestHasta, kpis: KpiTesis[5], comparativaTri }` | 401 |
+| `/evidencia/tri` | GET | cualquiera | — | `EvidenciaTRI { postest, pretest, promedioPostest, promedioPretest, reduccionPct, meta, estado }` | 401 |
+| `/evidencia/tri/pretest` | POST | `jefe`, `investigador` | `CargarPretestDto { registros: [{ fecha, eventoRegistrado, horaInicioRegistro, tiempoMin, observacion? }] }` | `{ data: RegistroTRI[], promedioPretest }` (201) | 422 lista vacía / fecha u hora inválida |
+| `/evidencia/fuentes` | GET | cualquiera | — | `FuenteExternaResumen[]` (las 3 fuentes: filas acumuladas, última importación, periodo) | 401 |
+| `/evidencia/fuentes/:tipo/plantilla` | GET | cualquiera | `tipo` = `sensores\|solicitudes\|sap_mermas` | XLSX (`StreamableFile`): hoja de datos + hoja «Instrucciones» | 404 tipo no reconocido |
+| `/evidencia/fuentes/:tipo/importar` | POST | `jefe`, `investigador` | multipart: `archivo` (xlsx/csv ≤ 5 MB), `mapeo?` (JSON texto `{columnaEsperada: cabeceraDelArchivo}`) | `ImportacionResultado { id, tipo, archivo, filasOk, filasRechazadas, filasDuplicadas, rechazos[], periodo? }` (201) | 422 sin archivo / archivo sin filas / `mapeo` no es JSON objeto · 404 tipo no reconocido |
+| `/evidencia/fuentes/:tipo/importaciones` | GET | cualquiera | `tipo` | `ImportacionResumen[]` (historial, más reciente primero) | 404 tipo no reconocido |
+| `/evidencia/tci/validar` | POST | `jefe`, `investigador` | `ValidarTciDto { desde?, hasta?, tipos? }` — sin rango usa desde la primera captura del postest hasta hoy; sin `tipos`, los 3 | `EvidenciaTCI` (200) — **reemplaza** las evaluaciones del rango | 422 fechas fuera de `YYYY-MM-DD` / tipo no reconocido |
+| `/evidencia/tci` | GET | cualquiera | `TciQueryDto extends PaginationDto { tipo?, resultado? ('valido'\|'invalido'), desde?, hasta? }` | `ListadoTCI { data: EvaluacionTCI[], meta, resumen: ResumenTCI }` | 401 |
+| `/evidencia/tci/resumen` | GET | cualquiera | — | `ResumenTCI` (cabecera sin el detalle fila a fila: totales, `porTipo`, `ultimaValidacion`, `fuentes`) | 401 |
+| `/evidencia/tci/:id` | PATCH | `jefe`, `investigador`, `calidad` | `OverrideTciDto { overrides?: {clave: boolean\|null}, observacion? }` — `null` devuelve el criterio a la regla | `EvaluacionTCI` recalculada | 404 · 422 clave de criterio no reconocida / observación > 300 car. |
+| `/evidencia/tsp` | GET | cualquiera | — | `EvidenciaTSP { items[8], invitaciones, respuestas, invitados, promedio, pctAcuerdo, meta, estado, enlace }` | 401 |
+| `/evidencia/tsp/invitaciones` | POST | `jefe`, `investigador` | `CrearInvitacionDto { invitado (3–80 car.), rol? (≤60 car.) }` | `InvitacionTSP { token, invitado, rol?, url, respondida: false, creadaEn }` (201) | 422 nombre corto/largo |
+| `/evidencia/cfs` | GET | cualquiera | — | `EvidenciaCFS { items[9], cumplidas, totales, porcentaje, meta, estado }` | 401 |
+| `/evidencia/cfs/:id` | PATCH | `jefe`, `investigador` | `VerificacionCfsDto { cumple, observacion? (≤300 car., default '') }` | `{ item: VerificacionCFS, resumen: EvidenciaCFS }` | 404 · 422 |
+| `/evidencia/ep` | GET | cualquiera | — | `EvidenciaEP { registros, prediccionesCorrectas, prediccionesTotales, porcentaje, meta, estado }` | 401 |
+| `/evidencia/exportar` | POST | cualquiera | `ExportEvidenciaDto { kpis[] (≥1 de TRI\|TCI\|TSP\|CFS\|EP), formato? (xlsx\|csv\|pdf, def. xlsx), destino? (spss\|informe, def. spss) }` | `{ id, estado: 'generando' }` (202) — XLSX con una hoja por anexo | 422 lista de `kpis` vacía |
+| `/encuesta/:token` | GET **público** | — | — | `EncuestaPublica { token, titulo, descripcion, items[8], respondida }` | 404 token inválido |
+| `/encuesta/:token` | POST **público** | — | `EncuestaRespuestaDto { respuestas: number[8] (1–5), comentario? (≤500 car.) }` | `{ recibido, respuestas, pctAcuerdo }` (201) — recalcula el TSP | 404 · 409 token ya usado · 422 respuestas fuera de 1–5 o incompletas |
 
-Los seeds de tesis (paradas, mermas, velocidades) **redistribuyen entre las 9 líneas × 2 turnos** sin añadir ni quitar registros: los conteos e invariantes de TRI/TCI/TSP/CFS/EP no cambian con la migración de maestros.
+Los `GET` de evidencia no llevan `@Roles`: cualquier persona autenticada puede consultarlos (el módulo completo sólo
+es visible en el sidebar para `jefe` e `investigador`, `RoleGate` en el frontend). Las mutaciones sí están acotadas
+por rol, como en la tabla.
+
+### Modelo `EvaluacionTCI` / `CriterioTCI` (Anexo 03)
+
+```ts
+interface EvaluacionTCI {
+  id: string;
+  n: number;
+  fecha: string;              // YYYY-MM-DD del registro evaluado
+  turno: Turno;                // 'D' | 'N', derivado de la hora del registro
+  tipoRegistro: 'parada' | 'merma' | 'velocidad';
+  registroId: string;          // id del registro operativo evaluado
+  lineaId: string;
+  lineaCodigo: string;
+  referencia: string;          // resumen legible: '07:42 · PP-01-10 · 14 min'
+  criterios: CriterioTCI[];
+  valido: boolean;              // true si TODOS los criterios del tipo se cumplen
+  observacion?: string;
+  validadoEn: string;           // ISO-8601 de la corrida que produjo esta fila
+  overrides?: Partial<Record<ClaveCriterioTci, boolean>>;
+}
+
+interface CriterioTCI {
+  clave: 'completo' | 'sensor' | 'solicitud' | 'sap';
+  label: string;                // 'Campos completos' | 'Coherencia con sensores' | 'N.º de solicitud' | 'Transferencia SAP'
+  cumple: boolean;               // resultado efectivo, ya con el override aplicado
+  detalle: string;                // explicación legible de la regla (ver ejemplos abajo)
+  override?: boolean | null;      // valor forzado a mano desde 09.C; ausente = manda la regla
+}
+```
+
+`EvidenciaTCI` (cabecera del Anexo 03, `ResumenTCI` = el mismo tipo sin `registros`):
+
+```ts
+interface EvidenciaTCI {
+  registros: EvaluacionTCI[];
+  registrosCorrectos: number;
+  registrosTotales: number;
+  porcentaje: number | null;      // RC / RT × 100; null sin registros evaluados
+  meta: string;                    // '≥ 90 %'
+  estado: EstadoKpi;                // 'sin_datos' hasta la primera validación
+  porTipo: Record<'parada'|'merma'|'velocidad', { correctos: number; totales: number }>;
+  ultimaValidacion?: { fecha: string; desde: string; hasta: string; evaluados: number };
+  fuentes: FuenteExternaResumen[]; // estado de las 3 fuentes importadas
+}
+```
+
+### Reglas de validación por tipo de registro (`evidence.rules.ts`)
+
+Cada criterio es una función pura que recibe el registro operativo y las fuentes ya cargadas y devuelve `{cumple, detalle}`; `valido` = todos los criterios del tipo cumplidos (`esValido` / `esRegistroValidoTci`, compartida con `@mes/shared`). Las tolerancias (`ToleranciasTci { minutos, pct, diasSap }`) vienen de `Umbrales` (ver sección **alerts**, por defecto ±5 min, ±5 %, ±1 día).
+
+| Tipo | Criterios (en orden) |
+| --- | --- |
+| `parada` | `completo` · `sensor` · `solicitud` |
+| `merma` | `completo` · `sap` · `solicitud` |
+| `velocidad` | `completo` · `sensor` |
+
+- **`completo`** — todos los campos obligatorios del tipo están presentes (orden, línea, causa, acción tomada, responsable, duración > 0 en parada; equivalentes en merma/velocidad). Detalle: `"Los 6 campos obligatorios están completos"` o, si falta alguno, `"Faltan 2 campos obligatorios: acción tomada, responsable"`.
+- **`sensor` en `parada`** — el inicio (y el fin, si existe) de la parada coinciden dentro de `±tolerancia.minutos` con un tramo `PARADA` de las lecturas de sensor de esa línea (los tramos se construyen fusionando lecturas consecutivas del mismo estado). Detalle si cumple: `"Sensor: parada detectada 10:42–10:58, registro 10:44–10:57 (Δ inicio 2 min)"`; si no: agrega `"> 5 min"` o `"Sin lecturas de sensor de LLEN-A1 para el 28/09/2026"` si no hay tramos.
+- **`sensor` en `velocidad`** — la velocidad registrada difiere ≤ `tolerancia.pct` de la lectura de velocidad más cercana (`±tolerancia.minutos`) de esa línea. Detalle: `"Sensor 09:10: 132,0 u/min vs 128,4 u/min registradas (Δ 2,7 %)"`, o `"— supera el 5 %"` si falla; `"Sin lecturas de velocidad de LLEN-A1 entre las 09:12 ± 5 min"` sin dato cercano.
+- **`solicitud`** — si la causa `requiereSolicitud`, el número debe existir en la importación de solicitudes; si el registro trae un número aunque no lo exija, también se verifica (dato anotado a mano igual debe ser trazable); sólo se da por cumplido sin verificar si la causa no lo exige y el registro no trae número. Detalle: `"La causa PN-02-01 no exige n.º de solicitud"`, `"La causa … exige n.º de solicitud y el registro no lo tiene"`, o `"Solicitud SM-4471 no encontrada en la importación del 02/09"` / `"…porque aún no se importó ninguna solicitud"`.
+- **`sap` (sólo `merma`)** — existe una transferencia SAP de la misma línea y producto (código de 7 dígitos vía la orden), con fecha dentro de `±tolerancia.diasSap` y kilos dentro de `±tolerancia.pct`. Detalle: `"SAP: doc 4900012345 12,4 kg (Δ 3,2 %)"`, o el mismo texto con `"vs 15,0 kg registrados (Δ … % > 5 %)"` si falla, o `"Sin transferencia SAP del producto 1120002 en LLEN-A1 para el 28/09/2026 (± 1 día)"` sin candidata, o `"La orden de la merma no tiene producto con código SAP"` si el producto no resuelve.
+
+**Overrides** (`PATCH /evidencia/tci/:id`): fuerzan `cumple` de un criterio a `true`/`false` (o `null` para devolverlo a la regla), anteponen `"Override manual (válido/inválido) · "` al detalle original y quedan en `overrides` + `observacion` de la fila. `RevisarEvaluacionDrawer.tsx` en el frontend expone un switch por criterio y exige la justificación.
+
+### Fuentes externas — plantillas de importación
+
+No hay integración en vivo con sensores ni con SAP: se descarga una plantilla XLSX (generada con `exceljs`, hoja de
+datos con 3 filas de ejemplo + hoja «Instrucciones»; en modo mock se genera en el navegador con `xlsx`/SheetJS), se
+llena con lo que exporta el sistema de origen y se vuelve a subir. Cada importación **acumula** filas (no
+reemplaza) y queda registrada (`ImportacionFuente`: quién, cuándo, archivo, filas ok/rechazadas/duplicadas, periodo
+cubierto).
+
+| Plantilla | Columnas (`COLUMNAS_FUENTE`) | Notas |
+| --- | --- | --- |
+| `plantilla-sensores.xlsx` | `linea`, `fecha_hora`, `estado`, `velocidad_unid_min` | `linea` = código del maestro (`LLEN-M2`, `EXTR-2`…); `estado` = `PRODUCIENDO` \| `PARADA`; `velocidad_unid_min` opcional. Cada lectura abre un tramo que dura hasta la siguiente lectura de la misma línea. |
+| `plantilla-solicitudes.xlsx` | `numero_solicitud`, `fecha`, `linea`, `tipo`, `estado`, `descripcion` | `numero_solicitud` único (clave natural); `linea` opcional; `tipo` = `MANTENIMIENTO`\|`MERMA`\|`OTRO` (def. `MANTENIMIENTO`); `estado` = `ABIERTA`\|`ATENDIDA`\|`CERRADA` (def. `ABIERTA`). |
+| `plantilla-transferencias-sap.xlsx` | `documento`, `fecha`, `linea`, `codigo_producto`, `cantidad_kg`, `tipo_merma`, `motivo` | `documento` único; `codigo_producto` debe existir en el maestro de productos (7 dígitos); `cantidad_kg` > 0; `tipo_merma` opcional `MP`\|`EP`\|`PT`. |
+
+**Formatos aceptados** (lectura tolerante, `tabla.util.ts`):
+- **Cabeceras**: normalizadas sin tildes/mayúsculas/espacios (`"Fecha / Hora"` → `fecha_hora`); el `mapeo` opcional del multipart permite corregir columnas con otro nombre en el archivo (`{"fecha_hora":"Timestamp"}`).
+- **Archivo**: `.xlsx` (primera hoja) o `.csv` (separador `,`/`;`/tab autodetectado, RFC 4180 con comillas), ≤ 5 MB.
+- **Fechas**: `Date` de Excel, serie numérica de Excel, ISO `2026-08-28T10:42` / `2026-08-28`, o latina `28/09/2026 10:42`, `28-09-26`.
+- **Números**: coma o punto decimal, con o sin separador de miles (`1 234,5` → `1234.5`).
+- **Deduplicación**: clave natural por tipo — sensores `lineaId|fechaHora`, solicitudes `SOL|numero` (mayúsculas), SAP `SAP|documento` (mayúsculas); una fila con la misma clave que otra ya importada (misma importación o una anterior) se cuenta en `filasDuplicadas` y se ignora sin ser un error.
+- **Motivos de rechazo** (`RechazoFila { fila, motivo }`, `fila` = número de fila del archivo, 1 = cabecera): campo obligatorio faltante (`"Falta el código de línea"`, `"Falta el n.º de solicitud"`, `"Falta el n.º de documento SAP"`, `"Falta el código de producto"`), fecha/hora no reconocida (`"Fecha/hora inválida: «…»"`), número no reconocido o fuera de rango (`"La cantidad «…» no es un número"`, `"La cantidad en kg debe ser mayor que 0"`), referencia inexistente en el maestro (`"La línea «…» no existe en el maestro"`, `"El producto «…» no existe en el maestro"`), o valor fuera del enum esperado (`"Estado «…» fuera de PRODUCIENDO | PARADA"`, y equivalentes para `tipo`/`estado` de solicitud y `tipo_merma`).
+
+### TSP — invitaciones + encuesta pública (Anexo 04)
+
+1. `POST /evidencia/tsp/invitaciones { invitado, rol? }` crea una invitación nominal con un **token de un solo uso** y devuelve `{ token, url }` (`url` = enlace público completo, `http://localhost:3000/encuesta/tsp-2026-01`). `NuevaInvitacionModal.tsx` la crea y ofrece copiar el enlace.
+2. El enlace se comparte fuera del sistema (WhatsApp, papel); `/encuesta/:token` es pública (`@Public()`, sin JWT).
+3. `GET /encuesta/:token` sirve la ficha (8 ítems, sin exponer si ya fue respondida más que con el flag `respondida`); `POST /encuesta/:token { respuestas: number[8], comentario? }` guarda las respuestas (409 si el token ya se usó) y **recalcula el TSP** de inmediato.
+4. `GET /evidencia/tsp` agrega: `invitaciones` (con `respondida`/`respondidaEn`), `respuestas`, `invitados`, `promedio` Likert global (`null` sin respuestas) y `pctAcuerdo` (`PO/PT × 100`, % de respuestas 4 o 5).
+
+No hay seeds de invitaciones ni respuestas: el Anexo 04 arranca vacío y cada fila la crea el investigador desde la web.
+
+### CFS editable (Anexo 05)
+
+Seed inicial: 9 funcionalidades (`RF1`…`RF9`) con `cumple: false`, `observacion: ''`, sin verificar (`verificadaEn: null`). `PATCH /evidencia/cfs/:id { cumple, observacion? }` marca cada una desde la web (checklist de `CfsTab.tsx`), le sella `verificadaEn` (ISO-8601) y devuelve el ítem actualizado más el resumen recalculado; no hay automatización — el investigador o calidad la marca a mano viendo la pantalla que evidencia el requisito (`ruta`). `verificadaEn` distingue «verificada y no cumple» (`cumple: false` con fecha) de «sin verificar» (`cumple: false` sin fecha, el estado inicial): `EvidenciaCFS.verificadas` cuenta las funcionalidades ya revisadas y `porcentaje` es `null` (`estado: 'sin_datos'`) mientras `verificadas === 0`, igual que los demás KPI de la fase 3.
+
+### EP desde alertas (Anexo 06)
+
+Sin seed de `registro_ep`: un registro se crea automáticamente al **confirmar una alerta** (`POST /alertas/:id/confirmar`, ver sección **alerts**), tanto si acertó como si no. Las 7 alertas «confirmadas» que sí trae el seed de alertas son operativas de demostración y **no generan EP** (no cuentan como evidencia de tesis). `GET /evidencia/ep` agrega `prediccionesCorrectas/prediccionesTotales` y el `porcentaje` (`PCC/PTG × 100`, `null` sin ninguna confirmación).
+
+### Postest vacío por diseño
+
+Desde el 4-sep-2026 el seed de tesis (`thesis-evidence.seed.ts`) **no** siembra postest: los 5 KPIs arrancan en
+`estado: 'sin_datos'` y `valor: null` hasta que exista al menos una muestra real (una captura con `tiempoRegistroSeg`,
+una validación TCI, una respuesta de encuesta, un ítem CFS marcado, una alerta confirmada). `comparativaTri` devuelve
+la barra de `Postest` con `minutos: null`. Sólo se conserva el **pretest** del TRI: 10 registros medidos a mano
+(`fechaMenos`, 24-ago→21-sep-2026), promedio **2,9 min**, cargado por `ThesisEvidenceSeeder` y editable desde la web
+con `POST /evidencia/tri/pretest`.
+
+Los valores **TRI 1,4 min / TCI 93,3 % (28/30) / TSP 84,2 % (128/152) / CFS 100 % (9/9) / EP 83,5 % (137/164)** que
+documentaban versiones anteriores de este archivo eran **valores de la fase 1 (seed hipotético, retirado el
+4-sep-2026)**: un postest sintético que nunca vino de uso real del sistema. Con la fase 3 el postest se llena desde
+la web con datos reales — TRI automático desde cada captura (evento `evidence.tri.registro`), TCI validando contra
+las 3 fuentes externas importadas, TSP desde la encuesta pública, CFS marcado a mano por el investigador, EP desde
+las alertas confirmadas — y no tiene un valor fijo que documentar aquí hasta que la planta lo genere.
+
+Los seeds de tesis restantes (paradas, mermas, velocidades operativas fuera del Anexo 02) siguen **redistribuyendo
+entre las 9 líneas × 2 turnos** sin añadir ni quitar registros: eso no cambió con la fase 3.
 
 ---
 
@@ -348,5 +478,5 @@ Los seeds de tesis (paradas, mermas, velocidades) **redistribuyen entre las 9 l�
 
 - **`/ordenes/resumen.todas` devuelve 1 248** (total histórico del repositorio, spec 05.A) mientras que `meta.total` de `/ordenes` refleja las órdenes cargadas en el dataset. La UI debe usar `resumen` para las summary cards y el subtítulo del header, y `meta` para el pie de la tabla.
 - `porValidar`, `conParadas`, `conMermas` sí se calculan sobre el dataset sembrado.
-- El Home (spec 02.C) declara `TRI −48 % vs pretest` y Evidencia (spec 09.A) `−52 %`. Ambos textos se reproducen tal cual: el Home usa el valor fijo de `homeKpisSecundarios`, Evidencia el calculado sobre los 10 registros del Anexo 02.
+- El Home (spec 02.C) ya no muestra un TRI fijo: `homeKpisSecundarios` en el mock sólo trae `merma` y `paradas_no_programadas`; el TRI del Home se compone desde `GET /evidencia/resumen` (`useResumenJefe`) y es `null` mientras no haya capturas postest reales — un valor fijo ahí volvería a ser información hipotética de postest.
 - La orden de ejemplo `OF-2026-0815` sigue viva en el seed histórico; tras la migración de maestros su maquinista real de referencia es Jorge Quispe (`USR-02`, `LIN-EXTR-2`) en vez del antiguo "L2 Conos".

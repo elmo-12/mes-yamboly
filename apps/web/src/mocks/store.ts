@@ -3,23 +3,43 @@ import type {
   AuditEvent,
   CausaMerma,
   CausaParada,
+  ClaveCriterioTci,
+  CriterioTCI,
   DeteccionIoT,
+  EstadoLecturaSensor,
   ExportJob,
+  InvitacionTSP,
   Linea,
   LineaEstado,
   Merma,
   OrdenFabricacion,
   Parada,
   Producto,
+  RegistroEP,
   RegistroTRI,
   RegistroVelocidad,
   Sabor,
+  TipoFuenteExterna,
+  TipoMermaCodigo,
+  TipoRegistroTci,
+  Turno,
   Umbrales,
   User,
   VelocidadEstandar,
   VerificacionCFS,
 } from '@mes/types';
-import { calcEp, calcTci, calcTri, calcTsp } from '@mes/shared';
+import { TIPO_ALERTA_LABEL } from '@mes/types';
+import {
+  METAS_TESIS,
+  calcCfsOpcional,
+  calcEp,
+  calcEpOpcional,
+  calcPromedioLikert,
+  calcTci,
+  calcTri,
+  calcTriOpcional,
+  calcTsp,
+} from '@mes/shared';
 import * as data from './data';
 import { redondear } from './data/seed';
 import type { UsuarioSeed } from './data/users';
@@ -33,6 +53,106 @@ import type { UsuarioSeed } from './data/users';
 
 function clonar<T>(valor: T): T {
   return JSON.parse(JSON.stringify(valor)) as T;
+}
+
+/** `YYYY-MM-DD` del reloj local (espejo de `hoyIso()` de la API). */
+function hoyLocalIso(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Fuentes externas importadas (espejo de las entidades de la API)     */
+/* ------------------------------------------------------------------ */
+
+/** Espejo de `ImportacionFuente`: bitácora de un archivo XLSX/CSV importado. */
+export interface ImportacionFuenteMock {
+  id: string;
+  tipo: TipoFuenteExterna;
+  archivo: string;
+  importadoEn: string;
+  importadoPor: string;
+  filasOk: number;
+  filasRechazadas: number;
+  filasDuplicadas: number;
+  desde: string | null;
+  hasta: string | null;
+}
+
+/** Espejo de `LecturaSensor`. */
+export interface LecturaSensorMock {
+  id: string;
+  importacionId: string;
+  lineaId: string;
+  /** ISO-8601 local `YYYY-MM-DDTHH:mm:ss`. */
+  fechaHora: string;
+  estado: EstadoLecturaSensor;
+  velocidadUnidMin: number | null;
+}
+
+/** Espejo de `SolicitudExterna`. */
+export interface SolicitudExternaMock {
+  id: string;
+  importacionId: string;
+  numero: string;
+  fecha: string;
+  lineaId: string | null;
+  tipo: string;
+  estado: string;
+  descripcion: string;
+}
+
+/** Espejo de `TransferenciaSap`. */
+export interface TransferenciaSapMock {
+  id: string;
+  importacionId: string;
+  documento: string;
+  fecha: string;
+  lineaId: string;
+  productoCodigo: string;
+  cantidadKg: number;
+  tipoMerma: TipoMermaCodigo | null;
+  motivo: string;
+}
+
+/**
+ * Espejo de `EvaluacionCalidad`: los `criterios` guardan el resultado **de las
+ * reglas**, sin los overrides aplicados, para poder quitarlos y recuperar el
+ * valor calculado.
+ */
+export interface EvaluacionCalidadMock {
+  id: string;
+  n: number;
+  fecha: string;
+  turno: Turno;
+  tipoRegistro: TipoRegistroTci;
+  registroId: string;
+  lineaId: string;
+  lineaCodigo: string;
+  referencia: string;
+  criterios: CriterioTCI[];
+  overrides: Partial<Record<ClaveCriterioTci, boolean>> | null;
+  valido: boolean;
+  validadoEn: string;
+  desde: string;
+  hasta: string;
+  observacion: string;
+}
+
+/** Espejo de `EncuestaRespuesta`: una fila por invitación respondida. */
+export interface RespuestaTspMock {
+  id: string;
+  token: string;
+  respuestas: number[];
+  comentario: string | null;
+  fecha: string;
+}
+
+export interface FuentesExternasMock {
+  lecturasSensor: LecturaSensorMock[];
+  solicitudes: SolicitudExternaMock[];
+  transferenciasSap: TransferenciaSapMock[];
 }
 
 export interface MockStore {
@@ -58,25 +178,25 @@ export interface MockStore {
   umbrales: Umbrales;
   exportaciones: ExportJob[];
   verificacionesCfs: VerificacionCFS[];
+  /** Postest del Anexo 02: arranca vacío y crece con cada captura cronometrada. */
   triPostest: RegistroTRI[];
+  /** Pretest del Anexo 02: 10 filas medidas a mano, editables desde 09.B. */
   triPretest: RegistroTRI[];
   lineaEstados: LineaEstado[];
-  /** Matriz de respuestas de la encuesta TSP (19 semilla + nuevas). */
-  respuestasTsp: number[][];
-  /** Contadores acumulados del KPI EP (Anexo 06). */
-  ep: { correctas: number; totales: number };
+  /** Fuentes externas acumuladas por importación (XLSX/CSV). */
+  fuentes: FuentesExternasMock;
+  /** Bitácora de importaciones, la más reciente primero. */
+  importaciones: ImportacionFuenteMock[];
+  /** Evaluaciones del Anexo 03; las produce `POST /evidencia/tci/validar`. */
+  evaluacionesTci: EvaluacionCalidadMock[];
+  /** Invitaciones nominales a la encuesta TSP (un token por persona). */
+  invitacionesTsp: InvitacionTSP[];
+  /** Respuestas recibidas en la encuesta TSP (arranca vacío). */
+  respuestasTsp: RespuestaTspMock[];
+  /** Anexo 06: una fila por alerta confirmada (arranca vacío). */
+  registrosEp: RegistroEP[];
   /** Secuencia para ids nuevos. */
   seq: number;
-}
-
-function respuestasSemilla(): number[][] {
-  /* Reconstruye una matriz 19×8 coherente con los % de acuerdo del Anexo 04. */
-  const deAcuerdoPorItem = [17, 16, 15, 17, 16, 15, 16, 16];
-  const filas: number[][] = [];
-  for (let r = 0; r < 19; r += 1) {
-    filas.push(deAcuerdoPorItem.map((deAcuerdo, i) => (r < deAcuerdo ? (i % 2 === 0 ? 5 : 4) : (i % 2 === 0 ? 3 : 2))));
-  }
-  return filas;
 }
 
 function crearStore(): MockStore {
@@ -98,11 +218,15 @@ function crearStore(): MockStore {
     umbrales: clonar(data.umbralesIniciales),
     exportaciones: clonar(data.exportacionesIniciales) as unknown as ExportJob[],
     verificacionesCfs: clonar(data.verificacionesCfs),
-    triPostest: clonar(data.evidenciaTri.postest),
+    triPostest: [],
     triPretest: clonar(data.evidenciaTri.pretest),
     lineaEstados: clonar(data.lineaEstadosBase),
-    respuestasTsp: respuestasSemilla(),
-    ep: { correctas: data.EP_CORRECTAS_BASE, totales: data.EP_TOTALES_BASE },
+    fuentes: { lecturasSensor: [], solicitudes: [], transferenciasSap: [] },
+    importaciones: [],
+    evaluacionesTci: [],
+    invitacionesTsp: [],
+    respuestasTsp: [],
+    registrosEp: [],
     seq: 1000,
   };
 }
@@ -227,20 +351,30 @@ export function sincronizarTiempoReal(parada: Parada): void {
   };
 }
 
-/** TRI actual (ΣTR/n) sobre los registros postest del store. */
-export function triActual(): number {
-  return calcTri(store.triPostest.map((r) => r.tiempoMin));
+/** TRI actual (ΣTR/n) del postest; `null` mientras no haya ninguna captura. */
+export function triActual(): number | null {
+  return calcTriOpcional(store.triPostest.map((r) => r.tiempoMin));
 }
 
+/** TRI del pretest (línea base cargada a mano); `0` si aún no se cargó. */
 export function triPretestPromedio(): number {
   return calcTri(store.triPretest.map((r) => r.tiempoMin));
 }
 
-/** Añade un registro TRI cuando un formulario reporta `tiempoRegistroSeg`. */
-export function registrarTri(evento: string, segundos: number, fecha: string): void {
+/**
+ * Añade un registro TRI cuando un formulario reporta `tiempoRegistroSeg`.
+ * Espejo de `EvidenceService.registrarTiempoPostest`: sin cronómetro (0 s) no
+ * hay fila, y el id se deriva del registro que lo originó.
+ */
+export function registrarTri(
+  evento: string,
+  segundos: number,
+  fecha: string,
+  referenciaId?: string
+): void {
   if (segundos <= 0) return;
   store.triPostest.push({
-    id: nextId('TRI-PO'),
+    id: referenciaId ? `TRI-PO-AUTO-${referenciaId}` : nextId('TRI-PO'),
     n: store.triPostest.length + 1,
     fecha,
     eventoRegistrado: evento,
@@ -250,47 +384,88 @@ export function registrarTri(evento: string, segundos: number, fecha: string): v
   });
 }
 
-/** TCI actual: registros correctos / totales del Anexo 03. */
-export function tciActual(): number {
-  return calcTci(data.evidenciaTci.registrosCorrectos, data.evidenciaTci.registrosTotales);
+/**
+ * TCI actual sobre las evaluaciones del store; `null` mientras no se haya
+ * ejecutado ninguna validación (`POST /evidencia/tci/validar`).
+ */
+export function tciActual(): number | null {
+  const totales = store.evaluacionesTci.length;
+  const correctos = store.evaluacionesTci.filter((e) => e.valido).length;
+  return calcTci(correctos, totales);
 }
 
-/** TSP actual recalculado sobre la matriz de respuestas del store. */
-export function tspActual(): { pctAcuerdo: number; promedio: number; respuestas: number } {
-  let deAcuerdo = 0;
-  let total = 0;
-  let suma = 0;
-  for (const fila of store.respuestasTsp) {
-    for (const valor of fila) {
-      total += 1;
-      suma += valor;
-      if (valor >= 4) deAcuerdo += 1;
-    }
-  }
+/** TSP actual recalculado sobre las respuestas recibidas; `null` sin respuestas. */
+export function tspActual(): {
+  pctAcuerdo: number | null;
+  promedio: number | null;
+  respuestas: number;
+  invitados: number;
+} {
+  const planas = store.respuestasTsp.flatMap((r) => r.respuestas);
+  const deAcuerdo = planas.filter((v) => v >= 4).length;
   return {
-    pctAcuerdo: calcTsp(deAcuerdo, total),
-    promedio: total > 0 ? Math.round((suma / total) * 100) / 100 : 0,
+    pctAcuerdo: calcTsp(deAcuerdo, planas.length),
+    promedio: calcPromedioLikert(planas),
     respuestas: store.respuestasTsp.length,
+    invitados: store.invitacionesTsp.length,
   };
 }
 
 /** CFS actual: funcionalidades marcadas como cumplidas / 9. */
-export function cfsActual(): { cumplidas: number; totales: number; porcentaje: number } {
+export function cfsActual(): {
+  cumplidas: number;
+  verificadas: number;
+  totales: number;
+  porcentaje: number | null;
+} {
   const cumplidas = store.verificacionesCfs.filter((v) => v.cumple).length;
+  const verificadas = store.verificacionesCfs.filter((v) => v.verificadaEn).length;
   const totales = store.verificacionesCfs.length;
-  return { cumplidas, totales, porcentaje: redondear((cumplidas / totales) * 100) };
+  return {
+    cumplidas,
+    verificadas,
+    totales,
+    porcentaje: calcCfsOpcional(cumplidas, verificadas, totales || METAS_TESIS.CFS_TOTAL),
+  };
 }
 
-/** EP actual: se recalcula cada vez que se confirma un evento real. */
+/** EP acumulada en porcentaje: la forma que consume el header de Alertas (0 sin datos). */
 export function epActual(): number {
-  return calcEp(store.ep.correctas, store.ep.totales);
+  const { correctas, totales } = epContadores();
+  return calcEp(correctas, totales);
 }
 
-/** Registra el resultado real de una alerta y actualiza el KPI EP. */
-export function confirmarAcierto(alerta: Alerta, ocurrio: boolean): void {
-  const acierto = ocurrio;
-  alerta.acierto = acierto;
+/** EP del Anexo 06: `null` mientras no se haya confirmado ninguna alerta. */
+export function epEvidencia(): number | null {
+  const { correctas, totales } = epContadores();
+  return calcEpOpcional(correctas, totales);
+}
+
+export function epContadores(): { correctas: number; totales: number } {
+  return {
+    correctas: store.registrosEp.filter((r) => r.acierto).length,
+    totales: store.registrosEp.length,
+  };
+}
+
+/**
+ * Registra el resultado real de una alerta y añade su fila al Anexo 06.
+ * Espejo de `AlertsService.aplicarConfirmacion`.
+ */
+export function confirmarAcierto(alerta: Alerta, ocurrio: boolean, observacion?: string): void {
+  alerta.acierto = ocurrio;
   alerta.estado = 'confirmada';
-  store.ep.totales += 1;
-  if (acierto) store.ep.correctas += 1;
+  if (observacion) alerta.observacion = observacion;
+  store.registrosEp.push({
+    id: `EP-ALE-${alerta.id}`,
+    n: store.registrosEp.length + 1,
+    fecha: hoyLocalIso(),
+    tipoPrediccion: `${TIPO_ALERTA_LABEL[alerta.tipo]} · ${alerta.lineaCodigo} ${alerta.lineaNombre}`,
+    eventoReal: ocurrio
+      ? 'El evento ocurrió dentro de la ventana prevista'
+      : 'No se observó el evento en la ventana',
+    acierto: ocurrio,
+    observacion: observacion ?? '',
+    alertaId: alerta.id,
+  });
 }

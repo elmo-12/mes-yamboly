@@ -9,8 +9,9 @@ export const RESUMENES = ['todas', 'por_validar', 'con_paradas', 'con_mermas'] a
 export type ResumenOrdenes = (typeof RESUMENES)[number];
 
 export const PAGE_SIZE = 25;
-/** Página amplia para los filtros que no existen en la API (`con_paradas`). */
-const PAGE_SIZE_AMPLIO = 200;
+/** Página amplia para los filtros que no existen en la API (`con_paradas`);
+ *  el tope de `PaginationDto` es 100 y pedir más devuelve 422. */
+const PAGE_SIZE_AMPLIO = 100;
 
 export interface OrdenesFiltros {
   periodo: Periodo;
@@ -108,8 +109,8 @@ export function useOrdenesFiltros() {
 
 /**
  * Traduce los filtros de la UI a la query de `GET /ordenes`.
- * `con_paradas` y `con_mermas` no existen en el contrato: se piden hasta 200
- * filas y se filtran en cliente (ver `OrdenesTableBlock`).
+ * `con_paradas` y `con_mermas` no existen en el contrato: se pide la página
+ * máxima que acepta la API (100) y se filtra en cliente (ver `OrdenesTableBlock`).
  */
 export function aQueryApi(f: OrdenesFiltros): OrdenListQuery {
   const cliente = f.resumen === 'con_paradas' || f.resumen === 'con_mermas';

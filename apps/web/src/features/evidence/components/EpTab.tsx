@@ -3,6 +3,8 @@
 import {
   Badge,
   Button,
+  EmptyState,
+  Icon,
   SectionTitle,
   TBody,
   TCell,
@@ -13,6 +15,7 @@ import {
 } from '@mes/ui';
 import type { EvidenciaEP } from '@mes/types';
 import { formatDate, formatNumber } from '@mes/shared';
+import { AppLink } from '@/components/AppLink';
 import { KpiAnexoCard, KpiRow, PieAnexo, usePaginaLocal } from './evidencia-format';
 
 /**
@@ -22,6 +25,7 @@ import { KpiAnexoCard, KpiRow, PieAnexo, usePaginaLocal } from './evidencia-form
  */
 export function EpTab({ ep }: { ep: EvidenciaEP }) {
   const pagina = usePaginaLocal(ep.registros, 12);
+  const hayRegistros = ep.prediccionesTotales > 0;
   const falsosPositivos = ep.prediccionesTotales - ep.prediccionesCorrectas;
   const pctFalsos = ep.prediccionesTotales
     ? (falsosPositivos / ep.prediccionesTotales) * 100
@@ -32,16 +36,24 @@ export function EpTab({ ep }: { ep: EvidenciaEP }) {
       <KpiRow>
         <KpiAnexoCard
           label="EP · Exactitud"
-          value={`${formatNumber(ep.porcentaje, 1)} %`}
+          value={ep.porcentaje === null ? null : `${formatNumber(ep.porcentaje, 1)} %`}
           meta={ep.meta}
-          estado={ep.estado}
-          context={`${ep.prediccionesCorrectas} de ${ep.prediccionesTotales} predicciones correctas`}
+          estado={hayRegistros ? ep.estado : 'sin_datos'}
+          context={
+            hayRegistros
+              ? `${ep.prediccionesCorrectas} de ${ep.prediccionesTotales} predicciones correctas`
+              : 'Se calcula al confirmar el evento real de cada alerta'
+          }
         />
         <KpiAnexoCard
           label="Predicciones correctas (PCC)"
           value={ep.prediccionesCorrectas}
-          meta={`Meta ≥ ${Math.ceil(ep.prediccionesTotales * 0.8)} de ${ep.prediccionesTotales}`}
-          estado={ep.estado}
+          meta={
+            hayRegistros
+              ? `Meta ≥ ${Math.ceil(ep.prediccionesTotales * 0.8)} de ${ep.prediccionesTotales}`
+              : 'Meta ≥ 80 % de las emitidas'
+          }
+          estado={hayRegistros ? ep.estado : 'sin_datos'}
           context="contrastadas en planta"
         />
         <KpiAnexoCard
@@ -55,8 +67,12 @@ export function EpTab({ ep }: { ep: EvidenciaEP }) {
           label="Falsos positivos"
           value={falsosPositivos}
           meta="Máximo 20 %"
-          estado={pctFalsos <= 20 ? 'cumple' : 'en_riesgo'}
-          context={`${formatNumber(pctFalsos, 1)} % sin evento real asociado`}
+          estado={hayRegistros ? (pctFalsos <= 20 ? 'cumple' : 'en_riesgo') : 'sin_datos'}
+          context={
+            hayRegistros
+              ? `${formatNumber(pctFalsos, 1)} % sin evento real asociado`
+              : 'sin predicciones contrastadas'
+          }
         />
       </KpiRow>
 
@@ -66,6 +82,18 @@ export function EpTab({ ep }: { ep: EvidenciaEP }) {
         className="border-b border-divider pb-3"
       />
 
+      {!hayRegistros ? (
+        <EmptyState
+          icon={<Icon name="radar" size={40} />}
+          title="Todavía no hay predicciones contrastadas"
+          description="Se calcula al confirmar el evento real de cada alerta en Alertas."
+          action={
+            <AppLink href="/alertas" className="text-body-md font-medium">
+              Ir a Alertas
+            </AppLink>
+          }
+        />
+      ) : (
       <div className="flex flex-col">
         <Table density="dense">
           <THead>
@@ -108,7 +136,7 @@ export function EpTab({ ep }: { ep: EvidenciaEP }) {
           } de ${pagina.total} predicciones · PCC = ${ep.prediccionesCorrectas} · PTG = ${
             ep.prediccionesTotales
           } · EP = (${ep.prediccionesCorrectas} / ${ep.prediccionesTotales}) × 100 = ${formatNumber(
-            ep.porcentaje,
+            ep.porcentaje ?? 0,
             1,
           )} % · Meta ${ep.meta}`}
           actions={
@@ -133,6 +161,7 @@ export function EpTab({ ep }: { ep: EvidenciaEP }) {
           }
         />
       </div>
+      )}
     </div>
   );
 }

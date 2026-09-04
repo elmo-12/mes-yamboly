@@ -117,6 +117,8 @@ export const createOrdenSchema = z.object({
   supervisorId: z.string().min(1, 'Selecciona un supervisor'),
   operarios: z.coerce.number().int().min(1, 'Debe haber al menos 1 operario'),
   colaboradorIds: z.array(z.string()).default([]),
+  /** Cronómetro del wizard: alimenta el postest del TRI (Anexo 02). */
+  tiempoRegistroSeg: z.coerce.number().int().min(0).default(0),
 });
 export type CreateOrdenInput = z.infer<typeof createOrdenSchema>;
 export type CreateOrden = CreateOrdenInput;
@@ -126,6 +128,8 @@ export const finalizeOrdenSchema = z.object({
   conteoCodificadora: z.coerce.number().int().min(0, 'Debe ser 0 o mayor'),
   evidenciaUrl: z.string().optional(),
   comentario: z.string().max(500, 'Máximo 500 caracteres').optional(),
+  /** Cronómetro del modal de cierre: alimenta el postest del TRI (Anexo 02). */
+  tiempoRegistroSeg: z.coerce.number().int().min(0).default(0),
 });
 export type FinalizeOrdenInput = z.infer<typeof finalizeOrdenSchema>;
 export type FinalizeOrden = FinalizeOrdenInput;

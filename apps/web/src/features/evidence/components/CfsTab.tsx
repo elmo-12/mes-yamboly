@@ -2,9 +2,9 @@
 
 import * as React from 'react';
 import {
-  Checkbox,
   Input,
   SectionTitle,
+  Switch,
   TBody,
   TCell,
   TH,
@@ -25,22 +25,28 @@ import { KpiAnexoCard, KpiRow, PieAnexo } from './evidencia-format';
  * observación editable y enlace a la pantalla que evidencia el requisito.
  */
 export function CfsTab({ cfs }: { cfs: EvidenciaCFS }) {
+  /* Sin ninguna funcionalidad revisada el CFS es «sin datos», no 0 %. */
+  const hayVerificadas = cfs.porcentaje !== null;
   return (
     <div className="flex flex-col gap-6">
       <KpiRow>
         <KpiAnexoCard
           label="CFS · Cumplimiento"
-          value={`${formatNumber(cfs.porcentaje, 0)} %`}
+          value={hayVerificadas ? `${formatNumber(cfs.porcentaje ?? 0, 0)} %` : null}
           meta={cfs.meta}
           estado={cfs.estado}
-          context={`${cfs.cumplidas}/${cfs.totales} funcionalidades`}
+          context={
+            hayVerificadas
+              ? `${cfs.cumplidas}/${cfs.totales} funcionalidades`
+              : 'Marca cada funcionalidad verificada en la ficha'
+          }
         />
         <KpiAnexoCard
           label="Implementadas (FRI)"
           value={cfs.cumplidas}
           meta={`Meta ≥ ${cfs.totales} de ${cfs.totales}`}
           estado={cfs.estado}
-          context="verificadas en planta"
+          context={`${cfs.verificadas} de ${cfs.totales} verificadas en planta`}
         />
         <KpiAnexoCard
           label="Planificadas (FRP)"
@@ -50,11 +56,11 @@ export function CfsTab({ cfs }: { cfs: EvidenciaCFS }) {
           context="RF1–RF9 · alcance de la tesis"
         />
         <KpiAnexoCard
-          label="Pendientes"
-          value={cfs.totales - cfs.cumplidas}
+          label="Por verificar"
+          value={cfs.totales - cfs.verificadas}
           meta="Meta = 0 pendientes"
-          estado={cfs.totales === cfs.cumplidas ? 'cumple' : 'en_riesgo'}
-          context="sin evidencia registrada"
+          estado={cfs.totales === cfs.verificadas ? 'cumple' : 'en_riesgo'}
+          context="sin revisar en la ficha"
         />
       </KpiRow>
 
@@ -83,9 +89,11 @@ export function CfsTab({ cfs }: { cfs: EvidenciaCFS }) {
         </Table>
 
         <PieAnexo
-          texto={`FRI = ${cfs.cumplidas} · FRP = ${cfs.totales} · CFS = (${cfs.cumplidas} / ${
-            cfs.totales
-          }) × 100 = ${formatNumber(cfs.porcentaje, 0)} % · Meta ${cfs.meta}. Los cambios se guardan al marcar la casilla o al salir del campo de observación.`}
+          texto={
+            hayVerificadas
+              ? `FRI = ${cfs.cumplidas} · FRP = ${cfs.totales} · CFS = (${cfs.cumplidas} / ${cfs.totales}) × 100 = ${formatNumber(cfs.porcentaje ?? 0, 0)} % · Meta ${cfs.meta}. Los cambios se guardan al marcar la casilla o al salir del campo de observación.`
+              : `FRP = ${cfs.totales} · Sin funcionalidades verificadas todavía: el CFS se calcula al marcar la primera casilla. Meta ${cfs.meta}. Los cambios se guardan al marcar la casilla o al salir del campo de observación.`
+          }
         />
       </div>
     </div>
@@ -120,18 +128,14 @@ function FilaCfs({ item }: { item: VerificacionCFS }) {
         {item.rf} · {item.funcionalidad}
       </TCell>
       <TCell className="py-2.5">
-        <span className="flex items-center gap-2">
-          <Checkbox
-            size="sm"
-            checked={item.cumple}
-            disabled={actualizar.isPending}
-            aria-label={`${item.rf} cumple`}
-            onCheckedChange={(valor) =>
-              void guardar({ cumple: valor === true, observacion })
-            }
-          />
-          <span className="text-text-primary">{item.cumple ? 'Sí' : 'No'}</span>
-        </span>
+        <Switch
+          size="sm"
+          checked={item.cumple}
+          disabled={actualizar.isPending}
+          aria-label={`${item.rf} cumple`}
+          label={item.cumple ? 'Sí' : 'No'}
+          onCheckedChange={(valor) => void guardar({ cumple: valor, observacion })}
+        />
       </TCell>
       <TCell className="py-2">
         <Input
