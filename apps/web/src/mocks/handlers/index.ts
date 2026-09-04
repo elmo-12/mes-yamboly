@@ -9,12 +9,14 @@ import { realtimeHandlers } from './realtime';
 import { reportsHandlers } from './reports';
 import { scrapHandlers } from './scrap';
 import { speedsHandlers } from './speeds';
+import { usersHandlers } from './users';
 
 /** Todos los endpoints de `docs/api-contracts.md`. El orden importa: las rutas
  *  más específicas (`/ordenes/resumen`) van antes que las paramétricas. */
 export const handlers = [
   ...authHandlers,
   ...catalogsHandlers,
+  ...usersHandlers,
   ...realtimeHandlers,
   ...reportsHandlers,
   ...alertsHandlers,
@@ -38,4 +40,5 @@ export {
   reportsHandlers,
   scrapHandlers,
   speedsHandlers,
+  usersHandlers,
 };

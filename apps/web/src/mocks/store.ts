@@ -1,6 +1,7 @@
 import type {
   Alerta,
   AuditEvent,
+  CausaMerma,
   CausaParada,
   DeteccionIoT,
   ExportJob,
@@ -12,12 +13,17 @@ import type {
   Producto,
   RegistroTRI,
   RegistroVelocidad,
+  Sabor,
+  Sede,
   Umbrales,
+  User,
+  VelocidadEstandar,
   VerificacionCFS,
 } from '@mes/types';
 import { calcEp, calcTci, calcTri, calcTsp } from '@mes/shared';
 import * as data from './data';
 import { redondear } from './data/seed';
+import type { UsuarioSeed } from './data/users';
 
 /**
  * Store en memoria del mock. Se clona a partir de los datasets deterministas
@@ -41,7 +47,16 @@ export interface MockStore {
   maquinas: Maquina[];
   /** Editable desde Configuración → Productos y velocidades (spec 10). */
   productos: Producto[];
+  /** Pares producto × línea: la velocidad estándar vive aquí, no en el producto. */
+  velocidadesEstandar: VelocidadEstandar[];
+  /** Catálogo de sabores del maestro real (solo lectura por ahora). */
+  sabores: Sabor[];
+  /** Sedes editables desde Configuración → Sedes y usuarios. */
+  sedes: Sede[];
+  /** Usuarios editables (alta, edición, estado y restablecer contraseña). */
+  usuarios: UsuarioSeed[];
   causasParada: CausaParada[];
+  causasMerma: CausaMerma[];
   umbrales: Umbrales;
   exportaciones: ExportJob[];
   verificacionesCfs: VerificacionCFS[];
@@ -77,7 +92,12 @@ function crearStore(): MockStore {
     bitacora: clonar(data.bitacora),
     maquinas: clonar(data.maquinas),
     productos: clonar(data.productos),
+    velocidadesEstandar: clonar(data.velocidadesEstandar),
+    sabores: clonar(data.sabores),
+    sedes: clonar(data.sedes),
+    usuarios: clonar(data.usuarios),
     causasParada: clonar(data.causasParada),
+    causasMerma: clonar(data.causasMerma),
     umbrales: clonar(data.umbralesIniciales),
     exportaciones: clonar(data.exportacionesIniciales) as unknown as ExportJob[],
     verificacionesCfs: clonar(data.verificacionesCfs),
@@ -104,6 +124,65 @@ export function resetStore(): void {
 export function nextId(prefijo: string): string {
   store.seq += 1;
   return `${prefijo}-${store.seq}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Lookups sobre los catálogos mutables del store                      */
+/* ------------------------------------------------------------------ */
+
+/** Espejo de `LookupsService.parActivo`: par producto × línea vigente. */
+export function parActivo(productoId: string, lineaId: string): VelocidadEstandar | undefined {
+  return store.velocidadesEstandar.find(
+    (v) => v.productoId === productoId && v.lineaId === lineaId && v.estado === 'activo'
+  );
+}
+
+export function buscarCausaMerma(id: string): CausaMerma | undefined {
+  return store.causasMerma.find((c) => c.id === id);
+}
+
+/**
+ * Cadena de ascendencia de una causa de merma: `causa` (hoja) →
+ * `clasificacion` (intermedio, opcional) → `tipo` (raíz). Espejo de
+ * `cadenaCausaMerma` de `apps/api/src/common/mappers/enrich.ts`.
+ */
+export function cadenaCausaMerma(causaId: string): {
+  causa?: CausaMerma;
+  clasificacion?: CausaMerma;
+  tipo?: CausaMerma;
+} {
+  const causa = buscarCausaMerma(causaId);
+  const padre = causa?.parentId ? buscarCausaMerma(causa.parentId) : undefined;
+  const abuelo = padre?.parentId ? buscarCausaMerma(padre.parentId) : undefined;
+  if (abuelo) return { causa, clasificacion: padre, tipo: abuelo };
+  if (padre) return { causa, clasificacion: undefined, tipo: padre };
+  return { causa, clasificacion: undefined, tipo: causa };
+}
+
+export function usuarioPorId(id: string): UsuarioSeed | undefined {
+  return store.usuarios.find((u) => u.id === id);
+}
+
+/**
+ * Vista pública de un usuario: sin contraseña y sin `null` en los opcionales,
+ * igual que `toUserDto` de la API.
+ */
+export function toUser(u: UsuarioSeed): User {
+  const { password: _password, ...user } = u;
+  return {
+    ...user,
+    lineaId: user.lineaId ?? undefined,
+    avatarUrl: user.avatarUrl ?? undefined,
+    ultimoAcceso: user.ultimoAcceso ?? undefined,
+  };
+}
+
+export function nombreUsuario(id: string): string {
+  return usuarioPorId(id)?.nombre ?? 'Sistema';
+}
+
+export function inicialesUsuario(id: string): string {
+  return usuarioPorId(id)?.iniciales ?? 'SY';
 }
 
 /* ------------------------------------------------------------------ */

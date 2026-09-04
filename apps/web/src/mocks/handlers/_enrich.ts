@@ -8,9 +8,8 @@ import type {
   RegistroVelocidad,
   RegistroVelocidadListItem,
 } from '@mes/types';
-import { causaMermaPorId, lineaPorId, maquinaPorId, productoPorId } from '../data';
-import { nombreUsuario } from '../data/users';
-import { getStore } from '../store';
+import { lineaPorId } from '../data';
+import { buscarCausaMerma, cadenaCausaMerma, getStore, nombreUsuario } from '../store';
 
 function ordenCodigo(ordenId: string): string {
   return getStore().ordenes.find((o) => o.id === ordenId)?.codigo ?? '—';
@@ -18,7 +17,7 @@ function ordenCodigo(ordenId: string): string {
 
 export function enriquecerOrden(orden: OrdenFabricacion): OrdenListItem {
   const linea = lineaPorId.get(orden.lineaId);
-  const producto = productoPorId.get(orden.productoId);
+  const producto = getStore().productos.find((p) => p.id === orden.productoId);
   return {
     ...orden,
     lineaCodigo: linea?.codigo ?? '—',
@@ -36,7 +35,7 @@ export function enriquecerParada(parada: Parada): ParadaListItem {
   return {
     ...parada,
     lineaCodigo: lineaPorId.get(parada.lineaId)?.codigo ?? '—',
-    maquinaNombre: maquinaPorId.get(parada.maquinaId)?.nombre ?? '—',
+    maquinaNombre: store.maquinas.find((m) => m.id === parada.maquinaId)?.nombre ?? '—',
     causaCodigo: causa?.codigo ?? '—',
     causaNombre: causa?.nombre ?? '—',
     tipoCausaCodigo: tipo?.codigo ?? '—',
@@ -47,12 +46,22 @@ export function enriquecerParada(parada: Parada): ParadaListItem {
 }
 
 export function enriquecerMerma(merma: Merma): MermaListItem {
-  const causa = causaMermaPorId.get(merma.causaId);
+  const causa = buscarCausaMerma(merma.causaId);
+  const cadena = cadenaCausaMerma(merma.causaId);
+  const tipoCausaId = merma.tipoCausaId || (cadena.tipo?.id ?? '');
+  const clasificacionId = merma.clasificacionId ?? cadena.clasificacion?.id ?? null;
   return {
     ...merma,
+    tipoCausaId,
+    clasificacionId,
+    numeroSolicitud: merma.numeroSolicitud ?? null,
     lineaCodigo: lineaPorId.get(merma.lineaId)?.codigo ?? '—',
     causaCodigo: causa?.codigo ?? '—',
     causaNombre: causa?.nombre ?? '—',
+    tipoCausaNombre: buscarCausaMerma(tipoCausaId)?.nombre ?? '—',
+    clasificacionNombre: clasificacionId
+      ? (buscarCausaMerma(clasificacionId)?.nombre ?? '—')
+      : null,
     responsableNombre: nombreUsuario(merma.responsableId),
     ordenCodigo: ordenCodigo(merma.ordenId),
   };

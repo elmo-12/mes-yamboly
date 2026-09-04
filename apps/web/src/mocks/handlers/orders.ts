@@ -1,8 +1,15 @@
 import { http, HttpResponse } from 'msw';
 import type { OrdenFabricacion, OrdenesResumen, Periodo, Turno } from '@mes/types';
 import { rangoPeriodo } from '@mes/shared';
-import { HOY, TOTAL_HISTORICO_ORDENES, colaboradoresBase, productoPorId } from '../data';
-import { getStore, nextId, recalcularOrden, registrarBitacora } from '../store';
+import {
+  HOY,
+  TOTAL_HISTORICO_ORDENES,
+  TURNO_ACTUAL,
+  colaboradoresBase,
+  lineas,
+  productoPorId,
+} from '../data';
+import { getStore, parActivo, recalcularOrden, registrarBitacora } from '../store';
 import {
   API,
   ahoraIso,
@@ -15,6 +22,9 @@ import {
 } from './_utils';
 import { enriquecerMerma, enriquecerOrden, enriquecerParada, enriquecerVelocidad } from './_enrich';
 import { usuarioDesdeToken } from './auth';
+
+/** Primera línea del maestro real: solo se usa si el cuerpo no trae `lineaId`. */
+const LINEA_POR_DEFECTO = lineas[0]?.id ?? '';
 
 function filtrar(url: URL): OrdenFabricacion[] {
   const store = getStore();
@@ -165,22 +175,37 @@ export const ordersHandlers = [
     if (store.ordenes.some((o) => o.codigo === codigo)) {
       return errores.conflicto('Ya existe una orden con ese número', { codigo });
     }
-    const productoId = String(body.productoId ?? 'PRD-003');
-    const producto = productoPorId.get(productoId);
+    const productoId = String(body.productoId ?? '');
+    const lineaId = String(body.lineaId ?? LINEA_POR_DEFECTO);
+    const producto = store.productos.find((p) => p.id === productoId);
+
+    /*
+     * La velocidad estándar se resuelve del par producto × línea vigente y se
+     * congela en u/min: sin par activo la orden no puede iniciarse, porque el
+     * OEE quedaría sin referencia de desempeño (espejo de `orders.service.ts`).
+     */
+    const par = parActivo(productoId, lineaId);
+    if (!par) {
+      return errores.validacion({
+        productoId: 'El producto no tiene velocidad estándar en esta línea',
+      });
+    }
+
     const colaboradorIds = (body.colaboradorIds as string[] | undefined) ?? [];
     const orden: OrdenFabricacion = {
-      id: nextId('ORD'),
+      id: `ORD-${codigo.slice(-4)}`,
       codigo,
       fecha: ahoraIso().slice(0, 10),
-      lineaId: String(body.lineaId ?? 'LIN-02'),
+      lineaId,
       productoId,
-      turno: (body.turno as OrdenFabricacion['turno']) ?? 'M',
+      turno: (body.turno as OrdenFabricacion['turno']) ?? TURNO_ACTUAL,
       lote: String(body.lote ?? ''),
       vencimiento: String(body.vencimiento ?? ''),
       planificado: Number(body.planificado ?? 0),
       producido: 0,
       conteoCodificadora: 0,
-      velocidadEstandar: producto?.velocidadEstandar ?? 100,
+      velocidadEstandar: par.velocidadUnidMin,
+      velocidadEstandarId: par.id,
       estado: 'en_curso',
       maquinistaId: String(body.maquinistaId ?? 'USR-02'),
       supervisorId: String(body.supervisorId ?? 'USR-03'),

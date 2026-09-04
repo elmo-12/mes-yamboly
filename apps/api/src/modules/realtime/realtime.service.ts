@@ -48,7 +48,7 @@ export class RealtimeService {
   ) {}
 
   async resumen(
-    sedeId = 'SED-01',
+    sedeId = 'SED-LIMA',
     lineaIds: string[] = [],
     estados: string[] = [],
   ): Promise<TiempoRealResumen> {

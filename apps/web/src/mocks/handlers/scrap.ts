@@ -1,10 +1,99 @@
 import { http, HttpResponse } from 'msw';
-import type { Merma } from '@mes/types';
-import { causaMermaPorId } from '../data';
-import { getStore, nextId, recalcularOrden, registrarBitacora, registrarTri } from '../store';
+import type { Merma, TipoMermaCodigo } from '@mes/types';
+import {
+  buscarCausaMerma,
+  cadenaCausaMerma,
+  getStore,
+  recalcularOrden,
+  registrarBitacora,
+  registrarTri,
+} from '../store';
 import { API, ahoraIso, errores, listaQuery, numeroQuery, paginar, preludio } from './_utils';
 import { enriquecerMerma } from './_enrich';
 import { usuarioDesdeToken } from './auth';
+
+interface JerarquiaMerma {
+  causaId: string;
+  tipoCausaId: string;
+  clasificacionId: string | null;
+}
+
+/**
+ * Valida el árbol de causas de merma: la causa elegida debe ser una **hoja
+ * activa** (`nivel: 'causa'`) y su cadena de padres debe coincidir con la
+ * clasificación y el tipo enviados (si no vienen, se derivan de la hoja).
+ * Además exige `observacion` / `numeroSolicitud` cuando la causa lo marca.
+ * Espejo de `ScrapService.validarCausa`.
+ */
+function validarCausa(entrada: {
+  causaId: string;
+  tipo: TipoMermaCodigo;
+  tipoCausaId?: string;
+  clasificacionId?: string | null;
+  observacion?: string;
+  numeroSolicitud?: string;
+}): { jerarquia?: JerarquiaMerma; error?: Response } {
+  const causa = buscarCausaMerma(entrada.causaId);
+  if (!causa) {
+    return { error: errores.validacion({ causaId: 'La causa seleccionada no existe' }) };
+  }
+  if (causa.nivel !== 'causa') {
+    return {
+      error: errores.validacion({
+        causaId: `${causa.codigo} es un nivel «${causa.nivel}»: elige una causa final del árbol`,
+      }),
+    };
+  }
+  if (causa.estado !== 'activo') {
+    return {
+      error: errores.validacion({ causaId: `La causa ${causa.codigo} está dada de baja` }),
+    };
+  }
+  if (causa.aplicaA.length > 0 && !causa.aplicaA.includes(entrada.tipo)) {
+    return {
+      error: errores.validacion({
+        causaId: `La causa ${causa.codigo} no aplica a mermas de tipo ${entrada.tipo}`,
+      }),
+    };
+  }
+
+  const cadena = cadenaCausaMerma(causa.id);
+  const tipoCausaId = cadena.tipo?.id ?? '';
+  const clasificacionId = cadena.clasificacion?.id ?? null;
+
+  if (entrada.tipoCausaId && entrada.tipoCausaId !== tipoCausaId) {
+    return {
+      error: errores.validacion({
+        tipoCausaId: `La causa ${causa.codigo} no pertenece al tipo de producción seleccionado`,
+      }),
+    };
+  }
+  if (entrada.clasificacionId && entrada.clasificacionId !== clasificacionId) {
+    return {
+      error: errores.validacion({
+        clasificacionId: `La causa ${causa.codigo} no pertenece a la clasificación seleccionada`,
+      }),
+    };
+  }
+  if (causa.requiereComentario && !entrada.observacion?.trim()) {
+    return {
+      error: errores.validacion({ observacion: `La causa ${causa.codigo} exige un comentario` }),
+    };
+  }
+  if (causa.requiereSolicitud && !entrada.numeroSolicitud?.trim()) {
+    return {
+      error: errores.validacion({
+        numeroSolicitud: `La causa ${causa.codigo} exige un n.º de solicitud`,
+      }),
+    };
+  }
+
+  return { jerarquia: { causaId: causa.id, tipoCausaId, clasificacionId } };
+}
+
+function opcional(valor: unknown): string | undefined {
+  return typeof valor === 'string' && valor.length > 0 ? valor : undefined;
+}
 
 export const scrapHandlers = [
   http.get(`${API}/mermas`, async ({ request }) => {
@@ -42,23 +131,36 @@ export const scrapHandlers = [
     if (!(cantidadKg > 0)) {
       return errores.validacion({ cantidadKg: 'La cantidad debe ser mayor que 0' });
     }
-    const causa = causaMermaPorId.get(String(body.causaId ?? ''));
-    if (!causa) return errores.validacion({ causaId: 'Selecciona una causa de merma válida' });
+    const tipo = (body.tipo as Merma['tipo']) ?? 'EP';
+    const { jerarquia, error: invalida } = validarCausa({
+      causaId: String(body.causaId ?? ''),
+      tipo,
+      tipoCausaId: opcional(body.tipoCausaId),
+      clasificacionId: (body.clasificacionId as string | null | undefined) ?? null,
+      observacion: opcional(body.observacion),
+      numeroSolicitud: opcional(body.numeroSolicitud),
+    });
+    if (invalida) return invalida;
+    const causa = buscarCausaMerma(jerarquia!.causaId)!;
 
+    const ordenId = String(body.ordenId ?? '');
     const merma: Merma = {
-      id: nextId('MER'),
-      ordenId: String(body.ordenId ?? ''),
+      id: `MER-${ordenId.slice(4)}-N${store.mermas.length + 1}`,
+      ordenId,
       lineaId: String(body.lineaId ?? ''),
-      tipo: (body.tipo as Merma['tipo']) ?? 'EP',
+      tipo,
       cantidadKg,
       sabor: String(body.sabor ?? 'Vainilla'),
-      causaId: causa.id,
+      tipoCausaId: jerarquia!.tipoCausaId,
+      clasificacionId: jerarquia!.clasificacionId,
+      causaId: jerarquia!.causaId,
+      numeroSolicitud: opcional(body.numeroSolicitud) ?? null,
       responsableId: String(body.responsableId ?? 'USR-04'),
-      codigoBalde: body.codigoBalde ? String(body.codigoBalde) : undefined,
+      codigoBalde: opcional(body.codigoBalde),
       enviarPasteurizacion: Boolean(body.enviarPasteurizacion),
       registradaEn: ahoraIso(),
       tiempoRegistroSeg: Number(body.tiempoRegistroSeg ?? 0),
-      observacion: body.observacion ? String(body.observacion) : undefined,
+      observacion: opcional(body.observacion),
     };
     store.mermas.unshift(merma);
     recalcularOrden(merma.ordenId);
@@ -83,7 +185,38 @@ export const scrapHandlers = [
     const store = getStore();
     const merma = store.mermas.find((m) => m.id === params.id);
     if (!merma) return errores.noEncontrado('Merma');
-    Object.assign(merma, (await request.json()) as Partial<Merma>);
+    const body = (await request.json()) as Partial<Merma>;
+
+    if (body.cantidadKg !== undefined && body.cantidadKg <= 0) {
+      return errores.validacion({ cantidadKg: 'La cantidad debe ser mayor que 0' });
+    }
+
+    /* Al reclasificar se revalida el árbol completo con los valores resultantes. */
+    let jerarquia: JerarquiaMerma | undefined;
+    if (body.causaId) {
+      const resultado = validarCausa({
+        causaId: body.causaId,
+        tipo: body.tipo ?? merma.tipo,
+        tipoCausaId: opcional(body.tipoCausaId),
+        clasificacionId: body.clasificacionId ?? null,
+        observacion: opcional(body.observacion) ?? merma.observacion,
+        numeroSolicitud: opcional(body.numeroSolicitud) ?? merma.numeroSolicitud ?? undefined,
+      });
+      if (resultado.error) return resultado.error;
+      jerarquia = resultado.jerarquia;
+    }
+
+    Object.assign(merma, {
+      ...body,
+      codigoBalde: body.codigoBalde ?? merma.codigoBalde,
+      observacion: body.observacion ?? merma.observacion,
+      numeroSolicitud: body.numeroSolicitud ?? merma.numeroSolicitud,
+    });
+    if (jerarquia) {
+      merma.causaId = jerarquia.causaId;
+      merma.tipoCausaId = jerarquia.tipoCausaId;
+      merma.clasificacionId = jerarquia.clasificacionId;
+    }
     recalcularOrden(merma.ordenId);
     return HttpResponse.json(enriquecerMerma(merma));
   }),

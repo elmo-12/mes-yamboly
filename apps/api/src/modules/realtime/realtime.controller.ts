@@ -25,7 +25,7 @@ export class RealtimeController {
     @Query('lineaId') lineaId?: string | string[],
     @Query('estado') estado?: string | string[],
   ): Promise<TiempoRealResumen> {
-    return this.realtime.resumen(sedeId ?? 'SED-01', toList(lineaId), toList(estado));
+    return this.realtime.resumen(sedeId ?? 'SED-LIMA', toList(lineaId), toList(estado));
   }
 
   @Get('lineas/:id/timeline')

@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import type { RegistroVelocidad } from '@mes/types';
 import { calcDesvioVelocidad } from '@mes/shared';
-import { getStore, nextId, registrarBitacora, registrarTri } from '../store';
+import { getStore, parActivo, registrarBitacora, registrarTri } from '../store';
 import { API, ahoraIso, errores, listaQuery, numeroQuery, paginar, preludio } from './_utils';
 import { enriquecerVelocidad } from './_enrich';
 import { usuarioDesdeToken } from './auth';
@@ -33,12 +33,16 @@ export const speedsHandlers = [
       return errores.validacion({ velocidadReal: 'La velocidad debe ser mayor que 0' });
     }
     const orden = store.ordenes.find((o) => o.id === body.ordenId);
-    const velocidadEstandar = orden?.velocidadEstandar ?? 120;
+    if (!orden) return errores.noEncontrado('Orden de fabricación');
+
+    /* Estándar congelado en la orden; si faltara, el par producto × línea. */
+    const velocidadEstandar =
+      orden.velocidadEstandar || (parActivo(orden.productoId, orden.lineaId)?.velocidadUnidMin ?? 0);
 
     const registro: RegistroVelocidad = {
-      id: nextId('VEL'),
-      ordenId: String(body.ordenId ?? ''),
-      lineaId: String(body.lineaId ?? orden?.lineaId ?? ''),
+      id: `VEL-${orden.id.slice(4)}-N${store.velocidades.length + 1}`,
+      ordenId: orden.id,
+      lineaId: String(body.lineaId ?? orden.lineaId),
       registradaEn: ahoraIso(),
       velocidadReal,
       velocidadEstandar,
@@ -60,7 +64,7 @@ export const speedsHandlers = [
       usuario: usuario?.nombre ?? 'Jorge Quispe',
       usuarioIniciales: usuario?.iniciales ?? 'JQ',
       tipo: 'velocidad',
-      texto: `${usuario?.nombre ?? 'Jorge Quispe'} registró velocidad real ${registro.velocidadReal} u/min (estándar ${velocidadEstandar})`,
+      texto: `${usuario?.nombre ?? 'Jorge Quispe'} registró velocidad real ${registro.velocidadReal} u/min (estándar ${velocidadEstandar} · ${registro.desvioPct} %)`,
     });
 
     return HttpResponse.json(enriquecerVelocidad(registro), { status: 201 });

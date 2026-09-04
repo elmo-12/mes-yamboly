@@ -1,15 +1,15 @@
 import { http, HttpResponse } from 'msw';
 import type { LoginResponse, User } from '@mes/types';
-import { toUser, usuarios } from '../data';
+import { getStore, toUser } from '../store';
 import { API, ahoraIso, errores, normalizar, preludio } from './_utils';
 
-/** Token del mock: `mock.<userId>`. */
+/** Token del mock: `mock.<userId>`. Un usuario desactivado deja de valer. */
 export function usuarioDesdeToken(request: Request): User | null {
   const auth = request.headers.get('authorization');
   if (!auth?.startsWith('Bearer ')) return null;
   const id = auth.slice(7).replace('mock.', '');
-  const encontrado = usuarios.find((u) => u.id === id);
-  return encontrado ? toUser(encontrado) : null;
+  const encontrado = getStore().usuarios.find((u) => u.id === id);
+  return encontrado?.activo ? toUser(encontrado) : null;
 }
 
 export const authHandlers = [
@@ -19,11 +19,12 @@ export const authHandlers = [
 
     const body = (await request.json()) as { email?: string; password?: string };
     const identificador = normalizar(body.email ?? '');
-    const usuario = usuarios.find(
+    const usuario = getStore().usuarios.find(
       (u) => normalizar(u.email) === identificador || u.dni === body.email?.trim()
     );
 
-    if (!usuario || usuario.password !== body.password) {
+    /* Igual que `auth.service.ts`: un usuario inactivo no inicia sesión. */
+    if (!usuario || !usuario.activo || usuario.password !== body.password) {
       return errores.noAutorizado();
     }
 
