@@ -3,51 +3,48 @@
 import * as React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Badge, Input, Switch, Tag, toast } from '@mes/ui';
-import { causaParadaSchema } from '@mes/types';
-import type { CausaParada, CausaParadaInput, Linea } from '@mes/types';
+import { Input, Switch, Tag, toast } from '@mes/ui';
+import { NIVEL_CAUSA_MERMA_LABEL, TIPOS_MERMA, TIPO_MERMA_LABEL, causaMermaSchema } from '@mes/types';
+import type { CausaMerma, CausaMermaInput, Linea } from '@mes/types';
 import { formatDate, formatNumber } from '@mes/shared';
-import { useBajaCausaParada, useGuardarCausaParada } from '@/features/catalogs/hooks';
+import { useBajaCausaMerma, useGuardarCausaMerma } from '@/features/catalogs/hooks';
 import { CausaDetalleShell, EtiquetaCampo } from './CausaDetalleShell';
 
-const NIVEL_LABEL = {
-  tipo: 'Tipo (nivel 1)',
-  general: 'Categoría general (nivel 2)',
-  especifica: 'Causa específica (nivel 3)',
+const NIVEL_ORDINAL = {
+  tipo: 'Tipo de producción (nivel 1)',
+  clasificacion: 'Clasificación (nivel 2)',
+  causa: 'Causa (nivel 3)',
 } as const;
 
-export interface CausaParadaDetalleProps {
-  causa: CausaParada;
-  /** Nodo padre para mostrar la categoría general. */
-  padre?: CausaParada;
+export interface CausaMermaDetalleProps {
+  causa: CausaMerma;
+  /** Nodo padre (tipo o clasificación) para mostrar el camino del árbol. */
+  padre?: CausaMerma;
   lineas: readonly Linea[];
   onEliminada: () => void;
 }
 
-/** Panel de detalle del catálogo de causas de parada (Figma 2163:18282). */
-export function CausaParadaDetalle({
-  causa,
-  padre,
-  lineas,
-  onEliminada,
-}: CausaParadaDetalleProps) {
-  const guardar = useGuardarCausaParada();
-  const baja = useBajaCausaParada();
+/**
+ * Panel de detalle del catálogo de causas de merma. Misma estructura que el de
+ * paradas (Figma 2163:18282) mediante `CausaDetalleShell`, con los campos
+ * propios del árbol tipo → clasificación → causa.
+ */
+export function CausaMermaDetalle({ causa, padre, lineas, onEliminada }: CausaMermaDetalleProps) {
+  const guardar = useGuardarCausaMerma();
+  const baja = useBajaCausaMerma();
 
-  const valoresIniciales = React.useMemo<CausaParadaInput>(
+  const valoresIniciales = React.useMemo<CausaMermaInput>(
     () => ({
       codigo: causa.codigo,
       nombre: causa.nombre,
       nivel: causa.nivel,
       parentId: causa.parentId,
-      clasificacion: causa.clasificacion,
-      afectaOee: causa.afectaOee,
-      requiereEvidencia: causa.requiereEvidencia,
-      requiereSolicitud: causa.requiereSolicitud,
-      tiempoEstandarMin: causa.tiempoEstandarMin,
+      aplicaA: causa.aplicaA,
       lineasAplicables: causa.lineasAplicables,
+      requiereEvidencia: causa.requiereEvidencia,
+      requiereComentario: causa.requiereComentario,
+      requiereSolicitud: causa.requiereSolicitud,
       estado: causa.estado,
-      codigoLegado: causa.codigoLegado ?? null,
     }),
     [causa],
   );
@@ -60,8 +57,8 @@ export function CausaParadaDetalle({
     setValue,
     watch,
     formState: { errors, isDirty, isSubmitting },
-  } = useForm<CausaParadaInput>({
-    resolver: zodResolver(causaParadaSchema),
+  } = useForm<CausaMermaInput>({
+    resolver: zodResolver(causaMermaSchema),
     values: valoresIniciales,
   });
 
@@ -70,7 +67,7 @@ export function CausaParadaDetalle({
       await guardar.mutateAsync({ id: causa.id, input: valores });
       reset(valores);
       toast.success(`Causa ${valores.codigo} actualizada`, {
-        description: 'El cambio aplica a los próximos registros de parada.',
+        description: 'El cambio aplica a los próximos registros de merma.',
       });
     } catch (error) {
       toast.error('No se pudo guardar la causa', {
@@ -79,18 +76,11 @@ export function CausaParadaDetalle({
     }
   });
 
-  const programada = causa.clasificacion === 'programada';
-
   return (
     <CausaDetalleShell
       causa={causa}
-      subtitulo={`${NIVEL_LABEL[causa.nivel]} · Parada ${programada ? 'planificada' : 'no planificada'} · ${formatNumber(causa.paradasHistoricas)} paradas históricas`}
-      badges={
-        <Badge color={programada ? 'neutral' : 'critical'}>
-          {programada ? 'Planificada' : 'No planificada'}
-        </Badge>
-      }
-      formId="form-causa-parada"
+      subtitulo={`${NIVEL_ORDINAL[causa.nivel]} · ${formatNumber(causa.mermasHistoricas)} mermas históricas`}
+      formId="form-causa-merma"
       onSubmit={onSubmit}
       estado={watch('estado')}
       onCambiarEstado={(estado) =>
@@ -99,34 +89,21 @@ export function CausaParadaDetalle({
       hayCambios={isDirty}
       guardando={isSubmitting}
       baja={{
-        conservados: causa.paradasHistoricas,
-        etiquetaConservados: 'paradas históricas',
+        conservados: causa.mermasHistoricas,
+        etiquetaConservados: 'mermas históricas',
         onConfirmar: (id) => baja.mutateAsync(id),
       }}
       onEliminada={onEliminada}
       items={[
         {
-          label: <EtiquetaCampo titulo="Código" apoyo="Formato TT-GG-EE · no editable" />,
+          label: <EtiquetaCampo titulo="Código" apoyo="Formato MP-01 · MP-01-A · MP-01-01" />,
           value: <span className="font-medium tabular">{causa.codigo}</span>,
         },
         {
           label: (
             <EtiquetaCampo
-              titulo="Código del sistema anterior"
-              apoyo="Trazabilidad con el maestro legado (RUT04, FAL02…)"
-            />
-          ),
-          value: (
-            <span className="font-medium tabular text-text-secondary">
-              {causa.codigoLegado ?? 'Sin código legado'}
-            </span>
-          ),
-        },
-        {
-          label: (
-            <EtiquetaCampo
               titulo="Nombre de la causa"
-              apoyo="Visible para el maquinista al registrar"
+              apoyo="Visible para el encargado de merma al registrar"
             />
           ),
           value: (
@@ -142,29 +119,43 @@ export function CausaParadaDetalle({
           label: (
             <EtiquetaCampo titulo="Nivel del catálogo" apoyo="Define dónde aparece en el árbol" />
           ),
-          value: NIVEL_LABEL[causa.nivel],
+          value: `${NIVEL_CAUSA_MERMA_LABEL[causa.nivel]} · ${NIVEL_ORDINAL[causa.nivel]}`,
         },
         {
-          label: <EtiquetaCampo titulo="Categoría general" apoyo="Nodo padre en el árbol" />,
-          value: padre ? `${padre.codigo} · ${padre.nombre}` : 'Sin categoría (nodo raíz)',
+          label: <EtiquetaCampo titulo="Nodo padre" apoyo="Tipo o clasificación de la que cuelga" />,
+          value: padre ? `${padre.codigo} · ${padre.nombre}` : 'Sin padre (nodo raíz)',
         },
         {
           label: (
             <EtiquetaCampo
-              titulo="Afecta al OEE"
-              apoyo="Descuenta del tiempo disponible en el cálculo de OEE"
+              titulo="Tipos de merma donde aplica"
+              apoyo="MP materia prima · EP en proceso · PT producto terminado"
             />
           ),
           value: (
             <Controller
               control={control}
-              name="afectaOee"
+              name="aplicaA"
               render={({ field }) => (
-                <Switch
-                  checked={field.value ?? false}
-                  onCheckedChange={field.onChange}
-                  label={field.value ? 'Activado' : 'Desactivado'}
-                />
+                <div className="flex flex-wrap gap-2">
+                  {TIPOS_MERMA.map((t) => {
+                    const activa = field.value.includes(t);
+                    return (
+                      <Tag
+                        key={t}
+                        size="md"
+                        selected={activa}
+                        onClick={() =>
+                          field.onChange(
+                            activa ? field.value.filter((x) => x !== t) : [...field.value, t],
+                          )
+                        }
+                      >
+                        {`${t} · ${TIPO_MERMA_LABEL[t]}`}
+                      </Tag>
+                    );
+                  })}
+                </div>
               )}
             />
           ),
@@ -173,7 +164,7 @@ export function CausaParadaDetalle({
           label: (
             <EtiquetaCampo
               titulo="Requiere evidencia"
-              apoyo="Foto del equipo o parte de mantenimiento adjunto"
+              apoyo="Foto del producto descartado al registrar la merma"
             />
           ),
           value: (
@@ -193,14 +184,14 @@ export function CausaParadaDetalle({
         {
           label: (
             <EtiquetaCampo
-              titulo="Requiere N° de solicitud"
-              apoyo="Orden de trabajo del CMMS al registrar la parada"
+              titulo="Requiere comentario"
+              apoyo="Obliga a describir el motivo en el registro"
             />
           ),
           value: (
             <Controller
               control={control}
-              name="requiereSolicitud"
+              name="requiereComentario"
               render={({ field }) => (
                 <Switch
                   checked={field.value ?? false}
@@ -214,22 +205,21 @@ export function CausaParadaDetalle({
         {
           label: (
             <EtiquetaCampo
-              titulo="Tiempo estándar de atención"
-              apoyo="Usado como referencia en las alertas"
+              titulo="Requiere N° de solicitud"
+              apoyo="Número de solicitud del área que autoriza la baja"
             />
           ),
           value: (
-            <Input
-              aria-label="Tiempo estándar en minutos"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              suffix="min"
-              className="max-w-[180px]"
-              wrapperClassName="max-w-[180px]"
-              {...register('tiempoEstandarMin')}
-              destructive={Boolean(errors.tiempoEstandarMin)}
-              hint={errors.tiempoEstandarMin?.message}
+            <Controller
+              control={control}
+              name="requiereSolicitud"
+              render={({ field }) => (
+                <Switch
+                  checked={field.value ?? false}
+                  onCheckedChange={field.onChange}
+                  label={field.value ? 'Activado' : 'Desactivado'}
+                />
+              )}
             />
           ),
         },
@@ -294,11 +284,11 @@ export function CausaParadaDetalle({
         {
           label: (
             <EtiquetaCampo
-              titulo="Paradas históricas"
+              titulo="Mermas históricas"
               apoyo="Se conservan aunque se dé de baja"
             />
           ),
-          value: `${formatNumber(causa.paradasHistoricas)} registros · última revisión ${formatDate(new Date())}`,
+          value: `${formatNumber(causa.mermasHistoricas)} registros · última revisión ${formatDate(new Date())}`,
         },
       ]}
     />

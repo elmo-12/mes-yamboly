@@ -1,21 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Button,
-  EmptyState,
-  Icon,
-  Input,
-  ListDetailLayout,
-  Skeleton,
-} from '@mes/ui';
-import type { CausaParadaNodo } from '@mes/types';
+import { Button, EmptyState, Icon, Input, ListDetailLayout, Skeleton } from '@mes/ui';
+import { NIVELES_CAUSA, causaParadaSchema } from '@mes/types';
+import type { CausaParadaInput, CausaParadaNodo } from '@mes/types';
 import { formatNumber } from '@mes/shared';
-import { useCausasParada, useLineas } from '@/features/catalogs/hooks';
+import { useCausasParada, useGuardarCausaParada, useLineas } from '@/features/catalogs/hooks';
 import { aplanarCausas } from '@/features/catalogs/causas';
 import { CausaParadaDetalle } from './CausaParadaDetalle';
-import { CausasTree } from './CausasTree';
-import { NuevaCausaModal } from './NuevaCausaModal';
+import { CausasTree, type GrupoCausas } from './CausasTree';
+import { NuevaCausaModal, type NivelOption } from './NuevaCausaModal';
 
 /** Agrupación del árbol por clasificación, como en el frame (Figma 2163:18282). */
 const GRUPOS = [
@@ -23,15 +17,35 @@ const GRUPOS = [
   { clasificacion: 'programada', label: 'Paradas planificadas' },
 ] as const;
 
+const NIVELES: readonly NivelOption[] = [
+  { value: 'tipo', label: 'Tipo (nivel 1) · PN-02', nivelPadre: null },
+  { value: 'general', label: 'Categoría general (nivel 2) · PN-02-A', nivelPadre: 'tipo' },
+  { value: 'especifica', label: 'Causa específica (nivel 3) · PN-02-01', nivelPadre: 'general' },
+];
+
+const NIVEL_LEGIBLE: Record<string, string> = {
+  tipo: 'Tipo',
+  general: 'Categoría general',
+  especifica: 'Causa específica',
+};
+
+const nuevaCausaSchema = causaParadaSchema.pick({
+  codigo: true,
+  nombre: true,
+  nivel: true,
+  parentId: true,
+});
+
 /** Pestaña "Causas de parada" — lista-detalle (Figma 2163:18282). */
 export function CausasParadaTab() {
   const { data, isPending, error, refetch } = useCausasParada();
   const { data: lineas } = useLineas();
+  const guardar = useGuardarCausaParada();
   const [busqueda, setBusqueda] = React.useState('');
   const [seleccionadaId, setSeleccionadaId] = React.useState<string>();
   const [nueva, setNueva] = React.useState(false);
 
-  const arbol = React.useMemo(() => data?.data ?? [], [data]);
+  const arbol = React.useMemo<readonly CausaParadaNodo[]>(() => data?.data ?? [], [data]);
   const planas = React.useMemo(() => aplanarCausas(arbol), [arbol]);
 
   /* Selección por defecto: la primera causa específica del árbol. */
@@ -48,6 +62,16 @@ export function CausasParadaTab() {
 
   const activas = planas.filter((c) => c.estado === 'activo').length;
   const filtro = busqueda.trim().toLowerCase();
+
+  const grupos = React.useCallback(
+    (nodos: readonly CausaParadaNodo[]): readonly GrupoCausas<CausaParadaNodo>[] =>
+      GRUPOS.map((g) => ({
+        id: g.clasificacion,
+        label: g.label,
+        nodos: nodos.filter((n) => n.clasificacion === g.clasificacion),
+      })),
+    [],
+  );
 
   if (error) {
     return (
@@ -93,7 +117,7 @@ export function CausasParadaTab() {
             </div>
 
             <p className="text-overline text-text-disabled uppercase">
-              {`${formatNumber(activas)} causas activas · 3 niveles de codificación (TT-GG-EE)`}
+              {`${formatNumber(activas)} causas activas · ${NIVELES_CAUSA.length} niveles de codificación (TT-GG-EE)`}
             </p>
 
             {isPending ? (
@@ -102,28 +126,21 @@ export function CausasParadaTab() {
                   <Skeleton key={i} className="h-8 w-full" />
                 ))}
               </div>
+            ) : planas.length === 0 ? (
+              <EmptyState
+                icon={<Icon name="tree-structure" size={32} />}
+                title="Sin causas de parada"
+                description="Crea la primera con «Nueva causa»."
+              />
             ) : (
-              <div className="flex flex-col gap-3">
-                {GRUPOS.map((g) => {
-                  const nodos = (arbol as readonly CausaParadaNodo[]).filter(
-                    (n) => n.clasificacion === g.clasificacion,
-                  );
-                  if (nodos.length === 0) return null;
-                  return (
-                    <div key={g.clasificacion} className="flex flex-col">
-                      <span className="px-2 py-1.5 text-overline text-text-disabled uppercase">
-                        {g.label}
-                      </span>
-                      <CausasTree
-                        nodos={nodos}
-                        seleccionadaId={seleccionadaId}
-                        onSelect={(n) => setSeleccionadaId(n.id)}
-                        filtro={filtro}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+              <CausasTree
+                nodos={arbol}
+                grupos={grupos}
+                seleccionadaId={seleccionadaId}
+                onSelect={(n) => setSeleccionadaId(n.id)}
+                filtro={filtro}
+                etiquetaNivel={(nivel) => NIVEL_LEGIBLE[nivel] ?? nivel}
+              />
             )}
           </div>
         }
@@ -139,7 +156,7 @@ export function CausasParadaTab() {
             <CausaParadaDetalle
               causa={seleccionada}
               padre={padre}
-              lineas={(lineas?.data ?? []).filter((l) => l.id !== 'LIN-PT')}
+              lineas={lineas?.data ?? []}
               onEliminada={() => setSeleccionadaId(undefined)}
             />
           ) : (
@@ -155,7 +172,31 @@ export function CausasParadaTab() {
       <NuevaCausaModal
         open={nueva}
         onOpenChange={setNueva}
+        schema={nuevaCausaSchema}
+        niveles={NIVELES}
         posiblesPadres={planas.filter((c) => c.nivel !== 'especifica')}
+        titulo="Nueva causa de parada"
+        descripcion="La codificación TT-GG-EE mantiene el catálogo uniforme entre líneas (RF11)."
+        hintCodigo="Formatos válidos: PN-02, PN-02-A o PN-02-01."
+        placeholderCodigo="PN-02-05"
+        placeholderNombre="Obstrucción de boquilla"
+        onGuardar={async (valores) => {
+          const input: CausaParadaInput = {
+            codigo: valores.codigo,
+            nombre: valores.nombre,
+            nivel: valores.nivel as CausaParadaInput['nivel'],
+            parentId: valores.parentId,
+            clasificacion: 'imprevista',
+            afectaOee: true,
+            requiereEvidencia: false,
+            requiereSolicitud: false,
+            tiempoEstandarMin: 0,
+            lineasAplicables: [],
+            estado: 'activo',
+            codigoLegado: null,
+          };
+          await guardar.mutateAsync({ input });
+        }}
       />
     </>
   );

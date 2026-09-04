@@ -1,48 +1,75 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Badge,
-  Button,
-  DescriptionList,
-  EmptyState,
-  Icon,
-  Input,
-  ListDetailLayout,
-  Skeleton,
-  cn,
-} from '@mes/ui';
-import { TIPOS_MERMA, TIPO_MERMA_LABEL } from '@mes/types';
-import type { CausaMerma, TipoMermaCodigo } from '@mes/types';
-import { useCausasMerma } from '@/features/catalogs/hooks';
+import { Button, EmptyState, Icon, Input, ListDetailLayout, Skeleton } from '@mes/ui';
+import { NIVELES_CAUSA_MERMA, causaMermaSchema } from '@mes/types';
+import type { CausaMermaInput, CausaMermaNodo } from '@mes/types';
+import { formatNumber } from '@mes/shared';
+import { useCausasMermaArbol, useGuardarCausaMerma, useLineas } from '@/features/catalogs/hooks';
+import { aplanarCausas } from '@/features/catalogs/causas';
+import { CausaMermaDetalle } from './CausaMermaDetalle';
+import { CausasTree, type GrupoCausas } from './CausasTree';
+import { NuevaCausaModal, type NivelOption } from './NuevaCausaModal';
+
+const NIVELES: readonly NivelOption[] = [
+  { value: 'tipo', label: 'Tipo de producción (nivel 1) · MP-01', nivelPadre: null },
+  { value: 'clasificacion', label: 'Clasificación (nivel 2) · MP-01-A', nivelPadre: 'tipo' },
+  { value: 'causa', label: 'Causa (nivel 3) · MP-01-01', nivelPadre: 'clasificacion' },
+];
+
+const NIVEL_LEGIBLE: Record<string, string> = {
+  tipo: 'Tipo de producción',
+  clasificacion: 'Clasificación',
+  causa: 'Causa',
+};
+
+const nuevaCausaSchema = causaMermaSchema.pick({
+  codigo: true,
+  nombre: true,
+  nivel: true,
+  parentId: true,
+});
 
 /**
- * Pestaña "Causas de merma" — misma vista lista-detalle que las de parada,
- * con el árbol de 2 niveles (tipo de merma → causa MR-01…MR-04).
- *
- * El contrato de API solo expone `GET /causas-merma`: el panel es de solo
- * lectura hasta que exista `PATCH /causas-merma/:id`.
+ * Pestaña "Causas de merma" — misma vista lista-detalle que las de parada
+ * (Figma 2163:18282) sobre el árbol tipo → clasificación → causa.
  */
 export function CausasMermaTab() {
-  const { data, isPending, error, refetch } = useCausasMerma();
+  const { data, isPending, error, refetch } = useCausasMermaArbol();
+  const { data: lineas } = useLineas();
+  const guardar = useGuardarCausaMerma();
   const [busqueda, setBusqueda] = React.useState('');
   const [seleccionadaId, setSeleccionadaId] = React.useState<string>();
+  const [nueva, setNueva] = React.useState(false);
 
-  const causas = React.useMemo(() => data?.data ?? [], [data]);
+  const arbol = React.useMemo<readonly CausaMermaNodo[]>(() => data?.data ?? [], [data]);
+  const planas = React.useMemo(() => aplanarCausas(arbol), [arbol]);
 
+  /* Selección por defecto: la primera causa hoja del árbol. */
   React.useEffect(() => {
-    if (!seleccionadaId && causas[0]) setSeleccionadaId(causas[0].id);
-  }, [causas, seleccionadaId]);
+    if (seleccionadaId || planas.length === 0) return;
+    const primera = planas.find((c) => c.nivel === 'causa') ?? planas[0];
+    if (primera) setSeleccionadaId(primera.id);
+  }, [planas, seleccionadaId]);
 
-  const seleccionada = causas.find((c) => c.id === seleccionadaId);
+  const seleccionada = planas.find((c) => c.id === seleccionadaId);
+  const padre = seleccionada?.parentId
+    ? planas.find((c) => c.id === seleccionada.parentId)
+    : undefined;
+
+  const activas = planas.filter((c) => c.estado === 'activo').length;
   const filtro = busqueda.trim().toLowerCase();
 
-  const porTipo = (tipo: TipoMermaCodigo): CausaMerma[] =>
-    causas.filter(
-      (c) =>
-        c.aplicaA.includes(tipo) &&
-        (!filtro || `${c.codigo} ${c.nombre}`.toLowerCase().includes(filtro)),
-    );
+  /* Un grupo por tipo raíz (MP-01 … MP-05); bajo cada uno, sus clasificaciones. */
+  const grupos = React.useCallback(
+    (nodos: readonly CausaMermaNodo[]): readonly GrupoCausas<CausaMermaNodo>[] =>
+      nodos.map((raiz) => ({
+        id: raiz.id,
+        label: `${raiz.codigo} · ${raiz.nombre}`,
+        nodos: raiz.hijos,
+      })),
+    [],
+  );
 
   if (error) {
     return (
@@ -60,132 +87,129 @@ export function CausasMermaTab() {
     );
   }
 
-  return (
-    <ListDetailLayout
-      className="flex-col gap-6 xl:flex-row xl:gap-8"
-      listClassName="w-full border-r-0 pr-0 xl:w-list-pane xl:border-r xl:pr-8"
-      list={
-        <div className="flex flex-col gap-3">
-          <Input
-            aria-label="Buscar causa de merma"
-            placeholder="Buscar código o nombre"
-            leadingIcon={<Icon name="search" size={16} />}
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-          />
-          <p className="text-overline text-text-disabled uppercase">
-            {`${causas.length} causas · 3 tipos de merma (MP · EP · PT)`}
-          </p>
+  const sinResultados =
+    Boolean(filtro) &&
+    !planas.some((c) => `${c.codigo} ${c.nombre}`.toLowerCase().includes(filtro));
 
-          {isPending ? (
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 6 }, (_, i) => (
-                <Skeleton key={i} className="h-8 w-full" />
+  return (
+    <>
+      <ListDetailLayout
+        className="flex-col gap-6 xl:flex-row xl:gap-8"
+        listClassName="w-full border-r-0 pr-0 xl:w-list-pane xl:border-r xl:pr-8"
+        list={
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                aria-label="Buscar causa de merma"
+                placeholder="Buscar código o nombre"
+                leadingIcon={<Icon name="search" size={16} />}
+                wrapperClassName="min-w-0 flex-1"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Icon name="plus" />}
+                className="shrink-0"
+                onClick={() => setNueva(true)}
+              >
+                Nueva causa
+              </Button>
+            </div>
+
+            <p className="text-overline text-text-disabled uppercase">
+              {`${formatNumber(activas)} causas activas · ${NIVELES_CAUSA_MERMA.length} niveles (tipo · clasificación · causa)`}
+            </p>
+
+            {isPending ? (
+              <div className="flex flex-col gap-2">
+                {Array.from({ length: 8 }, (_, i) => (
+                  <Skeleton key={i} className="h-8 w-full" />
+                ))}
+              </div>
+            ) : planas.length === 0 ? (
+              <EmptyState
+                icon={<Icon name="tree-structure" size={32} />}
+                title="Sin causas de merma"
+                description="Crea la primera con «Nueva causa»."
+              />
+            ) : sinResultados ? (
+              <EmptyState
+                variant="no-results"
+                icon={<Icon name="search" size={32} />}
+                title="Sin coincidencias"
+                description={`Ninguna causa contiene «${busqueda.trim()}».`}
+                action={
+                  <Button variant="secondary" size="sm" onClick={() => setBusqueda('')}>
+                    Limpiar búsqueda
+                  </Button>
+                }
+              />
+            ) : (
+              <CausasTree
+                nodos={arbol}
+                grupos={grupos}
+                seleccionadaId={seleccionadaId}
+                onSelect={(n) => setSeleccionadaId(n.id)}
+                filtro={filtro}
+                etiquetaNivel={(nivel) => NIVEL_LEGIBLE[nivel] ?? nivel}
+              />
+            )}
+          </div>
+        }
+        detail={
+          isPending ? (
+            <div className="flex flex-col gap-3">
+              <Skeleton className="h-7 w-80" />
+              {Array.from({ length: 8 }, (_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {TIPOS_MERMA.map((tipo) => (
-                <li key={tipo} className="flex flex-col">
-                  <span className="px-2 py-1.5 text-overline text-text-disabled uppercase">
-                    {`${tipo} · ${TIPO_MERMA_LABEL[tipo]}`}
-                  </span>
-                  <ul className="flex flex-col">
-                    {porTipo(tipo).map((c) => {
-                      const activo = c.id === seleccionadaId;
-                      return (
-                        <li key={`${tipo}-${c.id}`}>
-                          <button
-                            type="button"
-                            onClick={() => setSeleccionadaId(c.id)}
-                            aria-current={activo ? 'true' : undefined}
-                            className={cn(
-                              'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 pl-6 text-left text-body',
-                              activo
-                                ? 'bg-primary-subtle font-medium text-info-text'
-                                : 'text-neutral-text hover:bg-background-subtle',
-                            )}
-                          >
-                            <span className="min-w-0 flex-1 truncate">{`${c.codigo} · ${c.nombre}`}</span>
-                            {c.estado === 'inactivo' && <Badge color="neutral">Inactiva</Badge>}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      }
-      detail={
-        isPending ? (
-          <div className="flex flex-col gap-3">
-            <Skeleton className="h-7 w-72" />
-            {Array.from({ length: 5 }, (_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : seleccionada ? (
-          <div className="flex flex-col gap-5">
-            <header className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <h2 className="text-h3 text-text-primary">
-                  {`${seleccionada.codigo} · ${seleccionada.nombre}`}
-                </h2>
-                <p className="text-body-sm text-text-secondary">
-                  Catálogo de mermas · solo lectura desde el MES
-                </p>
-              </div>
-              <Badge color={seleccionada.estado === 'activo' ? 'success' : 'neutral'}>
-                {seleccionada.estado === 'activo' ? 'Activa' : 'Inactiva'}
-              </Badge>
-            </header>
-
-            <DescriptionList
-              labelWidth={260}
-              items={[
-                { label: 'Código', value: seleccionada.codigo },
-                { label: 'Nombre de la causa', value: seleccionada.nombre },
-                {
-                  label: 'Tipos de merma donde aplica',
-                  value: (
-                    <span className="flex flex-wrap gap-2">
-                      {seleccionada.aplicaA.map((t) => (
-                        <Badge key={t} color="informational">
-                          {`${t} · ${TIPO_MERMA_LABEL[t]}`}
-                        </Badge>
-                      ))}
-                    </span>
-                  ),
-                },
-                {
-                  label: 'Requiere evidencia',
-                  value: seleccionada.requiereEvidencia
-                    ? 'Sí · foto del producto descartado'
-                    : 'No es obligatoria',
-                },
-                {
-                  label: 'Estado',
-                  value: seleccionada.estado === 'activo' ? 'Activa' : 'Inactiva',
-                },
-              ]}
+          ) : seleccionada ? (
+            <CausaMermaDetalle
+              causa={seleccionada}
+              padre={padre}
+              lineas={lineas?.data ?? []}
+              onEliminada={() => setSeleccionadaId(undefined)}
             />
+          ) : (
+            <EmptyState
+              icon={<Icon name="tree-structure" size={40} />}
+              title="Selecciona una causa del árbol"
+              description="El panel muestra en qué tipos de merma aplica y qué exige al registrar."
+            />
+          )
+        }
+      />
 
-            <p className="text-body-sm text-text-secondary">
-              El alta y la baja de causas de merma se coordinan con el área de calidad; el MES las
-              consume para clasificar cada registro (RF4).
-            </p>
-          </div>
-        ) : (
-          <EmptyState
-            icon={<Icon name="package" size={40} />}
-            title="Selecciona una causa de merma"
-            description="El panel muestra en qué tipos aplica y si exige evidencia fotográfica."
-          />
-        )
-      }
-    />
+      <NuevaCausaModal
+        open={nueva}
+        onOpenChange={setNueva}
+        schema={nuevaCausaSchema}
+        niveles={NIVELES}
+        posiblesPadres={planas.filter((c) => c.nivel !== 'causa')}
+        titulo="Nueva causa de merma"
+        descripcion="El árbol tipo → clasificación → causa mantiene el catálogo uniforme entre líneas (RF4)."
+        hintCodigo="Formatos válidos: MP-01, MP-01-A o MP-01-01."
+        placeholderCodigo="MP-01-06"
+        placeholderNombre="Derrame de mezcla"
+        onGuardar={async (valores) => {
+          const input: CausaMermaInput = {
+            codigo: valores.codigo,
+            nombre: valores.nombre,
+            nivel: valores.nivel as CausaMermaInput['nivel'],
+            parentId: valores.parentId,
+            aplicaA: [],
+            lineasAplicables: [],
+            requiereEvidencia: false,
+            requiereComentario: false,
+            requiereSolicitud: false,
+            estado: 'activo',
+          };
+          await guardar.mutateAsync({ input });
+        }}
+      />
+    </>
   );
 }
