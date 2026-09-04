@@ -22,16 +22,16 @@ import type { Seeder } from './seeder.interface';
 /* ------------------------------------------------------------------ */
 
 const EVENTOS_TRI = [
-  'Parada PL-03-02 · L2 Conos',
-  'Merma EP 3,2 kg · L2 Conos',
-  'Velocidad 118 u/min · L2 Conos',
-  'Parada PO-06-01 · L2 Conos',
-  'Parada PM-01-03 · L2 Conos',
-  'Merma PT 1,8 kg · L2 Conos',
-  'Parada PA-05-03 · L2 Conos',
-  'Inicio de orden OF-2026-0814 · L1 Paletas',
-  'Parada PM-01-04 · L4 Sándwich',
-  'Merma EP 2,4 kg · L3 Vasos',
+  'Parada PP-01-10 · LLEN-A1 Llenadora A1',
+  'Merma EP 3,2 kg · LLEN-A1 Llenadora A1',
+  'Velocidad 131 u/min · LLEN-A1 Llenadora A1',
+  'Parada PN-04-01 · LLEN-A1 Llenadora A1',
+  'Parada PN-02-01 · LLEN-A1 Llenadora A1',
+  'Merma PT 1,8 kg · LLEN-A1 Llenadora A1',
+  'Parada PN-04-14 · LLEN-A1 Llenadora A1',
+  'Inicio de orden OF-2026-0814 · LLEN-M2 Llenadora M2',
+  'Parada PN-02-02 · MOLD-A3 Moldeadora A3',
+  'Merma EP 2,4 kg · EXTR-2 Extrusora 2',
 ];
 const TIPOS_TRI = ['parada', 'merma', 'velocidad', 'parada', 'parada', 'merma', 'parada', 'orden', 'parada', 'merma'];
 const HORAS_POSTEST = ['07:42:18', '11:05:07', '09:10:33', '09:24:12', '11:18:41', '12:52:09', '12:40:55', '06:02:14', '13:47:26', '10:31:48'];
@@ -45,16 +45,16 @@ const SEGUNDOS_PRETEST = [168, 186, 162, 204, 156, 180, 174, 150, 192, 168];
 /* ------------------------------------------------------------------ */
 
 const REGISTROS_TCI = [
-  'Parada 07:42 · PL-03-02 · L2',
-  'Merma EP 3,2 kg · MR-03 · L2',
-  'Velocidad 118 u/min · L2',
-  'Parada 09:24 · PO-06-01 · L2',
-  'Parada 11:18 · PM-01-03 · L2',
-  'Merma PT 1,8 kg · MR-01 · L2',
-  'Parada 12:40 · PA-05-03 · L2',
-  'Orden OF-2026-0814 · L1',
-  'Parada 13:47 · PM-01-04 · L4',
-  'Merma EP 2,4 kg · MR-03 · L3',
+  'Parada 07:42 · PP-01-10 · LLEN-A1',
+  'Merma EP 3,2 kg · MP-01-01 · LLEN-A1',
+  'Velocidad 131 u/min · LLEN-A1',
+  'Parada 09:24 · PN-04-01 · LLEN-A1',
+  'Parada 11:18 · PN-02-01 · LLEN-A1',
+  'Merma PT 1,8 kg · MP-02-01 · LLEN-A1',
+  'Parada 12:40 · PN-04-14 · LLEN-A1',
+  'Orden OF-2026-0814 · LLEN-M2',
+  'Parada 13:47 · PN-02-02 · MOLD-A3',
+  'Merma EP 2,4 kg · MP-01-01 · EXTR-2',
 ];
 
 /** Los dos registros del Anexo 03 que no superan los cuatro criterios. */
@@ -116,10 +116,10 @@ export function matrizRespuestasTsp(): number[][] {
 const VERIFICACIONES_CFS = [
   { rf: 'RF1', funcionalidad: 'Captura de datos productivos', observacion: 'Registro en 3 toques con cronómetro TRI en cada modal', ruta: '/tiempo-real' },
   { rf: 'RF2', funcionalidad: 'Registro de producción', observacion: 'Inicio y cierre de orden con conteo de codificadora', ruta: '/ordenes' },
-  { rf: 'RF3', funcionalidad: 'Registro de paradas', observacion: 'Árbol de causas PM-01…PS-07 con acción tomada obligatoria', ruta: '/ordenes/ORD-0815' },
-  { rf: 'RF4', funcionalidad: 'Registro de mermas', observacion: 'Tipos MP/EP/PT y causas MR-01…MR-04 con código de balde', ruta: '/ordenes/ORD-0815' },
+  { rf: 'RF3', funcionalidad: 'Registro de paradas', observacion: 'Árbol de causas PP-01…PS-05 con acción tomada obligatoria', ruta: '/ordenes/ORD-0815' },
+  { rf: 'RF4', funcionalidad: 'Registro de mermas', observacion: 'Tipos MP/EP/PT y árbol de causas MP-01…MP-05 con código de balde', ruta: '/ordenes/ORD-0815' },
   { rf: 'RF5', funcionalidad: 'Repositorio centralizado', observacion: 'Órdenes con filtros, búsqueda, exportación y bitácora', ruta: '/ordenes' },
-  { rf: 'RF6', funcionalidad: 'Dashboard en tiempo real', observacion: '6 líneas con estado, avance y Modo TV', ruta: '/tiempo-real' },
+  { rf: 'RF6', funcionalidad: 'Dashboard en tiempo real', observacion: '9 líneas con estado, avance y Modo TV', ruta: '/tiempo-real' },
   { rf: 'RF7', funcionalidad: 'Indicadores', observacion: 'OEE por línea, turno y periodo con comparativas', ruta: '/reportes' },
   { rf: 'RF8', funcionalidad: 'Analítica con IA', observacion: 'Modelo v3.2 CRISP-DM con patrones y predicciones', ruta: '/analitica' },
   { rf: 'RF9', funcionalidad: 'Alertas', observacion: 'Bandeja con umbrales configurables y confirmación de evento real', ruta: '/alertas' },
@@ -130,12 +130,12 @@ const VERIFICACIONES_CFS = [
 /* ------------------------------------------------------------------ */
 
 const TIPOS_EP = [
-  'Parada prevista · L2 Conos',
-  'Merma prevista · L3 Vasos',
-  'Velocidad baja · L1 Paletas',
-  'OEE bajo umbral · L4 Sándwich',
-  'Parada prevista · L4 Sándwich',
-  'Parada prevista · L5 Bombones',
+  'Parada prevista · LLEN-A1 Llenadora A1',
+  'Merma prevista · MOLD-A3 Moldeadora A3',
+  'Velocidad baja · LLEN-M2 Llenadora M2',
+  'OEE bajo umbral · LLEN-A2 Llenadora A2',
+  'Parada prevista · EXTR-2 Extrusora 2',
+  'Parada prevista · MOLD-A4 Moldeadora A4',
 ];
 
 /** 164 predicciones contrastadas; fallan las de índice ≡ 5 (mód 6) → 137 aciertos. */
@@ -165,7 +165,7 @@ export class ThesisEvidenceSeeder implements Seeder {
         segundos,
         etapa: 'postest' as const,
         tipo: TIPOS_TRI[i]!,
-        usuarioId: 'USR-002',
+        usuarioId: 'USR-07',
       }),
     );
     const pretest = SEGUNDOS_PRETEST.map((segundos, i) =>
@@ -187,7 +187,7 @@ export class ThesisEvidenceSeeder implements Seeder {
   private async seedTci(ds: DataSource): Promise<void> {
     const repo = ds.getRepository(EvaluacionCalidad);
     if (await repo.count()) return;
-    const turnos: Turno[] = ['M', 'T', 'N'];
+    const turnos: Turno[] = ['D', 'N'];
     const filas: EvaluacionCalidad[] = [];
     for (let i = 0; i < 30; i += 1) {
       const falla = FALLOS_TCI.has(i);
@@ -195,8 +195,8 @@ export class ThesisEvidenceSeeder implements Seeder {
         repo.create({
           id: `TCI-${pad(i + 1)}`,
           n: i + 1,
-          fecha: fechaMenos(Math.floor(i / 3)),
-          turno: turnos[i % 3]!,
+          fecha: fechaMenos(Math.floor(i / 2)),
+          turno: turnos[i % 2]!,
           registro: REGISTROS_TCI[i % REGISTROS_TCI.length]!,
           registroId: null,
           /* i = 11: faltan campos obligatorios; i = 23: causa no específica. */

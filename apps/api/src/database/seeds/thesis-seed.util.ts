@@ -73,17 +73,25 @@ export function etiquetaFecha(isoFecha: string): string {
   return `${d.getDate()} ${MESES[d.getMonth()]}`;
 }
 
-/** Líneas de producción de Yamboly usadas por los agregados de tesis. */
+/**
+ * Las 9 líneas reales de Yamboly usadas por los agregados de tesis.
+ * `velocidadEstandar` es la capacidad nominal de la línea en u/min (máximo
+ * `velocidadUnidMin` de sus pares producto × línea).
+ */
 export const LINEAS_TESIS = [
-  { lineaId: 'LIN-01', lineaCodigo: 'L1', lineaNombre: 'Paletas', velocidadEstandar: 95 },
-  { lineaId: 'LIN-02', lineaCodigo: 'L2', lineaNombre: 'Conos', velocidadEstandar: 120 },
-  { lineaId: 'LIN-03', lineaCodigo: 'L3', lineaNombre: 'Vasos', velocidadEstandar: 110 },
-  { lineaId: 'LIN-04', lineaCodigo: 'L4', lineaNombre: 'Sándwich', velocidadEstandar: 80 },
-  { lineaId: 'LIN-05', lineaCodigo: 'L5', lineaNombre: 'Bombones', velocidadEstandar: 140 },
+  { lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2', velocidadEstandar: 450 },
+  { lineaId: 'LIN-EXTR-3', lineaCodigo: 'EXTR-3', lineaNombre: 'Extrusora 3', velocidadEstandar: 260 },
+  { lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1', velocidadEstandar: 280.5 },
+  { lineaId: 'LIN-LLEN-A2', lineaCodigo: 'LLEN-A2', lineaNombre: 'Llenadora A2', velocidadEstandar: 320 },
+  { lineaId: 'LIN-LLEN-M1', lineaCodigo: 'LLEN-M1', lineaNombre: 'Llenadora M1', velocidadEstandar: 45 },
+  { lineaId: 'LIN-LLEN-M2', lineaCodigo: 'LLEN-M2', lineaNombre: 'Llenadora M2', velocidadEstandar: 50 },
+  { lineaId: 'LIN-MOLD-A2', lineaCodigo: 'MOLD-A2', lineaNombre: 'Moldeadora A2', velocidadEstandar: 300 },
+  { lineaId: 'LIN-MOLD-A3', lineaCodigo: 'MOLD-A3', lineaNombre: 'Moldeadora A3', velocidadEstandar: 350 },
+  { lineaId: 'LIN-MOLD-A4', lineaCodigo: 'MOLD-A4', lineaNombre: 'Moldeadora A4', velocidadEstandar: 483.3 },
 ] as const;
 
+/** Turnos reales: `D` Día 06:00–18:00 y `N` Noche 18:00–06:00. */
 export const TURNOS_TESIS = [
-  { turno: 'M' as const, turnoLabel: 'Mañana' },
-  { turno: 'T' as const, turnoLabel: 'Tarde' },
+  { turno: 'D' as const, turnoLabel: 'Día' },
   { turno: 'N' as const, turnoLabel: 'Noche' },
 ];

@@ -1,4 +1,4 @@
-import type { Colaborador, User } from '@mes/types';
+import type { Colaborador, Turno, User } from '@mes/types';
 
 export interface UsuarioSeed extends User {
   /** Solo para el mock de login: contraseña en claro del seed. */
@@ -7,18 +7,23 @@ export interface UsuarioSeed extends User {
 
 export const PASSWORD_SEED = 'Yamboly2026';
 
+/**
+ * 11 usuarios del seed (mismos correos y contraseña que antes de la migración
+ * de maestros). Todos pertenecen a la sede de planta `SED-LIMA` y los
+ * maquinistas quedan asignados a una de las 9 líneas reales.
+ */
 export const usuarios: UsuarioSeed[] = [
-  { id: 'USR-01', nombre: 'Carlos Mendoza', email: 'jefe@yamboly.lat', dni: '41285630', rol: 'jefe', cargo: 'Jefe de producción', sedeId: 'SED-01', iniciales: 'CM', activo: true, password: PASSWORD_SEED },
-  { id: 'USR-02', nombre: 'Jorge Quispe', email: 'jorge.quispe@yamboly.lat', dni: '46012784', rol: 'maquinista', cargo: 'Maquinista L2 Conos', sedeId: 'SED-01', lineaId: 'LIN-02', iniciales: 'JQ', activo: true, password: PASSWORD_SEED },
-  { id: 'USR-03', nombre: 'Ana Ríos', email: 'ana.rios@yamboly.lat', dni: '43907512', rol: 'supervisor', cargo: 'Supervisora de turno', sedeId: 'SED-01', iniciales: 'AR', activo: true, password: PASSWORD_SEED },
-  { id: 'USR-04', nombre: 'María Torres', email: 'maria.torres@yamboly.lat', dni: '45118293', rol: 'mermas', cargo: 'Encargada de merma', sedeId: 'SED-01', iniciales: 'MT', activo: true, password: PASSWORD_SEED },
-  { id: 'USR-05', nombre: 'Investigador Tesis', email: 'investigador@yamboly.lat', dni: '70233145', rol: 'investigador', cargo: 'Investigador', sedeId: 'SED-01', iniciales: 'IT', activo: true, password: PASSWORD_SEED },
-  { id: 'USR-06', nombre: 'Rosa Huamán', email: 'rosa.huaman@yamboly.lat', dni: '44872109', rol: 'calidad', cargo: 'Analista de calidad', sedeId: 'SED-01', iniciales: 'RH', activo: true, password: PASSWORD_SEED },
-  { id: 'USR-07', nombre: 'Luis Vargas', email: 'luis.vargas@yamboly.lat', dni: '42335908', rol: 'maquinista', cargo: 'Maquinista L1 Paletas', sedeId: 'SED-01', lineaId: 'LIN-01', iniciales: 'LV', activo: true, password: PASSWORD_SEED },
-  { id: 'USR-08', nombre: 'Sofía Cárdenas', email: 'sofia.cardenas@yamboly.lat', dni: '47501263', rol: 'maquinista', cargo: 'Maquinista L3 Vasos', sedeId: 'SED-01', lineaId: 'LIN-03', iniciales: 'SC', activo: true, password: PASSWORD_SEED },
-  { id: 'USR-09', nombre: 'Pedro Ccahuana', email: 'pedro.ccahuana@yamboly.lat', dni: '40912877', rol: 'maquinista', cargo: 'Maquinista L4 Sándwich', sedeId: 'SED-01', lineaId: 'LIN-04', iniciales: 'PC', activo: true, password: PASSWORD_SEED },
-  { id: 'USR-10', nombre: 'Elena Ramos', email: 'elena.ramos@yamboly.lat', dni: '48230671', rol: 'maquinista', cargo: 'Maquinista L5 Bombones', sedeId: 'SED-01', lineaId: 'LIN-05', iniciales: 'ER', activo: true, password: PASSWORD_SEED },
-  { id: 'USR-11', nombre: 'Diego Salazar', email: 'diego.salazar@yamboly.lat', dni: '43118240', rol: 'supervisor', cargo: 'Supervisor de turno Tarde', sedeId: 'SED-01', iniciales: 'DS', activo: true, password: PASSWORD_SEED },
+  { id: 'USR-01', nombre: 'Carlos Mendoza', email: 'jefe@yamboly.lat', dni: '41285630', rol: 'jefe', cargo: 'Jefe de producción', sedeId: 'SED-LIMA', iniciales: 'CM', activo: true, password: PASSWORD_SEED },
+  { id: 'USR-02', nombre: 'Jorge Quispe', email: 'jorge.quispe@yamboly.lat', dni: '46012784', rol: 'maquinista', cargo: 'Maquinista Extrusora 2', sedeId: 'SED-LIMA', lineaId: 'LIN-EXTR-2', iniciales: 'JQ', activo: true, password: PASSWORD_SEED },
+  { id: 'USR-03', nombre: 'Ana Ríos', email: 'ana.rios@yamboly.lat', dni: '43907512', rol: 'supervisor', cargo: 'Supervisora de turno Día', sedeId: 'SED-LIMA', iniciales: 'AR', activo: true, password: PASSWORD_SEED },
+  { id: 'USR-04', nombre: 'María Torres', email: 'maria.torres@yamboly.lat', dni: '45118293', rol: 'mermas', cargo: 'Encargada de merma', sedeId: 'SED-LIMA', iniciales: 'MT', activo: true, password: PASSWORD_SEED },
+  { id: 'USR-05', nombre: 'Investigador Tesis', email: 'investigador@yamboly.lat', dni: '70233145', rol: 'investigador', cargo: 'Investigador', sedeId: 'SED-LIMA', iniciales: 'IT', activo: true, password: PASSWORD_SEED },
+  { id: 'USR-06', nombre: 'Rosa Huamán', email: 'rosa.huaman@yamboly.lat', dni: '44872109', rol: 'calidad', cargo: 'Analista de calidad', sedeId: 'SED-LIMA', iniciales: 'RH', activo: true, password: PASSWORD_SEED },
+  { id: 'USR-07', nombre: 'Luis Vargas', email: 'luis.vargas@yamboly.lat', dni: '42335908', rol: 'maquinista', cargo: 'Maquinista Llenadora M2', sedeId: 'SED-LIMA', lineaId: 'LIN-LLEN-M2', iniciales: 'LV', activo: true, password: PASSWORD_SEED },
+  { id: 'USR-08', nombre: 'Sofía Cárdenas', email: 'sofia.cardenas@yamboly.lat', dni: '47501263', rol: 'maquinista', cargo: 'Maquinista Llenadora M1', sedeId: 'SED-LIMA', lineaId: 'LIN-LLEN-M1', iniciales: 'SC', activo: true, password: PASSWORD_SEED },
+  { id: 'USR-09', nombre: 'Pedro Ccahuana', email: 'pedro.ccahuana@yamboly.lat', dni: '40912877', rol: 'maquinista', cargo: 'Maquinista Moldeadora A3', sedeId: 'SED-LIMA', lineaId: 'LIN-MOLD-A3', iniciales: 'PC', activo: true, password: PASSWORD_SEED },
+  { id: 'USR-10', nombre: 'Elena Ramos', email: 'elena.ramos@yamboly.lat', dni: '48230671', rol: 'maquinista', cargo: 'Maquinista Moldeadora A4', sedeId: 'SED-LIMA', lineaId: 'LIN-MOLD-A4', iniciales: 'ER', activo: true, password: PASSWORD_SEED },
+  { id: 'USR-11', nombre: 'Diego Salazar', email: 'diego.salazar@yamboly.lat', dni: '43118240', rol: 'supervisor', cargo: 'Supervisor de turno Noche', sedeId: 'SED-LIMA', iniciales: 'DS', activo: true, password: PASSWORD_SEED },
 ];
 
 export const usuarioPorId = new Map(usuarios.map((u) => [u.id, u]));
@@ -37,28 +42,37 @@ export function inicialesUsuario(id: string): string {
   return usuarioPorId.get(id)?.iniciales ?? 'SY';
 }
 
-/** Cuadrilla que aparece en el bloque "Equipo" de la OF (6 avatares). */
+/**
+ * Cuadrilla que aparece en el bloque "Equipo" de la OF (6 avatares), con los
+ * puestos reales de planta.
+ */
 export const colaboradoresBase: Colaborador[] = [
-  { id: 'COL-01', nombre: 'Rosa Huamán', iniciales: 'RH', rol: 'Calidad' },
-  { id: 'COL-02', nombre: 'María Torres', iniciales: 'MT', rol: 'Merma' },
-  { id: 'COL-03', nombre: 'Kevin Palomino', iniciales: 'KP', rol: 'Operario' },
-  { id: 'COL-04', nombre: 'Nadia Espinoza', iniciales: 'NE', rol: 'Operaria' },
-  { id: 'COL-05', nombre: 'Iván Cáceres', iniciales: 'IC', rol: 'Operario' },
-  { id: 'COL-06', nombre: 'Gladys Ninanya', iniciales: 'GN', rol: 'Operaria' },
+  { id: 'COL-01', nombre: 'Kevin Palomino', iniciales: 'KP', rol: 'Mesa' },
+  { id: 'COL-02', nombre: 'Nadia Espinoza', iniciales: 'NE', rol: 'Palillero' },
+  { id: 'COL-03', nombre: 'Iván Cáceres', iniciales: 'IC', rol: 'Bobinero' },
+  { id: 'COL-04', nombre: 'Gladys Ninanya', iniciales: 'GN', rol: 'Llenador' },
+  { id: 'COL-05', nombre: 'Milagros Ávila', iniciales: 'MA', rol: 'Encajado' },
+  { id: 'COL-06', nombre: 'Óscar Ludeña', iniciales: 'OL', rol: 'Coberturero' },
 ];
 
-/** Maquinista titular por línea (para generar órdenes deterministas). */
+/**
+ * Maquinista titular de cada una de las 9 líneas reales: los 5 maquinistas del
+ * seed rotan, y cada uno arranca en la línea que lleva en su ficha (`lineaId`).
+ */
 export const maquinistaPorLinea: Record<string, string> = {
-  'LIN-01': 'USR-07',
-  'LIN-02': 'USR-02',
-  'LIN-03': 'USR-08',
-  'LIN-04': 'USR-09',
-  'LIN-05': 'USR-10',
-  'LIN-PT': 'USR-07',
+  'LIN-EXTR-2': 'USR-02',
+  'LIN-EXTR-3': 'USR-10',
+  'LIN-LLEN-A1': 'USR-07',
+  'LIN-LLEN-A2': 'USR-08',
+  'LIN-LLEN-M1': 'USR-08',
+  'LIN-LLEN-M2': 'USR-07',
+  'LIN-MOLD-A2': 'USR-09',
+  'LIN-MOLD-A3': 'USR-09',
+  'LIN-MOLD-A4': 'USR-10',
 };
 
-export const supervisorPorTurno: Record<string, string> = {
-  M: 'USR-03',
-  T: 'USR-11',
-  N: 'USR-03',
+/** Supervisor de cada turno real (`D` Día · `N` Noche). */
+export const supervisorPorTurno: Record<Turno, string> = {
+  D: 'USR-03',
+  N: 'USR-11',
 };

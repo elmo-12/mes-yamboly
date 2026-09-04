@@ -23,35 +23,39 @@ export const analiticaResumen: AnaliticaResumen = {
     {
       id: 'INS-01',
       tono: 'warning',
-      texto: 'L2 Conos concentra 34 % de paradas mecánicas en turno Tarde',
-      soporte: '48 de 142 eventos PM-01 de los últimos 30 días',
+      texto: 'La Moldeadora A3 concentra 34 % de los paros por falla del turno Noche',
+      soporte: '48 de 142 eventos PN-02 de los últimos 30 días',
     },
     {
       id: 'INS-02',
       tono: 'info',
-      texto: 'Cambios PC-04 después de las 12:00 duran 40 % más',
+      texto: 'Los cambios de sabor (PP-01-10) después de las 12:00 duran 40 % más',
       soporte: 'Media 42 min frente a 30 min del estándar',
     },
     {
       id: 'INS-03',
       tono: 'warning',
-      texto: 'Merma EP sube 1,8 pp en arranques con Sabor Lúcuma',
-      soporte: '19 arranques analizados en L3 Vasos',
+      texto: 'La merma EP sube 1,8 pp en los arranques con sabor Lucuma',
+      soporte: '19 arranques analizados en la Llenadora M1',
     },
   ],
   riesgoPorLinea: [
-    { lineaId: 'LIN-02', lineaCodigo: 'L2', lineaNombre: 'Conos', riesgo: 78, turnoObjetivo: 'T', causaProbable: 'PM-01 Falla mecánica · Envolvedora L2' },
-    { lineaId: 'LIN-04', lineaCodigo: 'L4', lineaNombre: 'Sándwich', riesgo: 71, turnoObjetivo: 'T', causaProbable: 'PM-01 Desalineación de moldes' },
-    { lineaId: 'LIN-03', lineaCodigo: 'L3', lineaNombre: 'Vasos', riesgo: 64, turnoObjetivo: 'T', causaProbable: 'PE-02 Falla de variador' },
-    { lineaId: 'LIN-01', lineaCodigo: 'L1', lineaNombre: 'Paletas', riesgo: 46, turnoObjetivo: 'T', causaProbable: 'PO-06 Ajuste de temperatura' },
-    { lineaId: 'LIN-05', lineaCodigo: 'L5', lineaNombre: 'Bombones', riesgo: 38, turnoObjetivo: 'T', causaProbable: 'PA-05 Falta de cobertura' },
+    { lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1', riesgo: 78, turnoObjetivo: 'N', causaProbable: 'PN-02 Falla mantto · Tapadora LLEN A1' },
+    { lineaId: 'LIN-MOLD-A3', lineaCodigo: 'MOLD-A3', lineaNombre: 'Moldeadora A3', riesgo: 71, turnoObjetivo: 'N', causaProbable: 'PN-02 Falla operacional · Pinzas extractoras' },
+    { lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2', riesgo: 64, turnoObjetivo: 'N', causaProbable: 'PN-02 Falla mantto · Envolvedora EXTR 2' },
+    { lineaId: 'LIN-MOLD-A4', lineaCodigo: 'MOLD-A4', lineaNombre: 'Moldeadora A4', riesgo: 58, turnoObjetivo: 'N', causaProbable: 'PN-04 Sin stock en almacén' },
+    { lineaId: 'LIN-LLEN-M2', lineaCodigo: 'LLEN-M2', lineaNombre: 'Llenadora M2', riesgo: 52, turnoObjetivo: 'D', causaProbable: 'PN-04 Desviación de calibración' },
+    { lineaId: 'LIN-MOLD-A2', lineaCodigo: 'MOLD-A2', lineaNombre: 'Moldeadora A2', riesgo: 46, turnoObjetivo: 'D', causaProbable: 'PN-03 Exceso de limpieza' },
+    { lineaId: 'LIN-EXTR-3', lineaCodigo: 'EXTR-3', lineaNombre: 'Extrusora 3', riesgo: 41, turnoObjetivo: 'N', causaProbable: 'PN-03 Exceso de mantenimiento' },
+    { lineaId: 'LIN-LLEN-M1', lineaCodigo: 'LLEN-M1', lineaNombre: 'Llenadora M1', riesgo: 38, turnoObjetivo: 'D', causaProbable: 'PP-01 Cambio de sabor' },
+    { lineaId: 'LIN-LLEN-A2', lineaCodigo: 'LLEN-A2', lineaNombre: 'Llenadora A2', riesgo: 33, turnoObjetivo: 'D', causaProbable: 'PS-05 Relevo por refrigerio' },
   ],
   prediccionesActivas: [
-    { id: 'ALE-001', lineaCodigo: 'L2', tipo: 'Parada prevista', prediccion: 'Parada PM-01 en L2 en 40 min', probabilidad: 78, ventana: '14:40–15:20', estado: 'Activa' },
-    { id: 'ALE-002', lineaCodigo: 'L4', tipo: 'Parada prevista', prediccion: 'Parada PM-01 en curso · riesgo de superar 30 min', probabilidad: 91, ventana: '13:47–14:30', estado: 'Activa' },
-    { id: 'ALE-004', lineaCodigo: 'L3', tipo: 'Merma prevista', prediccion: 'Merma EP sobre 2,5 % en L3', probabilidad: 74, ventana: '14:00–18:00', estado: 'Activa' },
-    { id: 'ALE-005', lineaCodigo: 'L4', tipo: 'OEE bajo umbral', prediccion: 'OEE del turno bajo 75 % en L4', probabilidad: 83, ventana: '14:00–22:00', estado: 'Activa' },
-    { id: 'ALE-006', lineaCodigo: 'L5', tipo: 'Parada prevista', prediccion: 'Parada PA-05 por falta de cobertura', probabilidad: 70, ventana: '15:30–16:30', estado: 'Activa' },
+    { id: 'ALE-001', lineaCodigo: 'LLEN-A1', tipo: 'Parada prevista', prediccion: 'Parada PN-02 en LLEN-A1 en 40 min', probabilidad: 78, ventana: '14:40–15:20', estado: 'Activa' },
+    { id: 'ALE-002', lineaCodigo: 'MOLD-A3', tipo: 'Parada prevista', prediccion: 'Parada PN-02 en curso · riesgo de superar 30 min', probabilidad: 91, ventana: '13:47–14:30', estado: 'Activa' },
+    { id: 'ALE-004', lineaCodigo: 'EXTR-2', tipo: 'Merma prevista', prediccion: 'Merma EP sobre 2,5 % en EXTR-2', probabilidad: 74, ventana: '14:00–18:00', estado: 'Activa' },
+    { id: 'ALE-005', lineaCodigo: 'MOLD-A3', tipo: 'OEE bajo umbral', prediccion: 'OEE del turno bajo 75 % en MOLD-A3', probabilidad: 83, ventana: '14:00–18:00', estado: 'Activa' },
+    { id: 'ALE-006', lineaCodigo: 'MOLD-A4', tipo: 'Parada prevista', prediccion: 'Parada PN-04 por falta de insumo', probabilidad: 70, ventana: '15:30–16:30', estado: 'Activa' },
   ],
 };
 
@@ -60,30 +64,25 @@ export const analiticaResumen: AnaliticaResumen = {
 /* ------------------------------------------------------------------ */
 
 const CAUSAS_HEATMAP = [
-  { codigo: 'PM-01', nombre: 'Falla mecánica' },
-  { codigo: 'PE-02', nombre: 'Falla eléctrica' },
-  { codigo: 'PL-03', nombre: 'Limpieza CIP' },
-  { codigo: 'PC-04', nombre: 'Cambio de producto' },
-  { codigo: 'PA-05', nombre: 'Falta de insumo' },
-  { codigo: 'PO-06', nombre: 'Ajuste operativo' },
-  { codigo: 'PS-07', nombre: 'Sin personal' },
+  { codigo: 'PN-02', nombre: 'Paro por fallas' },
+  { codigo: 'PN-03', nombre: 'Demoras' },
+  { codigo: 'PN-04', nombre: 'Paro imprevisto' },
+  { codigo: 'PP-01', nombre: 'Paro rutinario (planificado)' },
+  { codigo: 'PS-05', nombre: 'Paro sin programa' },
 ];
 
 const TURNOS_HEATMAP = [
-  { codigo: 'M', label: 'Mañana' },
-  { codigo: 'T', label: 'Tarde' },
+  { codigo: 'D', label: 'Día' },
   { codigo: 'N', label: 'Noche' },
 ];
 
-/** Minutos por causa × turno (fijos, suman los totales del Pareto semanal). */
-const MINUTOS_HEATMAP: Record<string, [number, number, number]> = {
-  'PM-01': [38, 72, 32],
-  'PE-02': [11, 15, 11],
-  'PL-03': [42, 31, 23],
-  'PC-04': [26, 41, 21],
-  'PA-05': [17, 21, 13],
-  'PO-06': [14, 19, 11],
-  'PS-07': [4, 6, 8],
+/** Minutos por tipo de parada × turno (fijos, suman los 476 min del Pareto semanal). */
+const MINUTOS_HEATMAP: Record<string, [number, number]> = {
+  'PN-02': [96, 83],
+  'PN-03': [26, 24],
+  'PN-04': [45, 38],
+  'PP-01': [72, 62],
+  'PS-05': [17, 13],
 };
 
 function heatmapCausaTurno(): HeatmapCelda[] {
@@ -106,12 +105,12 @@ function heatmapCausaTurno(): HeatmapCelda[] {
 export const patrones: Patrones = {
   heatmap: heatmapCausaTurno(),
   recurrencias: [
-    { id: 'REC-01', patron: 'PM-01 en Envolvedora L2 tras cambio de producto', frecuencia: 9, impactoMin: 118, lineas: ['L2'], confianza: 88 },
-    { id: 'REC-02', patron: 'PC-04 después de las 12:00 excede el tiempo estándar', frecuencia: 12, impactoMin: 96, lineas: ['L1', 'L2', 'L4'], confianza: 84 },
-    { id: 'REC-03', patron: 'Merma EP alta en arranque con sabor Lúcuma', frecuencia: 7, impactoMin: 0, lineas: ['L3'], confianza: 81 },
-    { id: 'REC-04', patron: 'PE-02 en Selladora L3 en turno Tarde', frecuencia: 5, impactoMin: 74, lineas: ['L3'], confianza: 76 },
-    { id: 'REC-05', patron: 'PS-07 en turno Noche por refrigerio no cubierto', frecuencia: 4, impactoMin: 48, lineas: ['L4', 'L5'], confianza: 72 },
-    { id: 'REC-06', patron: 'PA-05 falta de bobina al final del turno Mañana', frecuencia: 6, impactoMin: 62, lineas: ['L2', 'L5'], confianza: 69 },
+    { id: 'REC-01', patron: 'PN-02 en la Tapadora LLEN A1 tras el cambio de formato', frecuencia: 9, impactoMin: 118, lineas: ['LLEN-A1'], confianza: 88 },
+    { id: 'REC-02', patron: 'PP-01-10 Cambio de sabor después de las 12:00 excede el tiempo estándar', frecuencia: 12, impactoMin: 96, lineas: ['LLEN-M1', 'LLEN-M2', 'LLEN-A1'], confianza: 84 },
+    { id: 'REC-03', patron: 'Merma EP alta en el arranque con sabor Lucuma', frecuencia: 7, impactoMin: 0, lineas: ['LLEN-M1'], confianza: 81 },
+    { id: 'REC-04', patron: 'PN-02 en las Pinzas extractoras MOLD A3 en turno Noche', frecuencia: 5, impactoMin: 74, lineas: ['MOLD-A3'], confianza: 76 },
+    { id: 'REC-05', patron: 'PS-05 Relevo por refrigerio sin cubrir en turno Noche', frecuencia: 4, impactoMin: 48, lineas: ['MOLD-A3', 'MOLD-A4'], confianza: 72 },
+    { id: 'REC-06', patron: 'PN-04-14 Sin stock de bobina al final del turno Día', frecuencia: 6, impactoMin: 62, lineas: ['EXTR-2', 'MOLD-A4'], confianza: 69 },
   ],
 };
 
@@ -140,7 +139,10 @@ function serie(): Predicciones['serie'] {
 
 function historico(): Predicciones['historico'] {
   const r = rng(707);
-  const lineasRef = ['L1', 'L2', 'L3', 'L4', 'L5'];
+  const lineasRef = [
+    'EXTR-2', 'EXTR-3', 'LLEN-A1', 'LLEN-A2', 'LLEN-M1',
+    'LLEN-M2', 'MOLD-A2', 'MOLD-A3', 'MOLD-A4',
+  ];
   const tipos = ['Parada prevista', 'Merma prevista', 'Velocidad baja', 'OEE bajo umbral'];
   const out: Predicciones['historico'] = [];
   for (let i = 0; i < 24; i += 1) {
@@ -169,7 +171,7 @@ export const predicciones: Predicciones = { serie: serie(), historico: historico
 
 export const modelo: Modelo = {
   fasesCrispDm: [
-    { id: 'comprension_negocio', orden: 1, nombre: 'Comprensión del negocio', estado: 'completada', descripcion: 'Objetivo: anticipar paradas y mermas para reducir el tiempo perdido en las 5 líneas.', metricas: [{ label: 'Objetivos', valor: '3' }, { label: 'RF cubiertos', valor: 'RF8, RF9' }] },
+    { id: 'comprension_negocio', orden: 1, nombre: 'Comprensión del negocio', estado: 'completada', descripcion: 'Objetivo: anticipar paradas y mermas para reducir el tiempo perdido en las 9 líneas.', metricas: [{ label: 'Objetivos', valor: '3' }, { label: 'RF cubiertos', valor: 'RF8, RF9' }] },
     { id: 'comprension_datos', orden: 2, nombre: 'Comprensión de los datos', estado: 'completada', descripcion: 'Órdenes, paradas, mermas y velocidades registradas desde el MES.', metricas: [{ label: 'Registros', valor: '2 140' }, { label: 'Fuentes', valor: '4' }] },
     { id: 'preparacion', orden: 3, nombre: 'Preparación de los datos', estado: 'completada', descripcion: 'Limpieza, codificación de causas y construcción de ventanas temporales.', metricas: [{ label: 'Features', valor: '14' }, { label: 'Nulos tratados', valor: '2,1 %' }] },
     { id: 'modelado', orden: 4, nombre: 'Modelado', estado: 'completada', descripcion: 'Gradient Boosting con validación cruzada estratificada de 5 pliegues.', metricas: [{ label: 'Algoritmo', valor: 'Gradient Boosting' }, { label: 'Pliegues', valor: '5' }] },

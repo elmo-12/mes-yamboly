@@ -1,0 +1,65 @@
+[
+  {
+    "id": "SED-AREQUIPA",
+    "codigo": "AREQ",
+    "nombre": "Arequipa",
+    "ciudad": "Arequipa",
+    "activa": true
+  },
+  {
+    "id": "SED-AYACUCHO",
+    "codigo": "AYAC",
+    "nombre": "Ayacucho",
+    "ciudad": "Ayacucho",
+    "activa": true
+  },
+  {
+    "id": "SED-CHICLAYO",
+    "codigo": "CHIC",
+    "nombre": "Chiclayo",
+    "ciudad": "Chiclayo",
+    "activa": true
+  },
+  {
+    "id": "SED-HUANCAYO",
+    "codigo": "HUAN",
+    "nombre": "Huancayo",
+    "ciudad": "Huancayo",
+    "activa": true
+  },
+  {
+    "id": "SED-IQUITOS",
+    "codigo": "IQUI",
+    "nombre": "Iquitos",
+    "ciudad": "Iquitos",
+    "activa": true
+  },
+  {
+    "id": "SED-LIMA",
+    "codigo": "LIMA",
+    "nombre": "Lima",
+    "ciudad": "Lima",
+    "activa": true
+  },
+  {
+    "id": "SED-MOYOBAMBA",
+    "codigo": "MOYO",
+    "nombre": "Moyobamba",
+    "ciudad": "Moyobamba",
+    "activa": true
+  },
+  {
+    "id": "SED-PUCALLPA",
+    "codigo": "PUCA",
+    "nombre": "Pucallpa",
+    "ciudad": "Pucallpa",
+    "activa": true
+  },
+  {
+    "id": "SED-TARAPOTO",
+    "codigo": "TARA",
+    "nombre": "Tarapoto",
+    "ciudad": "Tarapoto",
+    "activa": true
+  }
+]

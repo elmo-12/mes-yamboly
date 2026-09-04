@@ -1,0 +1,1376 @@
+[
+  {
+    "id": "CME-MP-01",
+    "codigo": "MP-01",
+    "nombre": "Merma del proceso",
+    "nivel": "tipo",
+    "parentId": null,
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 1
+  },
+  {
+    "id": "CME-MP-01-A",
+    "codigo": "MP-01-A",
+    "nombre": "Arranque",
+    "nivel": "clasificacion",
+    "parentId": "CME-MP-01",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": null
+  },
+  {
+    "id": "CME-MP-01-B",
+    "codigo": "MP-01-B",
+    "nombre": "Arranque refrigerio",
+    "nivel": "clasificacion",
+    "parentId": "CME-MP-01",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": null
+  },
+  {
+    "id": "CME-MP-01-C",
+    "codigo": "MP-01-C",
+    "nombre": "CIP",
+    "nivel": "clasificacion",
+    "parentId": "CME-MP-01",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": null
+  },
+  {
+    "id": "CME-MP-01-D",
+    "codigo": "MP-01-D",
+    "nombre": "Parada Produc",
+    "nivel": "clasificacion",
+    "parentId": "CME-MP-01",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": null
+  },
+  {
+    "id": "CME-MP-01-E",
+    "codigo": "MP-01-E",
+    "nombre": "Produc Operando",
+    "nivel": "clasificacion",
+    "parentId": "CME-MP-01",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": null
+  },
+  {
+    "id": "CME-MP-01-01",
+    "codigo": "MP-01-01",
+    "nombre": "Arranque",
+    "nivel": "causa",
+    "parentId": "CME-MP-01-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 2
+  },
+  {
+    "id": "CME-MP-01-02",
+    "codigo": "MP-01-02",
+    "nombre": "Arranque refrigerio",
+    "nivel": "causa",
+    "parentId": "CME-MP-01-B",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 27
+  },
+  {
+    "id": "CME-MP-01-03",
+    "codigo": "MP-01-03",
+    "nombre": "CIP",
+    "nivel": "causa",
+    "parentId": "CME-MP-01-C",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 1
+  },
+  {
+    "id": "CME-MP-01-04",
+    "codigo": "MP-01-04",
+    "nombre": "Falla palera",
+    "nivel": "causa",
+    "parentId": "CME-MP-01-D",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 35
+  },
+  {
+    "id": "CME-MP-01-05",
+    "codigo": "MP-01-05",
+    "nombre": "Falla productora",
+    "nivel": "causa",
+    "parentId": "CME-MP-01-D",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 41
+  },
+  {
+    "id": "CME-MP-01-06",
+    "codigo": "MP-01-06",
+    "nombre": "Faja blanca supera capacidad de llenado",
+    "nivel": "causa",
+    "parentId": "CME-MP-01-E",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 42
+  },
+  {
+    "id": "CME-MP-01-07",
+    "codigo": "MP-01-07",
+    "nombre": "Falla palera",
+    "nivel": "causa",
+    "parentId": "CME-MP-01-E",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 36
+  },
+  {
+    "id": "CME-MP-01-08",
+    "codigo": "MP-01-08",
+    "nombre": "Falla productora",
+    "nivel": "causa",
+    "parentId": "CME-MP-01-E",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 39
+  },
+  {
+    "id": "CME-MP-01-09",
+    "codigo": "MP-01-09",
+    "nombre": "Recogida",
+    "nivel": "causa",
+    "parentId": "CME-MP-01-E",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-3"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 34
+  },
+  {
+    "id": "CME-MP-02",
+    "codigo": "MP-02",
+    "nombre": "Merma por desvío del proceso",
+    "nivel": "tipo",
+    "parentId": null,
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 2
+  },
+  {
+    "id": "CME-MP-02-A",
+    "codigo": "MP-02-A",
+    "nombre": "Produc Operando",
+    "nivel": "clasificacion",
+    "parentId": "CME-MP-02",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": null
+  },
+  {
+    "id": "CME-MP-02-01",
+    "codigo": "MP-02-01",
+    "nombre": "Cambio de bobina",
+    "nivel": "causa",
+    "parentId": "CME-MP-02-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 19
+  },
+  {
+    "id": "CME-MP-02-02",
+    "codigo": "MP-02-02",
+    "nombre": "Descargador",
+    "nivel": "causa",
+    "parentId": "CME-MP-02-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 20
+  },
+  {
+    "id": "CME-MP-02-03",
+    "codigo": "MP-02-03",
+    "nombre": "Envolvedora",
+    "nivel": "causa",
+    "parentId": "CME-MP-02-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 21
+  },
+  {
+    "id": "CME-MP-02-04",
+    "codigo": "MP-02-04",
+    "nombre": "Extracción",
+    "nivel": "causa",
+    "parentId": "CME-MP-02-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 22
+  },
+  {
+    "id": "CME-MP-02-05",
+    "codigo": "MP-02-05",
+    "nombre": "Faja",
+    "nivel": "causa",
+    "parentId": "CME-MP-02-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 28
+  },
+  {
+    "id": "CME-MP-02-06",
+    "codigo": "MP-02-06",
+    "nombre": "Faja Azul",
+    "nivel": "causa",
+    "parentId": "CME-MP-02-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 32
+  },
+  {
+    "id": "CME-MP-02-07",
+    "codigo": "MP-02-07",
+    "nombre": "Hilo roto",
+    "nivel": "causa",
+    "parentId": "CME-MP-02-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 23
+  },
+  {
+    "id": "CME-MP-02-08",
+    "codigo": "MP-02-08",
+    "nombre": "Pick and place",
+    "nivel": "causa",
+    "parentId": "CME-MP-02-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-3"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 24
+  },
+  {
+    "id": "CME-MP-02-09",
+    "codigo": "MP-02-09",
+    "nombre": "Pinzas",
+    "nivel": "causa",
+    "parentId": "CME-MP-02-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 29
+  },
+  {
+    "id": "CME-MP-03",
+    "codigo": "MP-03",
+    "nombre": "Merma por fallas operativas",
+    "nivel": "tipo",
+    "parentId": null,
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 3
+  },
+  {
+    "id": "CME-MP-03-A",
+    "codigo": "MP-03-A",
+    "nombre": "Parada Produc",
+    "nivel": "clasificacion",
+    "parentId": "CME-MP-03",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": null
+  },
+  {
+    "id": "CME-MP-03-B",
+    "codigo": "MP-03-B",
+    "nombre": "Produc Operando",
+    "nivel": "clasificacion",
+    "parentId": "CME-MP-03",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": null
+  },
+  {
+    "id": "CME-MP-03-01",
+    "codigo": "MP-03-01",
+    "nombre": "Base densa",
+    "nivel": "causa",
+    "parentId": "CME-MP-03-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 8
+  },
+  {
+    "id": "CME-MP-03-02",
+    "codigo": "MP-03-02",
+    "nombre": "Falla de codificadora",
+    "nivel": "causa",
+    "parentId": "CME-MP-03-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 6
+  },
+  {
+    "id": "CME-MP-03-03",
+    "codigo": "MP-03-03",
+    "nombre": "Falla de productora",
+    "nivel": "causa",
+    "parentId": "CME-MP-03-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 7
+  },
+  {
+    "id": "CME-MP-03-04",
+    "codigo": "MP-03-04",
+    "nombre": "Falla operativa",
+    "nivel": "causa",
+    "parentId": "CME-MP-03-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 9
+  },
+  {
+    "id": "CME-MP-03-05",
+    "codigo": "MP-03-05",
+    "nombre": "Falta de base",
+    "nivel": "causa",
+    "parentId": "CME-MP-03-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 5
+  },
+  {
+    "id": "CME-MP-03-06",
+    "codigo": "MP-03-06",
+    "nombre": "Falta de espacio camara",
+    "nivel": "causa",
+    "parentId": "CME-MP-03-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 3
+  },
+  {
+    "id": "CME-MP-03-07",
+    "codigo": "MP-03-07",
+    "nombre": "Falta de materiales",
+    "nivel": "causa",
+    "parentId": "CME-MP-03-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 4
+  },
+  {
+    "id": "CME-MP-03-08",
+    "codigo": "MP-03-08",
+    "nombre": "Otros",
+    "nivel": "causa",
+    "parentId": "CME-MP-03-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 10
+  },
+  {
+    "id": "CME-MP-03-09",
+    "codigo": "MP-03-09",
+    "nombre": "Bombones pegados",
+    "nivel": "causa",
+    "parentId": "CME-MP-03-B",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 17
+  },
+  {
+    "id": "CME-MP-03-10",
+    "codigo": "MP-03-10",
+    "nombre": "Bombones pequeños",
+    "nivel": "causa",
+    "parentId": "CME-MP-03-B",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 18
+  },
+  {
+    "id": "CME-MP-03-11",
+    "codigo": "MP-03-11",
+    "nombre": "Otro",
+    "nivel": "causa",
+    "parentId": "CME-MP-03-B",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 25
+  },
+  {
+    "id": "CME-MP-04",
+    "codigo": "MP-04",
+    "nombre": "Merma por fallas de mantenimiento",
+    "nivel": "tipo",
+    "parentId": null,
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 4
+  },
+  {
+    "id": "CME-MP-04-A",
+    "codigo": "MP-04-A",
+    "nombre": "Mantto Operando",
+    "nivel": "clasificacion",
+    "parentId": "CME-MP-04",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": null
+  },
+  {
+    "id": "CME-MP-04-B",
+    "codigo": "MP-04-B",
+    "nombre": "Parada Mantto",
+    "nivel": "clasificacion",
+    "parentId": "CME-MP-04",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": null
+  },
+  {
+    "id": "CME-MP-04-01",
+    "codigo": "MP-04-01",
+    "nombre": "Falla palera",
+    "nivel": "causa",
+    "parentId": "CME-MP-04-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": true,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 37
+  },
+  {
+    "id": "CME-MP-04-02",
+    "codigo": "MP-04-02",
+    "nombre": "Falla productora",
+    "nivel": "causa",
+    "parentId": "CME-MP-04-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": true,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 38
+  },
+  {
+    "id": "CME-MP-04-03",
+    "codigo": "MP-04-03",
+    "nombre": "Otro",
+    "nivel": "causa",
+    "parentId": "CME-MP-04-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": true,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 26
+  },
+  {
+    "id": "CME-MP-04-04",
+    "codigo": "MP-04-04",
+    "nombre": "Falla descargador",
+    "nivel": "causa",
+    "parentId": "CME-MP-04-B",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": true,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 14
+  },
+  {
+    "id": "CME-MP-04-05",
+    "codigo": "MP-04-05",
+    "nombre": "Falla envolvedora",
+    "nivel": "causa",
+    "parentId": "CME-MP-04-B",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": true,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 12
+  },
+  {
+    "id": "CME-MP-04-06",
+    "codigo": "MP-04-06",
+    "nombre": "Falla palera",
+    "nivel": "causa",
+    "parentId": "CME-MP-04-B",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": true,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 11
+  },
+  {
+    "id": "CME-MP-04-07",
+    "codigo": "MP-04-07",
+    "nombre": "Falla pinzas",
+    "nivel": "causa",
+    "parentId": "CME-MP-04-B",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": true,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 15
+  },
+  {
+    "id": "CME-MP-04-08",
+    "codigo": "MP-04-08",
+    "nombre": "Falla productora",
+    "nivel": "causa",
+    "parentId": "CME-MP-04-B",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": true,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 13
+  },
+  {
+    "id": "CME-MP-04-09",
+    "codigo": "MP-04-09",
+    "nombre": "Otros",
+    "nivel": "causa",
+    "parentId": "CME-MP-04-B",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": true,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 16
+  },
+  {
+    "id": "CME-MP-05",
+    "codigo": "MP-05",
+    "nombre": "Merma por fallas externas",
+    "nivel": "tipo",
+    "parentId": null,
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 5
+  },
+  {
+    "id": "CME-MP-05-A",
+    "codigo": "MP-05-A",
+    "nombre": "Parada Externa",
+    "nivel": "clasificacion",
+    "parentId": "CME-MP-05",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": null
+  },
+  {
+    "id": "CME-MP-05-01",
+    "codigo": "MP-05-01",
+    "nombre": "Falta de energía",
+    "nivel": "causa",
+    "parentId": "CME-MP-05-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": false,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 30
+  },
+  {
+    "id": "CME-MP-05-02",
+    "codigo": "MP-05-02",
+    "nombre": "Otros",
+    "nivel": "causa",
+    "parentId": "CME-MP-05-A",
+    "aplicaA": [
+      "MP",
+      "EP",
+      "PT"
+    ],
+    "lineasAplicables": [
+      "LIN-EXTR-2",
+      "LIN-EXTR-3",
+      "LIN-LLEN-A1",
+      "LIN-LLEN-A2",
+      "LIN-LLEN-M1",
+      "LIN-LLEN-M2",
+      "LIN-MOLD-A2",
+      "LIN-MOLD-A3",
+      "LIN-MOLD-A4"
+    ],
+    "requiereEvidencia": false,
+    "requiereComentario": true,
+    "requiereSolicitud": false,
+    "estado": "activo",
+    "mermasHistoricas": 0,
+    "idLegado": 31
+  }
+]

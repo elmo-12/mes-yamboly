@@ -1,0 +1,92 @@
+[
+  {
+    "id": "LIN-EXTR-2",
+    "codigo": "EXTR-2",
+    "nombre": "Extrusora 2",
+    "nombreCorto": "EXTR 2",
+    "tipoProceso": "extrusora",
+    "idLegado": 2,
+    "sedeId": "SED-LIMA",
+    "estado": "activo"
+  },
+  {
+    "id": "LIN-EXTR-3",
+    "codigo": "EXTR-3",
+    "nombre": "Extrusora 3",
+    "nombreCorto": "EXTR 3",
+    "tipoProceso": "extrusora",
+    "idLegado": 8,
+    "sedeId": "SED-LIMA",
+    "estado": "activo"
+  },
+  {
+    "id": "LIN-LLEN-A1",
+    "codigo": "LLEN-A1",
+    "nombre": "Llenadora A1",
+    "nombreCorto": "LLEN A1",
+    "tipoProceso": "llenadora",
+    "idLegado": 9,
+    "sedeId": "SED-LIMA",
+    "estado": "activo"
+  },
+  {
+    "id": "LIN-LLEN-A2",
+    "codigo": "LLEN-A2",
+    "nombre": "Llenadora A2",
+    "nombreCorto": "LLEN A2",
+    "tipoProceso": "llenadora",
+    "idLegado": 5,
+    "sedeId": "SED-LIMA",
+    "estado": "activo"
+  },
+  {
+    "id": "LIN-LLEN-M1",
+    "codigo": "LLEN-M1",
+    "nombre": "Llenadora M1",
+    "nombreCorto": "LLEN M1",
+    "tipoProceso": "llenadora",
+    "idLegado": 6,
+    "sedeId": "SED-LIMA",
+    "estado": "activo"
+  },
+  {
+    "id": "LIN-LLEN-M2",
+    "codigo": "LLEN-M2",
+    "nombre": "Llenadora M2",
+    "nombreCorto": "LLEN M2",
+    "tipoProceso": "llenadora",
+    "idLegado": 1,
+    "sedeId": "SED-LIMA",
+    "estado": "activo"
+  },
+  {
+    "id": "LIN-MOLD-A2",
+    "codigo": "MOLD-A2",
+    "nombre": "Moldeadora A2",
+    "nombreCorto": "MOLD A2",
+    "tipoProceso": "moldeadora",
+    "idLegado": 4,
+    "sedeId": "SED-LIMA",
+    "estado": "activo"
+  },
+  {
+    "id": "LIN-MOLD-A3",
+    "codigo": "MOLD-A3",
+    "nombre": "Moldeadora A3",
+    "nombreCorto": "MOLD A3",
+    "tipoProceso": "moldeadora",
+    "idLegado": 10,
+    "sedeId": "SED-LIMA",
+    "estado": "activo"
+  },
+  {
+    "id": "LIN-MOLD-A4",
+    "codigo": "MOLD-A4",
+    "nombre": "Moldeadora A4",
+    "nombreCorto": "MOLD A4",
+    "tipoProceso": "moldeadora",
+    "idLegado": 3,
+    "sedeId": "SED-LIMA",
+    "estado": "activo"
+  }
+]

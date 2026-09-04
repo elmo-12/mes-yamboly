@@ -9,6 +9,7 @@ export const ordenesSeeder: Seeder = {
     await dataSource.getRepository(OrdenFabricacion).save(
       ordenes.map((o) => ({
         ...o,
+        velocidadEstandarId: o.velocidadEstandarId ?? null,
         observacion: o.observacion ?? null,
       })),
       { chunk: 50 },

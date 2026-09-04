@@ -9,6 +9,7 @@ export const mermasSeeder: Seeder = {
     await dataSource.getRepository(Merma).save(
       mermas.map((m) => ({
         ...m,
+        numeroSolicitud: m.numeroSolicitud ?? null,
         codigoBalde: m.codigoBalde ?? null,
         observacion: m.observacion ?? null,
       })),
