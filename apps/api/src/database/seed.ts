@@ -1,10 +1,12 @@
 /**
  * Runner de seeds: `pnpm --filter @mes/api seed`.
- * Borra el archivo SQLite, recrea el esquema y ejecuta todos los `SEEDERS`.
+ * Con `DATABASE_URL` siembra sobre PostgreSQL (vaciando antes las tablas);
+ * sin ella borra el archivo SQLite. En ambos casos recrea el esquema
+ * (`synchronize`) y ejecuta todos los `SEEDERS`.
  */
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { crearDataSource } from './data-source';
+import { crearDataSource, vaciarTablas } from './data-source';
 import { ejecutarSeeds } from './seeds';
 
 /** Lector minimalista de `.env` (el runner corre fuera del contexto Nest). */
@@ -24,18 +26,29 @@ function cargarEnv(archivo = '.env'): void {
 
 async function main(): Promise<void> {
   cargarEnv();
-  const dbPath = resolve(process.cwd(), process.env.DB_PATH ?? './data/mes.sqlite');
-  mkdirSync(dirname(dbPath), { recursive: true });
-  if (existsSync(dbPath)) {
-    rmSync(dbPath);
-    console.log(`Base de datos anterior eliminada: ${dbPath}`);
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+
+  let dbPath: string | undefined;
+  let destino: string;
+  if (databaseUrl) {
+    destino = databaseUrl.replace(/:\/\/[^@]*@/, '://***@');
+  } else {
+    dbPath = resolve(process.cwd(), process.env.DB_PATH ?? './data/mes.sqlite');
+    mkdirSync(dirname(dbPath), { recursive: true });
+    if (existsSync(dbPath)) {
+      rmSync(dbPath);
+      console.log(`Base de datos anterior eliminada: ${dbPath}`);
+    }
+    destino = dbPath;
   }
 
-  const dataSource = crearDataSource(dbPath);
+  const dataSource = crearDataSource({ databaseUrl, dbPath });
   await dataSource.initialize();
+  /* En PostgreSQL el esquema persiste entre corridas: hay que vaciarlo a mano. */
+  if (databaseUrl) await vaciarTablas(dataSource);
   await ejecutarSeeds(dataSource);
   await dataSource.destroy();
-  console.log(`Seeds completados en ${dbPath}`);
+  console.log(`Seeds completados en ${destino}`);
 }
 
 main().catch((error: unknown) => {

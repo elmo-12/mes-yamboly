@@ -42,7 +42,7 @@ export class OrdenFabricacion {
    * Velocidad estándar en **unidades por minuto**, congelada al iniciar la orden
    * desde el par producto × línea vigente (`VelocidadEstandar.velocidadUnidMin`).
    */
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   velocidadEstandar!: number;
 
   /** Par producto × línea del que se copió `velocidadEstandar` (`VE-0002`). */
@@ -70,7 +70,7 @@ export class OrdenFabricacion {
   @Column('integer', { default: 0 })
   paradasCount!: number;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   mermasKg!: number;
 
   @Column('text')

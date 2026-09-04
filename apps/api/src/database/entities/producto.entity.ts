@@ -40,7 +40,7 @@ export class Producto {
   unidadesPorCaja!: number;
 
   /** Peso neto por unidad en kilogramos. */
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   pesoKg!: number;
 
   /** Id de `Sabor`; `null` cuando la heurística del maestro no lo resolvió. */

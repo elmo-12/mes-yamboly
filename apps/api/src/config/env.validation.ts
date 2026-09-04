@@ -5,6 +5,11 @@ export const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   JWT_SECRET: z.string().min(8, 'JWT_SECRET debe tener al menos 8 caracteres'),
   JWT_EXPIRES_IN: z.string().default('8h'),
+  /**
+   * PostgreSQL (Docker local): `postgres://mes:mes_dev@localhost:5432/mes_yamboly`.
+   * Si está presente manda sobre `DB_PATH`; si falta se usa SQLite (e2e, respaldo).
+   */
+  DATABASE_URL: z.string().url().optional().or(z.literal('')),
   DB_PATH: z.string().default('./data/mes.sqlite'),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
   /** Origen público de la web; si falta se usa `CORS_ORIGIN` (enlaces de encuesta). */

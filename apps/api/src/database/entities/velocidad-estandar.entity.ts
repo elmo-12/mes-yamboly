@@ -26,19 +26,19 @@ export class VelocidadEstandar {
   velocidadUnidHora!: number;
 
   /** Derivado: `velocidadUnidHora / 60` con 1 decimal. Lo consume el OEE. */
-  @Column('real')
+  @Column('double precision')
   velocidadUnidMin!: number;
 
   /** Merma estándar admitida para el par, en porcentaje (0–100). */
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   mermaEstandarPct!: number;
 
   /** Minutos de CIP del par; `null` si el maestro no lo define. */
-  @Column('real', { nullable: true })
+  @Column('double precision', { nullable: true })
   cipMin!: number | null;
 
   /** Minutos de arranque del par; `null` si el maestro no lo define. */
-  @Column('real', { nullable: true })
+  @Column('double precision', { nullable: true })
   arranqueMin!: number | null;
 
   @Column('text', { default: 'activo' })

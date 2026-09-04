@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mes-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mes_yamboly
+      POSTGRES_USER: mes
+      POSTGRES_PASSWORD: mes_dev
+    ports:
+      - '5432:5432'
+    volumes:
+      - mes_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mes -d mes_yamboly']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  mes_pgdata:

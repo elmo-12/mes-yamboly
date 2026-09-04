@@ -13,20 +13,20 @@ export class IndicadorTurno {
   @Column('text')
   turnoLabel!: string;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   oee!: number;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   disponibilidad!: number;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   desempeno!: number;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   calidad!: number;
 
   /** Δ en puntos porcentuales frente al periodo comparado. */
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   deltaOee!: number;
 
   @Column('integer', { default: 0 })

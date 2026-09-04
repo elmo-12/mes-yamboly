@@ -31,7 +31,8 @@ export class IndicadorLinea {
   @Column('integer', { default: 0 })
   unidadesBuenas!: number;
 
-  @Column('integer', { default: 0 })
+  /** Velocidad estándar de la línea en unid/min: decimal (p. ej. 280,5). */
+  @Column('double precision', { default: 0 })
   velocidadEstandar!: number;
 
   @Column('integer', { default: 0 })

@@ -34,6 +34,6 @@ export class Linea {
   estado!: EstadoCatalogo;
 
   /** Máximo `velocidadUnidMin` de sus pares producto × línea activos. */
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   capacidadUnidadesMin!: number;
 }

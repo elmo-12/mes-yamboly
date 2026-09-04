@@ -43,7 +43,7 @@ Este backlog documenta el trabajo necesario para sostener esos 5 KPIs con datos 
 - **Prioridad (MoSCoW):** `Must` (bloquea la tesis o la operación diaria) · `Should` (valor claro, no bloqueante) · `Could` (mejora deseable) · `Won't` (fuera de este alcance).
 - **Estimación:** puntos de historia, escala Fibonacci (1, 2, 3, 5, 8, 13, 21).
 - **Estados:** `Hecho` (código en `main`/rama de fase, verificado) · `En curso` (código presente pero incompleto o con cambios sin commitear) · `Pendiente` (no iniciado) · `Descartada` (se retira del alcance por una decisión explícita del producto, documentada en la propia historia con fecha; **sus puntos no se computan** en ningún total de la sección 6 "Métricas del backlog" — se muestran aparte).
-- **Sprints:** `S1–S4` = fase Figma → código (ago-2026, base `2bb7f89`, 57/57 frames) · `S5` = fase "maestros reales" + ajustes del 4-sep tarde (Hecho) · `S6` = fase "Evidencia real" (4-sep-2026, noche: limpieza del postest hipotético, importadores de fuentes externas, validación TCI, invitaciones TSP) · `S7+` = pendientes sin fecha asignada.
+- **Sprints:** `S1–S4` = fase Figma → código (ago-2026, base `2bb7f89`, 57/57 frames) · `S5` = fase "maestros reales" + ajustes del 4-sep tarde (Hecho) · `S6` = fase "Evidencia real" (4-sep-2026, noche: limpieza del postest hipotético, importadores de fuentes externas, validación TCI, invitaciones TSP) · `S6b` = migración a PostgreSQL 16 en Docker (4-sep-2026, noche) · `S7+` = pendientes sin fecha asignada.
 - **Definición de Terminado (DoD):** `pnpm --filter @mes/types build && pnpm typecheck && pnpm lint && pnpm build` en verde · suite e2e correspondiente en verde · paridad mock↔API (mismos datos, mismo contrato) · fidelidad a Figma o desviación justificada por documento · todos los estados de UI cubiertos (loading / empty / no-results / error / success+toast / validación / confirmación / forbidden) · un único `Button variant="primary"` por pantalla · baja lógica con modal de confirmación en toda acción Danger.
 
 ---
@@ -510,10 +510,21 @@ Como **investigador**, quiero cargar el histórico real de paradas y mermas del 
 - Debe convivir con los seeds de tesis (E9-04) sin romper los totales fijos de los 5 KPIs.
 
 **E9-07 — Migración a PostgreSQL**
-`Prioridad: Should · Puntos: 8 · Estado: Pendiente · Sprint: S7`
+`Prioridad: Should · Puntos: 8 · Estado: Hecho · Sprint: S6b`
 Como **equipo de desarrollo**, quiero migrar de SQLite a PostgreSQL, para operar en un entorno de producción con concurrencia y respaldo reales.
-- `TypeOrmModule` ya está aislado detrás de un datasource (documentado en el README como "migrar a PostgreSQL = cambiar el datasource"), pero no hay migraciones ni script de despliegue todavía.
-- Requiere generar migraciones TypeORM (hoy `synchronize: true`) antes del corte a producción.
+- `docker-compose.yml` en la raíz levanta `postgres:16-alpine` (base `mes_yamboly`, volumen nombrado `mes_pgdata`, `healthcheck` con `pg_isready`); scripts `pnpm db:up` / `db:down` / `db:logs`.
+- Datasource **multi-motor**: `opcionesDataSource()` elige PostgreSQL si hay `DATABASE_URL` y SQLite si no, así que los e2e siguen corriendo en memoria y sin Docker (132/132) y la app arranca igual sin contenedores.
+- `apps/api/scripts/migrar-sqlite-a-postgres.ts` (`pnpm db:migrar`) trasladó las **37 tablas / 1 624 filas** conservando los ids, con tabla de conteos `entidad | sqlite | postgres` y `ON CONFLICT DO NOTHING` para poder re-ejecutarlo.
+- Portabilidad de tipos: 39 columnas `real` → `double precision` y `indicador_linea.velocidadEstandar` `integer` → `double precision` (SQLite guardaba 280,5 y 483,3 en una columna `INTEGER`). Sin columnas `datetime`, sin nombres de tabla reservados, búsquedas resueltas en memoria (no hace falta `ILike`).
+- Verificado en caliente: `SeedOnBootService` no re-siembra, login, `/lineas` 9, `/productos` 201, `/tiempo-real/lineas` 9, `/ordenes?periodo=hoy` 8, `/evidencia/tsp` con `pctAcuerdo` 100, `POST /paradas` 201 y exportación XLSX 200.
+- **Queda fuera** (ver `E9-12`): las migraciones formales de TypeORM — hoy sigue `synchronize: true` en los dos motores.
+
+**E9-12 — Migraciones TypeORM en vez de `synchronize`**
+`Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S7`
+Como **equipo de desarrollo**, quiero versionar el esquema con migraciones TypeORM en lugar de derivarlo de las entidades en cada arranque, para poder desplegar cambios de modelo sin riesgo de perder o alterar datos en producción.
+- Hoy `synchronize: true` en PostgreSQL y SQLite (`opcionesDataSource`): cómodo en desarrollo, inaceptable en producción — no borra columnas y aplica cambios sin control ni vuelta atrás.
+- Requiere `migration:generate`/`migration:run` en `@mes/api`, una migración inicial que refleje el esquema vigente (37 tablas) y desactivar `synchronize` fuera de desarrollo.
+- Desbloquea el corte a producción de `E11-03` (backups) y `E11-01` (imágenes Docker de `web`/`api`).
 
 **E9-08 — Tiempos estándar de cambio producto × producto**
 `Prioridad: Could · Puntos: 5 · Estado: Pendiente · Sprint: S7`
@@ -585,7 +596,7 @@ Como **equipo de desarrollo**, quiero que cada cambio corra `typecheck`/`lint`/`
 **E11-01 — Dockerizar `web` y `api`**
 `Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S7`
 Como **equipo de desarrollo**, quiero imágenes Docker de `apps/web` y `apps/api`, para desplegar el sistema en cualquier entorno sin instalar Node/pnpm manualmente.
-- No existen `Dockerfile` ni `docker-compose.yml` en el repositorio hoy.
+- Desde `E9-07` hay `docker-compose.yml` en la raíz, pero **sólo con el servicio `postgres`**: `web` y `api` siguen corriendo en el host con `pnpm dev` y no existe ningún `Dockerfile`.
 
 **E11-02 — Variables de entorno y secretos por ambiente**
 `Prioridad: Should · Puntos: 3 · Estado: Pendiente · Sprint: S7`
@@ -595,7 +606,7 @@ Como **equipo de desarrollo**, quiero `.env` diferenciados por ambiente (desarro
 **E11-03 — Backups y monitoreo**
 `Prioridad: Should · Puntos: 5 · Estado: Pendiente · Sprint: S7`
 Como **jefe de producción**, quiero backups automáticos de la base de datos y alertas si el sistema cae, para no perder el histórico de producción de la planta ni enterarme de una caída por un operario que no puede registrar una parada.
-- Depende de E9-07 (PostgreSQL) para backups gestionados; sobre SQLite hoy no hay estrategia de respaldo.
+- `E9-07` ya dejó la base en PostgreSQL 16, así que los backups gestionados (`pg_dump` programado, retención) son posibles; hoy el volumen `mes_pgdata` sigue siendo la única copia y no hay monitoreo de caídas.
 
 ---
 
@@ -652,8 +663,9 @@ Como **cualquier persona con sesión iniciada**, quiero que el atajo ⌘K abra l
 | **S4** | Evidencia de tesis: los 5 KPIs y su exportación | 6 | 31 | Hecho |
 | **S5** | Maestros reales + ajustes del 4-sep tarde: 9 líneas, par producto×línea, árbol de merma, mantenedor de líneas, usuarios sin sede, tarjetas de tiempo real ampliadas | 23 | 140 | **22 Hecho · 1 Descartada** |
 | **S6** | Evidencia real (4-sep-2026, noche): limpieza del postest hipotético, importadores de fuentes externas + plantillas, motor de validación TCI, overrides, tolerancias, invitaciones TSP, CFS/EP reales, Home sin KPI fijo | 9 | 34 | Hecho |
-| **S7+** | Conector en vivo de sensores/SAP, microservicio Python, históricos reales, PostgreSQL, `oeeTurnoPct`, seguridad avanzada, despliegue, mejoras UX | 25 | 108 | **24 Pendiente · 1 Descartada** |
-| **Total** | — | **85** | **443** | — |
+| **S6b** | Base de datos PostgreSQL 16 en Docker (4-sep-2026, noche): `docker-compose.yml`, datasource multi-motor, script de migración SQLite → PostgreSQL, 37 tablas / 1 624 filas trasladadas | 1 | 8 | Hecho |
+| **S7+** | Conector en vivo de sensores/SAP, microservicio Python, históricos reales, migraciones TypeORM, `oeeTurnoPct`, seguridad avanzada, despliegue, mejoras UX | 25 | 105 | **24 Pendiente · 1 Descartada** |
+| **Total** | — | **86** | **448** | — |
 
 Cierre de S5 (4-sep-2026, mañana): las 8 historias que estaban `En curso` (E2-01, E2-03, E2-04, E8-04, E8-05, E8-06,
 E8-08, E8-09) se completaron, commitearon y verificaron (`pnpm typecheck` 7/7 · `pnpm lint` limpio · `pnpm build` 4/4
@@ -683,6 +695,16 @@ nueva; `thesis.e2e-spec.ts` reescrita al flujo real). QA de integración de esta
 «QA fase 3 (pendiente de la pasada de integración)» en `docs/qa-report.md`. Detalle funcional completo en
 `docs/implementation-summary.md` § «Fase 3».
 
+Cierre de S6b (4-sep-2026, noche, rama `feat/postgres-docker`): `E9-07` (Migración a PostgreSQL, 8 pts) pasa de
+`Pendiente` a `Hecho` y sale de `S7+`; se abre `E9-12` (Migraciones TypeORM en vez de `synchronize`, 5 pts,
+`Pendiente`, `S7`) con el residuo que `E9-07` deja explícitamente fuera. Neto sobre el backlog: +1 historia
+(85 → 86), +5 puntos computables (443 → 448), Hecho 59 → 60 historias y 335 → 343 puntos, Pendiente 108 → 105
+puntos con las mismas 24 historias. La migración real trasladó las **37 tablas / 1 624 filas** conservando los ids
+(incluida la invitación TSP respondida ese mismo día) y quedó verificada en caliente contra la API.
+`pnpm typecheck`/`lint`/`build` en verde · `pnpm --filter @mes/api test` **5/5** (nuevo spec de selección de driver)
+· `pnpm --filter @mes/api test:e2e` **132/132** en 8 suites, todavía sobre SQLite en memoria. Detalle en
+`docs/implementation-summary.md` § «Fase 4».
+
 ### Riesgos y dependencias
 
 - **Microservicio Python (E6-05):** sin él, la analítica IA sigue operando con reglas (`RuleBasedPredictionProvider`); el capítulo de analítica de la tesis debe dejar explícito que el modelo entrenado es un hito posterior al periodo experimental actual.
@@ -693,6 +715,7 @@ nueva; `thesis.e2e-spec.ts` reescrita al flujo real). QA de integración de esta
 - **Adopción en planta (transversal):** el diseño reduce el TRI en la medición controlada del experimento; la adopción real en la planta de Lima, con turnos D/N, depende de capacitación que no está en este backlog (fuera del alcance de la tesis, pero condiciona si el sistema se sostiene después del periodo experimental).
 - **Paridad mock↔API residual (E9-09):** el snapshot mock de `lineaEstados`, escrito a mano, difiere de la API en 3 líneas y en el turno — riesgo de demostrar un estado de planta distinto según el modo elegido hasta que se resuelva.
 - **Reloj real vs. día operativo fijo en los seeds de tesis (E9-10):** mientras `thesis-seed.util.ts: hoy()` no se ancle a la misma constante `HOY` que usa el mock, una demo contra la API en una fecha distinta puede mostrar una referencia temporal distinta a la del mock (los totales de los 5 KPIs no cambian, sólo la fecha de referencia).
+- **Esquema derivado de las entidades (E9-12):** con `synchronize: true` en PostgreSQL, un cambio de entidad se aplica solo al arrancar, sin migración versionada ni vuelta atrás; hasta que existan migraciones TypeORM, cualquier despliegue con datos reales arriesga el histórico de planta. En la misma línea, el volumen `mes_pgdata` es hoy la única copia de la base (ver `E11-03`) y la contraseña `mes_dev` viaja en claro en `docker-compose.yml` (ver `E11-02`).
 - **Modal anidado sin oscurecer el modal base (nuevo, QA fase 2b):** en `VelocidadesModal` (E8-06), `--z-overlay` (60) queda por debajo de `--z-modal` (70), así que el overlay del modal anidado de alta/edición/baja no oscurece el modal de velocidades que queda debajo.
 
 ---
@@ -706,11 +729,11 @@ fuera de la base de cálculo del % de puntos.
 
 | Estado | Historias | % historias | Puntos | % puntos |
 | --- | --- | --- | --- | --- |
-| Hecho | 59 | 69,4 % | 335 | 75,6 % |
+| Hecho | 60 | 69,8 % | 343 | 76,6 % |
 | En curso | 0 | 0 % | 0 | 0 % |
-| Pendiente | 24 | 28,2 % | 108 | 24,4 % |
-| Descartada | 2 | 2,4 % | 5 (no computable) | — |
-| **Total** | **85** | **100 %** | **443** (computables) | **100 %** |
+| Pendiente | 24 | 27,9 % | 105 | 23,4 % |
+| Descartada | 2 | 2,3 % | 5 (no computable) | — |
+| **Total** | **86** | **100 %** | **448** (computables) | **100 %** |
 
 Historias `Descartada`: **E8-08** (Sedes: alta y edición, 3 pts) y **E12-01** (Agrupar filtro de líneas por proceso,
 2 pts) — ambas por la decisión del producto del 4-sep-2026 tarde (sin sedes, sin filtro de línea en tiempo real).
@@ -727,11 +750,11 @@ Historias `Descartada`: **E8-08** (Sedes: alta y edición, 3 pts) y **E12-01** (
 | E6 — Analítica IA | 5 | 36 | 4 | 0 | 1 | 0 |
 | E7 — Evidencia de tesis | 17 | 81 | 15 | 0 | 2 | 0 |
 | E8 — Configuración y mantenedores | 10 | 51 | 8 | 0 | 1 | 1 |
-| E9 — Datos maestros reales y migración | 11 | 64 | 5 | 0 | 6 | 0 |
+| E9 — Datos maestros reales y migración | 12 | 69 | 6 | 0 | 6 | 0 |
 | E10 — Backend, seguridad y calidad | 6 | 36 | 3 | 0 | 3 | 0 |
 | E11 — Despliegue y operación | 3 | 13 | 0 | 0 | 3 | 0 |
 | E12 — Mejoras UX detectadas | 8 | 14 | 2 | 0 | 5 | 1 |
-| **Total** | **85** | **443** | **59** | **0** | **24** | **2** |
+| **Total** | **86** | **448** | **60** | **0** | **24** | **2** |
 
 ---
 

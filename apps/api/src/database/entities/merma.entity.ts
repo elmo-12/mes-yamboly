@@ -17,7 +17,7 @@ export class Merma {
   @Column('text')
   tipo!: TipoMermaCodigo;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   cantidadKg!: number;
 
   @Column('text')

@@ -15,13 +15,13 @@ export class MermaAgregada {
   @Column('text')
   lineaNombre!: string;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   mp!: number;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   ep!: number;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   pt!: number;
 
   @Column('integer', { default: 0 })

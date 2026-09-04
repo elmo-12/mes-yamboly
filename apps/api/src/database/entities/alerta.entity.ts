@@ -29,7 +29,7 @@ export class Alerta {
   prediccion!: string;
 
   /** Probabilidad 0–100 devuelta por el `PredictionProvider`. */
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   probabilidad!: number;
 
   @Column('text')

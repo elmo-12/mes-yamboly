@@ -16,14 +16,14 @@ export class RegistroVelocidad {
   @Column('text')
   registradaEn!: string;
 
-  @Column('real')
+  @Column('double precision')
   velocidadReal!: number;
 
-  @Column('real')
+  @Column('double precision')
   velocidadEstandar!: number;
 
   /** Porcentaje con signo: `-1,7` = 1,7 % por debajo del estándar. */
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   desvioPct!: number;
 
   @Column('text', { nullable: true })
