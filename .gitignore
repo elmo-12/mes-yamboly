@@ -10,3 +10,9 @@ dist
 apps/api/data/exports/*.xlsx
 
 .next-qa
+
+# Volcados de base de datos (el volumen mes_pgdata vive en Docker, nunca en el repo)
+*.dump
+*.sql.gz
+*.pgdump
+pgdata/

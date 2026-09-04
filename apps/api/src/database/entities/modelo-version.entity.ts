@@ -14,16 +14,16 @@ export class ModeloVersion {
   @Column('integer', { default: 0 })
   eventos!: number;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   auc!: number;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   f1!: number;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   precision!: number;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   recall!: number;
 
   @Column('integer', { default: 0 })

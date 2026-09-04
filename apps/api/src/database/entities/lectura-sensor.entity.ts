@@ -29,6 +29,6 @@ export class LecturaSensor {
   estado!: EstadoLecturaSensor;
 
   /** Velocidad instantánea informada por el sensor; `null` si no viene. */
-  @Column('real', { nullable: true })
+  @Column('double precision', { nullable: true })
   velocidadUnidMin!: number | null;
 }

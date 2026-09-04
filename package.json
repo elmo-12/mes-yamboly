@@ -10,6 +10,10 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "seed": "pnpm --filter @mes/api seed",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:migrar": "pnpm --filter @mes/api migrar:pg",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {

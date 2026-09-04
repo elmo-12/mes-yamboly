@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import type { EnvVars } from '../config/env.validation';
-import { ENTITIES } from './data-source';
+import { opcionesDataSource } from './data-source';
 import { ejecutarSeeds, hayDatos } from './seeds';
 
 /** Siembra la BD al arrancar sólo si está vacía (arranque en frío). */
@@ -27,14 +27,14 @@ export class SeedOnBootService implements OnModuleInit {
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService<EnvVars, true>) => ({
-        type: 'sqlite' as const,
-        database: String(config.get('DB_PATH', { infer: true })),
-        /* `ENTITIES` cubre todo `entities/index.ts` aunque un módulo aún no
+        /* PostgreSQL cuando hay `DATABASE_URL`; SQLite en caso contrario. Las
+         * `ENTITIES` cubren todo `entities/index.ts` aunque un módulo aún no
          * registre su `forFeature`; `autoLoadEntities` suma las que lleguen después. */
-        entities: ENTITIES,
+        ...opcionesDataSource({
+          databaseUrl: config.get('DATABASE_URL', { infer: true }),
+          dbPath: String(config.get('DB_PATH', { infer: true })),
+        }),
         autoLoadEntities: true,
-        synchronize: true,
-        logging: false,
       }),
     }),
   ],

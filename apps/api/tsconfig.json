@@ -1,5 +1,5 @@
 {
   "extends": "@mes/config/tsconfig.nest.json",
   "compilerOptions": { "outDir": "./dist", "baseUrl": "./", "declaration": false, "declarationMap": false, "sourceMap": true, "esModuleInterop": true },
-  "include": ["src", "test"]
+  "include": ["src", "test", "scripts"]
 }

@@ -4,7 +4,7 @@ Sistema de ejecución de manufactura (MES) con analítica IA para Helatony's S.A
 
 ## Tecnologías
 - **Frontend:** Next.js 15.3 (App Router) · React 19 · Tailwind v4 · TanStack Query · react-hook-form + zod · Recharts · Radix UI · lucide-react · msw 2 (mocks) · zustand (sesión).
-- **Backend:** NestJS 11 · TypeORM + SQLite · JWT (passport-jwt) + roles · class-validator · Swagger · exceljs · event-emitter.
+- **Backend:** NestJS 11 · TypeORM + PostgreSQL 16 (Docker; SQLite como respaldo y en los e2e) · JWT (passport-jwt) + roles · class-validator · Swagger · exceljs · event-emitter.
 - **Monorepo:** pnpm 11 workspaces + Turborepo · TypeScript estricto.
 
 ## Estructura
@@ -15,7 +15,9 @@ mes-yamboly/
 │   │   └── src/{app,layouts,features,components,services,mocks,hooks,config,styles}
 │   └── api/                 Backend NestJS
 │       ├── scripts/         extraer-maestros.mjs (dump → seeds/data/real/*.json)
+│       │                    migrar-sqlite-a-postgres.ts (SQLite → PostgreSQL)
 │       └── src/{main.ts,config,common,database/{entities,seeds},modules/<dominio>}
+├── docker-compose.yml       PostgreSQL 16 (`pnpm db:up`)
 ├── packages/
 │   ├── ui/                  @mes/ui — Design System (tokens MDS + 45 componentes)
 │   ├── types/                @mes/types — contratos front↔back (tipos + zod)
@@ -26,14 +28,15 @@ mes-yamboly/
 Capa de datos del frontend: `UI → hooks (TanStack Query) → features/<dominio>/api.ts → services/api/client → mock (msw) | API NestJS`. Las vistas nunca importan mocks.
 
 ## Requisitos
-Node ≥ 20 (probado con 22) · pnpm 11 (`corepack enable pnpm`) · en macOS, Xcode CLT si `sqlite3` no encuentra prebuilt.
+Node ≥ 20 (probado con 22) · pnpm 11 (`corepack enable pnpm`) · **Docker** (probado con 29) para PostgreSQL · en macOS, Xcode CLT si `sqlite3` no encuentra prebuilt.
 
 ## Instalación y ejecución
 ```bash
 pnpm install
+pnpm db:up      # PostgreSQL 16 en Docker (espera a que el healthcheck pase a healthy)
 pnpm dev        # web http://localhost:3000 · api http://localhost:4000/api/v1 · Swagger http://localhost:4000/docs
 ```
-`pnpm dev` compila `@mes/types`/`@mes/shared` en watch, arranca Next y Nest; el backend crea `apps/api/data/mes.sqlite` y la siembra con los datos maestros reales la primera vez.
+`pnpm dev` compila `@mes/types`/`@mes/shared` en watch, arranca Next y Nest; si la base está vacía el backend la siembra con los datos maestros reales (`SeedOnBootService`).
 
 Si `sqlite3` falla con `Could not locate the bindings file`:
 ```bash
@@ -42,16 +45,51 @@ cd node_modules/.pnpm/sqlite3*/node_modules/sqlite3 && npm run install
 
 **Tras cambiar entidades de TypeORM** (nuevas columnas, tablas): `synchronize: true` **no borra columnas existentes**, así que hay que forzar la resiembra antes de levantar la API de nuevo:
 ```bash
-rm -f apps/api/data/mes.sqlite
-# o, equivalente:
-pnpm --filter @mes/api seed
+pnpm --filter @mes/api seed     # Postgres: vacía las tablas y resiembra · SQLite: borra el archivo y resiembra
 ```
+
+## Base de datos (PostgreSQL en Docker)
+La API es **multi-motor**: `apps/api/src/database/data-source.ts` elige el driver con una sola regla — si `DATABASE_URL` está definida usa **PostgreSQL**, si no cae a **SQLite**. Los e2e fuerzan `DATABASE_URL=''` + `DB_PATH=':memory:'`, así que siguen corriendo en SQLite en memoria sin Docker.
+
+`docker-compose.yml` (raíz) levanta `postgres:16-alpine` con base `mes_yamboly`, usuario `mes`, contraseña `mes_dev`, puerto `5432:5432`, volumen nombrado `mes_pgdata`, `healthcheck` con `pg_isready` y `restart: unless-stopped`.
+
+```bash
+pnpm db:up      # docker compose up -d postgres
+pnpm db:logs    # seguir el log del contenedor
+pnpm db:down    # parar (el volumen mes_pgdata se conserva)
+docker compose down -v   # parar y BORRAR los datos
+```
+
+En `apps/api/.env` (ver `.env.example`):
+```bash
+DATABASE_URL=postgres://mes:mes_dev@localhost:5432/mes_yamboly
+DB_PATH=./data/mes.sqlite   # respaldo; sólo se usa si DATABASE_URL está vacía o comentada
+```
+
+### Migrar los datos de SQLite a PostgreSQL
+`apps/api/scripts/migrar-sqlite-a-postgres.ts` copia una base SQLite existente a PostgreSQL conservando los ids: crea el esquema con `synchronize`, copia tabla por tabla en el orden de `entities/index.ts` en lotes de 500 con `ON CONFLICT DO NOTHING` (re-ejecutable sin duplicar) e imprime al final la tabla `entidad | sqlite | postgres`, fallando si algún conteo difiere.
+
+```bash
+pnpm db:up
+pnpm db:migrar                                   # o: pnpm --filter @mes/api migrar:pg
+pnpm db:migrar -- --reset                        # vacía PostgreSQL antes de copiar
+pnpm db:migrar -- --sqlite=./data/otra.sqlite --url=postgres://…   # orígenes/destinos alternativos
+```
+
+### Volver a SQLite
+Comenta `DATABASE_URL` en `apps/api/.env` y reinicia `pnpm dev`: la API vuelve a `DB_PATH` y siembra el archivo si no existe. El SQLite anterior sigue intacto en `apps/api/data/mes.sqlite` (el script de migración lo abre con `synchronize: false` y nunca lo modifica).
+
+### Consultar la base
+```bash
+docker exec -it mes-postgres psql -U mes -d mes_yamboly
+```
+Nota: los identificadores llevan mayúsculas (`"lineaId"`, `"respondidaEn"`), así que en `psql` hay que entrecomillarlos.
 
 ## Modos de datos
 | Modo | `apps/web/.env.local` | Uso |
 |---|---|---|
 | **mock** (por defecto) | `NEXT_PUBLIC_DATA_SOURCE=mock` | Navegar toda la app sin backend (msw intercepta en el navegador; datos deterministas y mutables en sesión, calcados de `apps/api/src/database/seeds/data`) |
-| **api** | `NEXT_PUBLIC_DATA_SOURCE=api` + `NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1` | Contra NestJS + SQLite (persistente, JWT real) |
+| **api** | `NEXT_PUBLIC_DATA_SOURCE=api` + `NEXT_PUBLIC_API_URL=http://localhost:4000/api/v1` | Contra NestJS + PostgreSQL (persistente, JWT real) |
 
 ## Credenciales de demostración (contraseña `Yamboly2026`, 11 usuarios en `SED-LIMA`)
 | Correo | Nombre | Rol | Línea |
@@ -89,16 +127,18 @@ Los catálogos de planta (líneas, sabores, productos, velocidades estándar, ca
 
 ## Variables de entorno
 - `apps/web/.env.local` (ver `.env.example`): `NEXT_PUBLIC_DATA_SOURCE`, `NEXT_PUBLIC_API_URL`.
-- `apps/api/.env` (ver `.env.example`): `PORT`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `DB_PATH`, `CORS_ORIGIN`, `SWAGGER_PATH`, `PREDICTION_SERVICE_URL` (microservicio Python opcional; sin él se usan reglas), `PREDICTION_TIMEOUT_MS`.
+- `apps/api/.env` (ver `.env.example`): `PORT`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `DATABASE_URL` (PostgreSQL; si está definida manda sobre `DB_PATH`), `DB_PATH` (respaldo SQLite), `CORS_ORIGIN`, `SWAGGER_PATH`, `PREDICTION_SERVICE_URL` (microservicio Python opcional; sin él se usan reglas), `PREDICTION_TIMEOUT_MS`.
 
 ## Scripts
 | Comando | Qué hace |
 |---|---|
 | `pnpm dev` | web + api en paralelo |
+| `pnpm db:up` / `pnpm db:down` / `pnpm db:logs` | PostgreSQL 16 en Docker: levantar / parar / seguir el log |
+| `pnpm db:migrar` | copia `apps/api/data/mes.sqlite` a PostgreSQL (`--reset` para vaciar antes) |
 | `pnpm build` | build de todos los paquetes |
 | `pnpm typecheck` / `pnpm lint` | TypeScript / ESLint en todo el monorepo |
-| `pnpm --filter @mes/api test:e2e` | tests e2e (SQLite en memoria), incluye `catalogs-crud` y `users` sobre el maestro real |
-| `pnpm seed` / `pnpm --filter @mes/api seed` | borra y regenera la base SQLite con los datos maestros reales |
+| `pnpm --filter @mes/api test:e2e` | tests e2e (SQLite en memoria, sin Docker), incluye `catalogs-crud` y `users` sobre el maestro real |
+| `pnpm seed` / `pnpm --filter @mes/api seed` | regenera la base (PostgreSQL o SQLite, según `DATABASE_URL`) con los datos maestros reales |
 | `pnpm --filter @mes/web dev` / `--filter @mes/api dev` | una sola app |
 | `node apps/api/scripts/extraer-maestros.mjs` | regenera `seeds/data/real/*.json` desde el dump Postgres (requiere `pg_restore`) |
 
@@ -144,7 +184,7 @@ Contrato completo (endpoints, modelo `EvaluacionTCI`/`CriterioTCI`, reglas con e
 ## Decisiones de arquitectura
 - **Design System en código antes que las vistas** (`@mes/ui`), tokens 1:1 con las variables de Figma; reglas MDS codificadas (la página es el contenedor, cards solo funcionales, sombras solo en flotantes, un Primary por pantalla, Danger con confirmación).
 - **Contratos compartidos** (`@mes/types` con zod) usados por vistas, mocks msw y DTOs NestJS → cambiar de mock a API no toca las vistas.
-- **SQLite con TypeORM** para arrancar sin infraestructura; migrar a PostgreSQL = cambiar el datasource.
+- **PostgreSQL 16 en Docker con TypeORM**, y un **datasource multi-motor** (`opcionesDataSource`) que cae a SQLite cuando no hay `DATABASE_URL`: los e2e siguen corriendo en memoria y sin Docker, y la app arranca igual en una máquina sin contenedores. Las columnas usan sólo tipos portables (`text`, `integer`, `double precision`, `boolean`, `simple-json`) y los nombres de tabla son explícitos en español, sin palabras reservadas.
 - **IA intercambiable**: `PredictionProvider` (reglas por defecto, HTTP hacia el microservicio scikit-learn cuando exista).
 - **Seguridad en servidor**: JWT + roles por endpoint; sin claves en el cliente.
 - **Baja lógica siempre**: ningún catálogo se borra físicamente si tiene histórico; `DELETE` responde `BajaLogicaResponse` (ver `docs/api-contracts.md`).

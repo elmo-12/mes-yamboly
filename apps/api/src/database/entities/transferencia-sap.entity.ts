@@ -34,7 +34,7 @@ export class TransferenciaSap {
   @Column('text')
   productoCodigo!: string;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   cantidadKg!: number;
 
   /** `MP` · `EP` · `PT`; `null` si el archivo no lo trae. */

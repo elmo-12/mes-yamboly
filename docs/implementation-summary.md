@@ -1,6 +1,6 @@
-# Resumen de implementación — MES Yamboly (28 ago 2026 · fase 2: 3–4 sep 2026 · fase 2b: 4 sep 2026 tarde · fase 3: 4 sep 2026 noche)
+# Resumen de implementación — MES Yamboly (28 ago 2026 · fase 2: 3–4 sep 2026 · fase 2b: 4 sep 2026 tarde · fase 3: 4 sep 2026 noche · fase 4: 4 sep 2026 noche)
 
-Implementación en código del rediseño Figma (`WOfwZEmPx1Hcw7ehaIsnpx`, sección `MES · YAMBOLY`) siguiendo la skill `figma-design-to-code` (`get_design_context` por frame, gates G1/G2–G4/G5). Estado tras la fase 1 (28-ago-2026): **`pnpm typecheck` · `lint` · `build` · `test:e2e` (55/55) en verde**. Estado tras la fase 2 "maestros reales" (4-sep-2026 mañana, ver sección al final de este documento): **`pnpm typecheck` (7/7) · `lint` limpio · `build` (4/4) · `pnpm --filter @mes/api test:e2e` (118/118 en 7 suites) en verde**. Estado tras la fase 2b — ajustes de configuración y tiempo real (4-sep-2026 tarde, sin máquina/equipo ni sedes; ver «Fase 2b» al final): **`pnpm typecheck` en verde · `lint` limpio · `build` en verde · `pnpm --filter @mes/api test:e2e` (114/114 en 7 suites) en verde; `pnpm dev` levanta web (:3000) y api (:4000)**. Estado tras la fase 3 — evidencia real y validación de calidad TCI (4-sep-2026 noche, ver «Fase 3» al final): postest de tesis vaciado de datos hipotéticos, importadores de fuentes externas y motor de validación TCI, invitaciones TSP; **`pnpm typecheck`/`lint`/`build` en verde · `pnpm --filter @mes/api test:e2e` 131/131 en 8 suites** (7 suites de la fase 2b + `evidence-validacion.e2e-spec.ts` nueva; `thesis.e2e-spec.ts` reescrita al flujo real), **98 endpoints** bajo `/api/v1`, **37 entidades** TypeORM.
+Implementación en código del rediseño Figma (`WOfwZEmPx1Hcw7ehaIsnpx`, sección `MES · YAMBOLY`) siguiendo la skill `figma-design-to-code` (`get_design_context` por frame, gates G1/G2–G4/G5). Estado tras la fase 1 (28-ago-2026): **`pnpm typecheck` · `lint` · `build` · `test:e2e` (55/55) en verde**. Estado tras la fase 2 "maestros reales" (4-sep-2026 mañana, ver sección al final de este documento): **`pnpm typecheck` (7/7) · `lint` limpio · `build` (4/4) · `pnpm --filter @mes/api test:e2e` (118/118 en 7 suites) en verde**. Estado tras la fase 2b — ajustes de configuración y tiempo real (4-sep-2026 tarde, sin máquina/equipo ni sedes; ver «Fase 2b» al final): **`pnpm typecheck` en verde · `lint` limpio · `build` en verde · `pnpm --filter @mes/api test:e2e` (114/114 en 7 suites) en verde; `pnpm dev` levanta web (:3000) y api (:4000)**. Estado tras la fase 3 — evidencia real y validación de calidad TCI (4-sep-2026 noche, ver «Fase 3» al final): postest de tesis vaciado de datos hipotéticos, importadores de fuentes externas y motor de validación TCI, invitaciones TSP; **`pnpm typecheck`/`lint`/`build` en verde · `pnpm --filter @mes/api test:e2e` 131/131 en 8 suites** (7 suites de la fase 2b + `evidence-validacion.e2e-spec.ts` nueva; `thesis.e2e-spec.ts` reescrita al flujo real), **98 endpoints** bajo `/api/v1`, **37 entidades** TypeORM. Estado tras la fase 4 — migración a PostgreSQL (4-sep-2026 noche, ver «Fase 4» al final): **base de datos PostgreSQL 16 en Docker (SQLite solo para e2e/fallback)**, las 37 tablas / 1 624 filas migradas conservando ids; **`pnpm typecheck`/`lint`/`build` en verde · `test` 5/5 · `test:e2e` 132/132 en 8 suites**.
 
 ## 1. Figma
 
@@ -23,7 +23,9 @@ Implementación en código del rediseño Figma (`WOfwZEmPx1Hcw7ehaIsnpx`, secci�
 - **Estados implementados:** loading (skeletons por bloque), empty, no-results, error (+ reintentar), success/toast, validación zod por paso, confirmación (Danger siempre con modal), disabled (Primary base con overlay), read-only, forbidden (RoleGate), 404, unauthorized (redirección).
 - **Responsive:** verificado 1440 / 1280 / 1024 / 768 / 390 sin scroll horizontal del body; tablas con scroll propio; grids que reflowan; Modo TV 1920 y 1440.
 
-## 3. Backend (`apps/api`, NestJS 11 + TypeORM + SQLite)
+## 3. Backend (`apps/api`, NestJS 11 + TypeORM + PostgreSQL 16)
+
+> **Base de datos: PostgreSQL 16 en Docker; SQLite solo para e2e/fallback.** Desde la fase 4 (4-sep-2026) `apps/api/src/database/data-source.ts` expone `opcionesDataSource()`, que elige `type: 'postgres'` cuando hay `DATABASE_URL` y `type: 'sqlite'` en caso contrario. `docker-compose.yml` en la raíz levanta `postgres:16-alpine` (`pnpm db:up`), los e2e fuerzan `DATABASE_URL=''` + `DB_PATH=':memory:'` y siguen corriendo sin Docker, y `apps/api/scripts/migrar-sqlite-a-postgres.ts` (`pnpm db:migrar`) trasladó las 37 tablas / 1 624 filas del SQLite anterior conservando los ids. Ver «Fase 4» al final.
 
 - **Módulos (12):** auth, users, catalogs, orders, downtimes, scrap, speeds, realtime, reports, alerts, analytics, evidence (2 controllers: `evidence` + `survey`, la encuesta pública). Estructura `module / controller / service / dto / mappers`, entidades en `database/entities` (**37** vigentes desde la fase 3 — 4 nuevas: `importacion_fuente`, `lectura_sensor`, `solicitud_externa`, `transferencia_sap`; 33 al cierre de la fase 2b, antes 34/35 con `Maquina` y `Sede`, ambas retiradas en fase 2b), seeds ordenados (`SEEDERS`) que reproducen los mocks y se ejecutan al arrancar si la BD está vacía (`pnpm seed` la regenera).
 - **Endpoints:** **98** rutas bajo `/api/v1` vigentes desde la fase 3 (91 al cierre de la fase 2b, 95 al cierre de la fase 2, 79 antes de la fase 2; contrato en `docs/api-contracts.md`) — la fase 3 suma 7 rutas nuevas en `evidence.controller.ts` (fuentes externas: listar, plantilla, importar, historial de importaciones — 4; TCI: validar, resumen — 2, `PATCH /evidencia/tci/:id` ya existía y se adaptó al nuevo modelo de criterios; `POST /evidencia/tsp/invitaciones` — 1), verificado contando `@Get|@Post|@Patch|@Delete|@Put` en los 13 `*.controller.ts` de `apps/api/src/modules/**` (17 en `evidence.controller.ts` + 2 en `survey.controller.ts`, antes 10 + 2). Colecciones `{data, meta}`, errores `{statusCode, code, message, details}` (422 con `campo → mensaje`), SSE `/tiempo-real/stream`, descarga de XLSX reales (exceljs) en reportes y evidencia (una hoja por anexo 02–06, más 3 plantillas de fuentes externas), encuesta pública con token de un solo uso.
@@ -60,7 +62,7 @@ Cambio de modo: `NEXT_PUBLIC_DATA_SOURCE=mock|api` en `apps/web/.env.local` (por
 | ¿Contratos coherentes front↔back? | Sí: `@mes/types` compartido; 11 divergencias corregidas en integración |
 | ¿Compila? | Sí: `pnpm typecheck`, `lint`, `build` en verde (4 paquetes) |
 | ¿Sin errores de consola? | Sí: 0 errores/warnings de React/Next/recharts/Radix en todas las rutas (QA) |
-| ¿Arquitectura escalable? | Monorepo por paquetes, features por dominio, módulos NestJS por dominio, contratos compartidos, proveedor de IA intercambiable, SQLite → PostgreSQL cambiando el datasource |
+| ¿Arquitectura escalable? | Monorepo por paquetes, features por dominio, módulos NestJS por dominio, contratos compartidos, proveedor de IA intercambiable, **PostgreSQL 16 en Docker** con datasource multi-motor (SQLite como respaldo y en e2e) |
 | ¿README permite ejecutar desde cero? | Sí (`README.md`) |
 
 ## 6. Pendientes conocidos (estado al cierre de la fase 1, 28-ago-2026)
@@ -300,3 +302,51 @@ pnpm build` en verde · `pnpm --filter @mes/api test:e2e` **131/131 en 8 suites*
 - **Evidencia fotográfica de merma** (`Merma.evidenciaUrl` sin persistir) sigue pendiente, sin relación con esta fase (ver `E2-07` en `docs/product-backlog.md`).
 - **QA de integración de la fase 3** todavía no corrió (recorrido ruta por ruta en `mock`/`api`, fidelidad, responsive, consola); ver `docs/qa-report.md` § «QA fase 3 (pendiente de la pasada de integración)».
 - **Plantillas de evidencia sin frame Figma propio**: el flujo de importación (modal, vista previa, mapeo de columnas) y el drawer de revisión de criterios se diseñaron en código sobre los patrones MDS existentes, sin una lectura de Figma dedicada (ver `docs/figma-map.md` / `docs/figma-specs-modulos.md` § «Desviaciones respecto a Figma»).
+
+---
+
+## Fase 4 — PostgreSQL 16 en Docker (4-sep-2026, noche)
+
+**Base de datos: PostgreSQL 16 en Docker; SQLite solo para e2e/fallback.** La API pasa de SQLite a PostgreSQL sin perder un solo registro: las **37 tablas / 1 624 filas** de `apps/api/data/mes.sqlite` —incluidos los datos creados a mano ese día (la invitación TSP `tsp-2026-01` respondida por Jorge Quispe)— se migraron conservando los ids.
+
+### Decisiones
+
+- **Un solo interruptor.** `opcionesDataSource()` (`src/database/data-source.ts`) devuelve `type: 'postgres'` si `DATABASE_URL` tiene valor y `type: 'sqlite'` si no. `database.module.ts`, `seed.ts`, los e2e y el script de migración comparten esa función, así que no hay dos verdades sobre qué motor está activo.
+- **Los e2e no dependen de Docker.** `test/setup-e2e.ts` fuerza `DATABASE_URL=''` además de `DB_PATH=':memory:'`; como `ConfigModule` mezcla `{...envFile, ...process.env}`, `process.env` gana sobre `apps/api/.env` y las 8 suites siguen en SQLite en memoria.
+- **`synchronize: true` por ahora** en los dos motores, igual que antes. Las migraciones formales de TypeORM quedan como pendiente para el despliegue.
+- **Migración por repositorios, no por SQL.** El script copia con `find()` + `INSERT … ON CONFLICT DO NOTHING` en lotes de 500 para que TypeORM haga las conversiones de tipo (booleanos 0/1 → `boolean`, `simple-json` → texto JSON) y para que re-ejecutarlo sea idempotente.
+
+### Tipos de columna ajustados (portabilidad)
+
+SQLite es de tipado dinámico y aceptaba valores que PostgreSQL rechaza. Auditando el archivo contra los metadatos de las entidades aparecieron dos correcciones:
+
+| Cambio | Columnas | Motivo |
+|---|---|---|
+| `'real'` → `'double precision'` | **39** columnas en 16 entidades (OEE, KPIs, velocidades, umbrales, mermas…) | `real` en PostgreSQL es `float4` (≈6 dígitos); `double precision` es lo que SQLite ya usaba internamente para `REAL` |
+| `'integer'` → `'double precision'` | `indicador_linea.velocidadEstandar` | Guardaba `velocidadUnidMin` con decimal (280,5 · 483,3): SQLite lo aceptaba en una columna `INTEGER`, PostgreSQL falla con `invalid input syntax for type integer` |
+
+Lo que **no** hizo falta tocar: no hay columnas `datetime` (las fechas son `text` ISO), `simple-json` es portable, los nombres de tabla son explícitos en español (`usuario`, `orden_fabricacion`, `parada`…) y ninguno choca con una palabra reservada de PostgreSQL, y las búsquedas (`search` de productos, órdenes, alertas y usuarios) se resuelven en memoria con `normalizar()` —sin `LIKE` en SQL—, así que siguen siendo insensibles a mayúsculas y tildes sin necesidad de `ILike`.
+
+### Archivos
+
+- `docker-compose.yml` (nuevo, raíz): `postgres:16-alpine`, base `mes_yamboly`, usuario `mes`, volumen nombrado `mes_pgdata`, `healthcheck` con `pg_isready`, `restart: unless-stopped`.
+- `apps/api/scripts/migrar-sqlite-a-postgres.ts` (nuevo): migración con tabla de conteos `entidad | sqlite | postgres`, salida distinta de 0 si algún conteo difiere, opciones `--reset`, `--sqlite=`, `--url=`.
+- `src/database/data-source.ts`: `opcionesDataSource()` + `vaciarTablas()` (TRUNCATE … CASCADE en PostgreSQL, DELETE por tabla en SQLite).
+- `src/config/env.validation.ts`: `DATABASE_URL` (`z.string().url().optional().or(z.literal(''))`), `DB_PATH` se conserva.
+- `src/database/seed.ts`: con `DATABASE_URL` vacía las tablas en vez de borrar el archivo.
+- `src/database/data-source.spec.ts` (nuevo): 5 pruebas unitarias de la selección de driver.
+- Scripts: `pnpm db:up` · `db:down` · `db:logs` · `db:migrar`; `pnpm --filter @mes/api migrar:pg`.
+
+### Verificación
+
+Migración: 37/37 tablas con conteos idénticos, **1 624 filas**; `usuario` 11, `encuesta_respuesta` 1 (con su `simple-json` `[5,4,5,4,5,4,5,4]` y el comentario intactos). Re-ejecutar el script sin `--reset` no duplica nada.
+
+Contra PostgreSQL en caliente: `SeedOnBootService` **no** re-siembra · login `jefe@yamboly.lat` 200 · `GET /evidencia/tsp` 1 respuesta con `pctAcuerdo` 100 · `/lineas` 9 · `/productos` 201 · `/tiempo-real/lineas` 9 con estados mixtos · `/ordenes?periodo=hoy` 8 filas · `/reportes/indicadores` 200 · `POST /paradas` 201 (con su evento TRI automático y su entrada de bitácora — los tres registros de prueba se borraron después) · exportación XLSX 200 (19 KB, `Microsoft Excel 2007+`).
+
+Gates: `pnpm typecheck` · `lint` · `build` en verde; `pnpm --filter @mes/api test` 5/5 (nuevo spec del driver); `pnpm --filter @mes/api test:e2e` **132/132** en 8 suites, aún sobre SQLite en memoria.
+
+### Pendientes
+
+- **Migraciones de TypeORM** en vez de `synchronize: true` antes de cualquier despliegue real (hoy el esquema se deriva de las entidades en cada arranque).
+- **Contraseña `mes_dev` en claro** en `docker-compose.yml` y `.env.example`: vale para desarrollo local, no para producción.
+- **Sin backup automatizado**: el volumen `mes_pgdata` es la única copia; el SQLite original queda como respaldo histórico en `apps/api/data/mes.sqlite`.

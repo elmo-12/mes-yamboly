@@ -15,10 +15,10 @@ export class IndicadorDiario {
   @Column('text')
   fecha!: string;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   oee!: number;
 
-  @Column('real', { default: 85 })
+  @Column('double precision', { default: 85 })
   meta!: number;
 
   /** Alertas que el modelo predijo ese día. */

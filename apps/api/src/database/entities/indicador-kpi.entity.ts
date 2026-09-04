@@ -22,16 +22,16 @@ export class IndicadorKpi {
   @Column('text')
   label!: string;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   valor!: number;
 
   @Column('text', { default: '' })
   unidad!: string;
 
-  @Column('real', { nullable: true })
+  @Column('double precision', { nullable: true })
   meta!: number | null;
 
-  @Column('real', { nullable: true })
+  @Column('double precision', { nullable: true })
   deltaValor!: number | null;
 
   @Column('text', { nullable: true })
@@ -41,7 +41,7 @@ export class IndicadorKpi {
   deltaFavorableSiSube!: boolean;
 
   /** Delta frente al mismo periodo del año anterior. */
-  @Column('real', { nullable: true })
+  @Column('double precision', { nullable: true })
   deltaAnioValor!: number | null;
 
   @Column('integer', { default: 0 })

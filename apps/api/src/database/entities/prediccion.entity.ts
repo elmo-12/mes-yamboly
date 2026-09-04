@@ -19,7 +19,7 @@ export class Prediccion {
   @Column('text')
   prediccion!: string;
 
-  @Column('real', { default: 0 })
+  @Column('double precision', { default: 0 })
   probabilidad!: number;
 
   @Column('text')
