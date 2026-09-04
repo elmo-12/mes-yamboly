@@ -56,7 +56,7 @@ export function ConfiguracionPage() {
     <>
       <AppPageHeader
         title="Configuración"
-        subtitle="Catálogos maestros · codificación uniforme de causas, máquinas y umbrales"
+        subtitle="Catálogos maestros · codificación uniforme de causas, máquinas, productos, sedes y usuarios"
       />
 
       <Tabs value={tab} onValueChange={cambiarTab}>

@@ -288,6 +288,12 @@ export class CatalogsService {
     return this.enriquecerPares(filas);
   }
 
+  /** Mayor correlativo `VE-####` en uso; 0 si aún no hay pares. */
+  private async maximoCorrelativoVelocidad(): Promise<number> {
+    const pares = await this.velocidades.find({ select: { id: true } });
+    return pares.reduce((maximo, { id }) => Math.max(maximo, Number(id.slice(3)) || 0), 0);
+  }
+
   async crearVelocidadEstandar(
     dto: CreateVelocidadEstandarDto,
   ): Promise<VelocidadEstandarDto> {
@@ -308,9 +314,12 @@ export class CatalogsService {
       });
     }
 
-    const total = await this.velocidades.count();
+    /* El correlativo sale del id máximo, no del total: el maestro llega hasta
+       VE-0340 con 333 pares vivos (los pares de productos filtrados no se
+       sembraron), así que `count() + 1` devolvía un id ya existente y `save()`
+       sobrescribía el par de otro producto. */
     const par = this.velocidades.create({
-      id: `VE-${String(total + 1).padStart(4, '0')}`,
+      id: `VE-${String((await this.maximoCorrelativoVelocidad()) + 1).padStart(4, '0')}`,
       productoId: dto.productoId,
       lineaId: dto.lineaId,
       velocidadUnidHora: dto.velocidadUnidHora,

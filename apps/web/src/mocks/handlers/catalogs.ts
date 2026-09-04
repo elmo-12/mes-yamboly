@@ -345,6 +345,17 @@ function enriquecerPar(par: VelocidadEstandar): VelocidadEstandarListItem {
   };
 }
 
+/**
+ * Correlativo del alta a partir del id máximo, no del tamaño del catálogo: el
+ * maestro llega hasta `VE-0340` con 333 pares vivos (los pares de productos
+ * filtrados no se sembraron), así que `length + 1` devolvía un id ya en uso y
+ * el alta pisaba el par de otro producto. Espejo de `catalogs.service.ts`.
+ */
+function siguienteIdVelocidad(pares: readonly VelocidadEstandar[]): string {
+  const maximo = pares.reduce((n, { id }) => Math.max(n, Number(id.slice(3)) || 0), 0);
+  return `VE-${String(maximo + 1).padStart(4, '0')}`;
+}
+
 const velocidadesHandlers = [
   http.get(`${API}/velocidades-estandar`, async ({ request }) => {
     const simulado = await preludio(request);
@@ -400,7 +411,7 @@ const velocidadesHandlers = [
 
     const velocidadUnidHora = numero(body.velocidadUnidHora);
     const par: VelocidadEstandar = {
-      id: `VE-${String(store.velocidadesEstandar.length + 1).padStart(4, '0')}`,
+      id: siguienteIdVelocidad(store.velocidadesEstandar),
       productoId,
       lineaId,
       velocidadUnidHora,

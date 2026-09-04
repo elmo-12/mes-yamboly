@@ -8,7 +8,7 @@ import { formatNumber } from '@mes/shared';
 import { useCausasMermaArbol, useGuardarCausaMerma, useLineas } from '@/features/catalogs/hooks';
 import { aplanarCausas } from '@/features/catalogs/causas';
 import { CausaMermaDetalle } from './CausaMermaDetalle';
-import { CausasTree, type GrupoCausas } from './CausasTree';
+import { CausasTree } from './CausasTree';
 import { NuevaCausaModal, type NivelOption } from './NuevaCausaModal';
 
 const NIVELES: readonly NivelOption[] = [
@@ -60,16 +60,6 @@ export function CausasMermaTab() {
   const activas = planas.filter((c) => c.estado === 'activo').length;
   const filtro = busqueda.trim().toLowerCase();
 
-  /* Un grupo por tipo raíz (MP-01 … MP-05); bajo cada uno, sus clasificaciones. */
-  const grupos = React.useCallback(
-    (nodos: readonly CausaMermaNodo[]): readonly GrupoCausas<CausaMermaNodo>[] =>
-      nodos.map((raiz) => ({
-        id: raiz.id,
-        label: `${raiz.codigo} · ${raiz.nombre}`,
-        nodos: raiz.hijos,
-      })),
-    [],
-  );
 
   if (error) {
     return (
@@ -147,9 +137,12 @@ export function CausasMermaTab() {
                 }
               />
             ) : (
+              /* Sin `grupos`: los 5 tipos raíz (MP-01 … MP-05) se pintan como
+                 nodos de nivel 0 del propio árbol, así son seleccionables y
+                 editables desde el detalle igual que clasificaciones y causas
+                 (como encabezado de grupo no lo eran). */
               <CausasTree
                 nodos={arbol}
-                grupos={grupos}
                 seleccionadaId={seleccionadaId}
                 onSelect={(n) => setSeleccionadaId(n.id)}
                 filtro={filtro}
