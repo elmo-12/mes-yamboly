@@ -31,13 +31,13 @@ describe('ordenes (e2e)', () => {
 
   it('filtra por línea, turno y estado', async () => {
     const { body } = await request(app.getHttpServer())
-      .get('/api/v1/ordenes?lineaId=LIN-02&estado=por_validar&pageSize=100')
+      .get('/api/v1/ordenes?lineaId=LIN-LLEN-A1&estado=por_validar&pageSize=100')
       .set(auth())
       .expect(200);
 
     expect(body.data.length).toBeGreaterThan(0);
     for (const orden of body.data) {
-      expect(orden.lineaId).toBe('LIN-02');
+      expect(orden.lineaId).toBe('LIN-LLEN-A1');
       expect(orden.estado).toBe('por_validar');
     }
   });
@@ -70,15 +70,15 @@ describe('ordenes (e2e)', () => {
     expect(body).toMatchObject({
       id: 'ORD-0815',
       codigo: 'OF-2026-0815',
-      lineaCodigo: 'L2',
-      lineaNombre: 'Conos',
-      productoNombre: 'Cono Vainilla 120 ml',
-      maquinistaNombre: 'Jorge Quispe',
+      lineaCodigo: 'LLEN-A1',
+      lineaNombre: 'Llenadora A1',
+      productoNombre: 'CORNELLO VAI 12X120ML',
+      maquinistaNombre: 'Luis Vargas',
       supervisorNombre: 'Ana Ríos',
-      lote: 'L-260828-02',
-      planificado: 10000,
-      producido: 9840,
-      conteoCodificadora: 9653,
+      lote: 'L-260828-A1',
+      planificado: 88000,
+      producido: 86240,
+      conteoCodificadora: 84601,
       estado: 'por_validar',
       paradasCount: 4,
       mermasKg: 5,
@@ -107,9 +107,9 @@ describe('ordenes (e2e)', () => {
     expect(body.data).toHaveLength(4);
     expect(body.resumen).toEqual({ cantidad: 4, minutos: 42, afectanOee: 3 });
     expect(body.data[0]).toMatchObject({
-      causaCodigo: 'PL-03-02',
-      causaNombre: 'CIP entre sabores',
-      maquinaNombre: 'Tolva de cobertura L2',
+      causaCodigo: 'PP-01-10',
+      causaNombre: 'Cambio De Sabor',
+      maquinaNombre: 'Llenadora LLEN A1',
     });
   });
 
@@ -124,7 +124,7 @@ describe('ordenes (e2e)', () => {
       .get('/api/v1/ordenes/ORD-0815/velocidades')
       .set(auth())
       .expect(200);
-    expect(velocidades.data[0]).toMatchObject({ velocidadReal: 118, desvioPct: -1.7 });
+    expect(velocidades.data[0]).toMatchObject({ velocidadReal: 131, desvioPct: -1.7 });
   });
 
   it('exige el checklist completo al validar (422) y escribe la bitácora al validar', async () => {
@@ -174,5 +174,56 @@ describe('ordenes (e2e)', () => {
       })
       .expect(409);
     expect(repetida.body.code).toBe('CONFLICT');
+  });
+
+  it('exige un par producto×línea activo al crear una orden (422 en productoId)', async () => {
+    /* PRD-1120002 sólo tiene velocidad estándar en LIN-LLEN-A1 (VE-0070). */
+    const { body } = await request(app.getHttpServer())
+      .post('/api/v1/ordenes')
+      .set(auth())
+      .send({
+        codigo: 'OF-2026-9001',
+        lineaId: 'LIN-EXTR-2',
+        productoId: 'PRD-1120002',
+        lote: 'L-TEST-9001',
+        vencimiento: '2027-02-28',
+        turno: 'D',
+        planificado: 1000,
+        maquinistaId: 'USR-02',
+        supervisorId: 'USR-03',
+        operarios: 4,
+      })
+      .expect(422);
+
+    expect(body.code).toBe('VALIDATION_ERROR');
+    expect(body.details).toHaveProperty('productoId');
+  });
+
+  it('crea una orden con el par activo y congela la velocidad estándar', async () => {
+    const { body } = await request(app.getHttpServer())
+      .post('/api/v1/ordenes')
+      .set(auth())
+      .send({
+        codigo: 'OF-2026-9002',
+        lineaId: 'LIN-LLEN-A1',
+        productoId: 'PRD-1120002',
+        lote: 'L-TEST-9002',
+        vencimiento: '2027-02-28',
+        turno: 'D',
+        planificado: 1000,
+        maquinistaId: 'USR-07',
+        supervisorId: 'USR-03',
+        operarios: 4,
+      })
+      .expect(201);
+
+    expect(body).toMatchObject({
+      codigo: 'OF-2026-9002',
+      lineaId: 'LIN-LLEN-A1',
+      productoId: 'PRD-1120002',
+      velocidadEstandarId: 'VE-0070',
+      velocidadEstandar: 133.3,
+      estado: 'en_curso',
+    });
   });
 });

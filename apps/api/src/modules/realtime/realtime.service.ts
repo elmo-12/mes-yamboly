@@ -16,7 +16,7 @@ import { turnoInfo, turnoPorFecha, turnoRango } from '@mes/shared';
 import { NoEncontradoException } from '../../common/exceptions/business.exception';
 import { LookupsService, type Lookups } from '../../common/mappers/lookups.service';
 import { ALERTS_LOOKUP, type AlertsLookup } from '../../common/services/alerts-lookup';
-import { ahoraIso, hoyIso, minutosEntreIso, redondear, toList } from '../../common/utils/query';
+import { ahoraIso, diaOperativo, minutosEntreIso, redondear, toList } from '../../common/utils/query';
 import {
   DeteccionIoT,
   Merma,
@@ -61,9 +61,10 @@ export class RealtimeService {
       .sort((a, b) => a.id.localeCompare(b.id));
     if (lineaIds.length > 0) lineas = lineas.filter((l) => lineaIds.includes(l.id));
 
+    const dia = await this.diaOperativoActual();
     const estadoLineas: LineaEstado[] = [];
     for (const linea of lineas) {
-      estadoLineas.push(await this.estadoDeLinea(linea.id, lookups));
+      estadoLineas.push(await this.estadoDeLinea(linea.id, lookups, dia));
     }
 
     return {
@@ -103,7 +104,8 @@ export class RealtimeService {
     const linea = lookups.lineas.get(lineaId);
     if (!linea) throw new NoEncontradoException('Línea');
 
-    const contexto = await this.contexto(lineaId, lookups);
+    const dia = await this.diaOperativoActual();
+    const contexto = await this.contexto(lineaId, lookups, dia);
     const eventos: TimelineEvento[] = [];
     const orden = contexto.orden;
 
@@ -182,11 +184,21 @@ export class RealtimeService {
     };
   }
 
+  /**
+   * Fecha (`YYYY-MM-DD`) que este módulo trata como "hoy" al elegir la orden
+   * vigente de cada línea. Ver {@link diaOperativo} para la regla completa:
+   * evita que el estado de las líneas se congele en `sin_orden` cuando el
+   * reloj real del servidor ya no coincide con el `HOY` fijo de los seeds.
+   */
+  private async diaOperativoActual(): Promise<string> {
+    const ordenes = await this.ordenes.find({ select: { fecha: true, estado: true } });
+    return diaOperativo(ordenes);
+  }
+
   /** Reúne los registros vivos que determinan el estado de una línea. */
-  private async contexto(lineaId: string, lookups: Lookups): Promise<ContextoLinea> {
-    const hoy = hoyIso();
+  private async contexto(lineaId: string, lookups: Lookups, dia: string): Promise<ContextoLinea> {
     const delDia = (await this.ordenes.find({ where: { lineaId } }))
-      .filter((o) => o.fecha === hoy)
+      .filter((o) => o.fecha === dia)
       .sort((a, b) => b.inicio.localeCompare(a.inicio));
     const ordenEnCurso = delDia.find((o) => o.estado === 'en_curso') ?? null;
     const orden = ordenEnCurso ?? delDia[0] ?? null;
@@ -223,9 +235,9 @@ export class RealtimeService {
     };
   }
 
-  private async estadoDeLinea(lineaId: string, lookups: Lookups): Promise<LineaEstado> {
+  private async estadoDeLinea(lineaId: string, lookups: Lookups, dia: string): Promise<LineaEstado> {
     const linea = lookups.lineas.get(lineaId)!;
-    const ctx = await this.contexto(lineaId, lookups);
+    const ctx = await this.contexto(lineaId, lookups, dia);
     const ahora = ahoraIso();
 
     /* Prioridad: parada abierta → detección sugerida → sin orden → alerta → produciendo. */

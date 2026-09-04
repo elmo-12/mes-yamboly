@@ -212,20 +212,20 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       expect(body.tendenciaOee.at(-1)).toMatchObject({ oee: 79.8, meta: 85 });
 
       /* OEE por línea se deriva con `computeOee` sobre las magnitudes crudas. */
-      expect(body.oeePorLinea).toHaveLength(5);
+      expect(body.oeePorLinea).toHaveLength(9);
       expect(body.oeePorLinea[0]).toMatchObject({
-        lineaCodigo: 'L1',
+        lineaCodigo: 'EXTR-2',
         oee: 82.1,
         disponibilidad: 93.4,
         desempeno: 89.6,
         calidad: 98.1,
       });
 
-      expect(body.comparativaTurno.map((t: { turno: string }) => t.turno)).toEqual(['M', 'T', 'N']);
+      expect(body.comparativaTurno.map((t: { turno: string }) => t.turno)).toEqual(['D', 'N']);
     });
 
     it('acepta el alias 7d y el filtro de línea recalculando los KPI', async () => {
-      const { body } = await get('/reportes/indicadores?periodo=7d&lineaId=LIN-04').expect(200);
+      const { body } = await get('/reportes/indicadores?periodo=7d&lineaId=LIN-LLEN-A2').expect(200);
       expect(body.oeePorLinea).toHaveLength(1);
       expect(body.kpis.find((k: { id: string }) => k.id === 'oee').valor).toBe(71.8);
     });
@@ -233,10 +233,10 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
     it('GET /reportes/paradas devuelve Pareto acumulado y donut de 612 min', async () => {
       const { body } = await get('/reportes/paradas').expect(200);
       expect(body.kpis.map((k: { valor: number }) => k.valor)).toEqual([48, 612, 12.8, 4.3]);
-      expect(body.pareto[0]).toMatchObject({ causaCodigo: 'PM-01', minutos: 142 });
+      expect(body.pareto[0]).toMatchObject({ causaCodigo: 'PN-02', minutos: 179 });
       expect(body.pareto.at(-1).acumuladoPct).toBe(100);
-      expect(body.donut.map((d: { valor: number }) => d.valor)).toEqual([230, 138, 244]);
-      expect(body.detallePorCausa).toHaveLength(7);
+      expect(body.donut.map((d: { valor: number }) => d.valor)).toEqual([211, 171, 230]);
+      expect(body.detallePorCausa).toHaveLength(5);
     });
 
     it('GET /reportes/mermas suma 412 kg entre líneas y causas', async () => {
@@ -247,7 +247,7 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
         0,
       );
       expect(totalLineas).toBe(412);
-      expect(body.heatmap).toHaveLength(12);
+      expect(body.heatmap).toHaveLength(10);
       expect(body.tabla.reduce((a: number, t: { kg: number }) => a + t.kg, 0)).toBe(412);
     });
 
@@ -287,17 +287,19 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       expect(body.modelo).toMatchObject({ version: 'v3.2', eventos: 2140, activo: true });
       expect(body.kpis).toMatchObject({ precision: 81, recall: 77, alertas30d: 142 });
       expect(body.insights).toHaveLength(3);
+      /* Top-5 de riesgo (no una fila por línea): lista curada en
+       * `analytics.constants.ts`, ya migrada a códigos de línea reales. */
       expect(body.riesgoPorLinea).toHaveLength(5);
       expect(body.prediccionesActivas.length).toBeGreaterThan(0);
     });
 
-    it('GET /analitica/patrones calcula el heatmap de 7 causas × 3 turnos', async () => {
+    it('GET /analitica/patrones calcula el heatmap de 5 causas × 2 turnos', async () => {
       const { body } = await get('/analitica/patrones').expect(200);
-      expect(body.heatmap).toHaveLength(21);
-      const pm01Tarde = body.heatmap.find(
-        (c: { fila: string; columna: string }) => c.fila === 'PM-01' && c.columna === 'T',
+      expect(body.heatmap).toHaveLength(10);
+      const pn02Dia = body.heatmap.find(
+        (c: { fila: string; columna: string }) => c.fila === 'PN-02' && c.columna === 'D',
       );
-      expect(pm01Tarde.valor).toBe(72);
+      expect(pn02Dia.valor).toBe(96);
       expect(body.recurrencias).toHaveLength(6);
     });
 

@@ -18,14 +18,15 @@ describe('paradas y detecciones IoT (e2e)', () => {
   const auth = () => ({ Authorization: `Bearer ${token}` });
 
   it('crea una parada (201) y la deja abierta', async () => {
+    /* ORD-0814 corre en la Llenadora M2; MAQ-19 es su dosificadora. */
     const { body } = await request(app.getHttpServer())
       .post('/api/v1/paradas')
       .set(auth())
       .send({
         ordenId: 'ORD-0814',
-        lineaId: 'LIN-01',
-        maquinaId: 'MAQ-01',
-        causaId: 'CPA-PM-01-02',
+        lineaId: 'LIN-LLEN-M2',
+        maquinaId: 'MAQ-19',
+        causaId: 'CPA-PN-04-02',
         inicio: '2026-08-28T14:10:00',
         accionTomada: 'Se retiró el material atascado y se limpió la mordaza',
         responsableId: 'USR-07',
@@ -35,9 +36,9 @@ describe('paradas y detecciones IoT (e2e)', () => {
 
     expect(body).toMatchObject({
       ordenId: 'ORD-0814',
-      causaCodigo: 'PM-01-02',
-      tipoCausaCodigo: 'PM-01',
-      lineaCodigo: 'L1',
+      causaCodigo: 'PN-04-02',
+      tipoCausaCodigo: 'PN-04',
+      lineaCodigo: 'LLEN-M2',
       origen: 'manual',
       fin: null,
     });
@@ -63,9 +64,9 @@ describe('paradas y detecciones IoT (e2e)', () => {
       .set(auth())
       .send({
         ordenId: 'ORD-0814',
-        lineaId: 'LIN-01',
-        maquinaId: 'MAQ-01',
-        causaId: 'CPA-PM-01-02',
+        lineaId: 'LIN-LLEN-M2',
+        maquinaId: 'MAQ-19',
+        causaId: 'CPA-PN-04-02',
         inicio: '2026-08-28T15:00:00',
         accionTomada: 'corto',
         responsableId: 'USR-07',
@@ -74,15 +75,23 @@ describe('paradas y detecciones IoT (e2e)', () => {
     expect(body.code).toBe('VALIDATION_ERROR');
   });
 
-  it('exige el número de solicitud cuando la causa lo requiere (422)', async () => {
+  /**
+   * Ninguna de las 83 causas de parada del maestro real trae
+   * `requiereSolicitud: true` (esa exigencia se movió al árbol de causas de
+   * merma — ver el caso homónimo en `realtime.e2e-spec.ts`), así que la rama
+   * de `numeroSolicitud` de `DowntimesService.crear` ya no es alcanzable
+   * desde datos reales. Se reutiliza el slot del test para cubrir la otra
+   * validación de negocio de la misma línea (máquina inexistente).
+   */
+  it('rechaza una máquina inexistente con 422', async () => {
     const { body } = await request(app.getHttpServer())
       .post('/api/v1/paradas')
       .set(auth())
       .send({
         ordenId: 'ORD-0814',
-        lineaId: 'LIN-01',
-        maquinaId: 'MAQ-01',
-        causaId: 'CPA-PM-01-01',
+        lineaId: 'LIN-LLEN-M2',
+        maquinaId: 'MAQ-NO-EXISTE',
+        causaId: 'CPA-PN-04-02',
         inicio: '2026-08-28T15:00:00',
         accionTomada: 'Se reemplazó la faja y se verificó tensión de rodillos',
         responsableId: 'USR-07',
@@ -90,7 +99,7 @@ describe('paradas y detecciones IoT (e2e)', () => {
       .expect(422);
 
     expect(body.code).toBe('VALIDATION_ERROR');
-    expect(body.details).toHaveProperty('numeroSolicitud');
+    expect(body.details).toHaveProperty('maquinaId');
   });
 
   it('rechaza una causa inexistente con 422', async () => {
@@ -99,8 +108,8 @@ describe('paradas y detecciones IoT (e2e)', () => {
       .set(auth())
       .send({
         ordenId: 'ORD-0814',
-        lineaId: 'LIN-01',
-        maquinaId: 'MAQ-01',
+        lineaId: 'LIN-LLEN-M2',
+        maquinaId: 'MAQ-19',
         causaId: 'CPA-NO-EXISTE',
         inicio: '2026-08-28T15:00:00',
         accionTomada: 'Se corrigió la condición y se reinició la línea',
@@ -110,20 +119,21 @@ describe('paradas y detecciones IoT (e2e)', () => {
   });
 
   it('registra en bitácora el cambio de causa al editar', async () => {
+    /* PAR-0815-02 nace con causaId CPA-PN-04-01 (PN-04-01) en el seed. */
     const { body: editada } = await request(app.getHttpServer())
       .patch('/api/v1/paradas/PAR-0815-02')
       .set(auth())
-      .send({ causaId: 'CPA-PO-06-02', motivoEdicion: 'Reclasificada tras revisión' })
+      .send({ causaId: 'CPA-PP-01-01', motivoEdicion: 'Reclasificada tras revisión' })
       .expect(200);
 
-    expect(editada.causaCodigo).toBe('PO-06-02');
+    expect(editada.causaCodigo).toBe('PP-01-01');
 
     const { body } = await request(app.getHttpServer())
       .get('/api/v1/ordenes/ORD-0815/bitacora?tipo=edicion')
       .set(auth())
       .expect(200);
 
-    expect(body.data.some((e: { texto: string }) => e.texto.includes('PO-06-01 → PO-06-02'))).toBe(
+    expect(body.data.some((e: { texto: string }) => e.texto.includes('PN-04-01 → PP-01-01'))).toBe(
       true,
     );
   });
@@ -135,10 +145,10 @@ describe('paradas y detecciones IoT (e2e)', () => {
       .expect(200);
 
     expect(body.data).toHaveLength(1);
-    expect(body.data[0]).toMatchObject({ id: 'IOT-L3-01', lineaCodigo: 'L3', minutos: 3 });
+    expect(body.data[0]).toMatchObject({ id: 'IOT-EXTR2-01', lineaCodigo: 'EXTR-2', minutos: 3 });
 
     const { body: descartada } = await request(app.getHttpServer())
-      .post('/api/v1/detecciones-iot/IOT-L3-01/descartar')
+      .post('/api/v1/detecciones-iot/IOT-EXTR2-01/descartar')
       .set(auth())
       .expect(200);
     expect(descartada.estado).toBe('descartada');
