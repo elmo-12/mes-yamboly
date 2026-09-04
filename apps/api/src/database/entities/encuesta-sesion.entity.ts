@@ -9,6 +9,11 @@ export class EncuestaSesion {
   @PrimaryColumn('text')
   token!: string;
 
+  /** Id del usuario invitado (`usuario.id`); nullable por compatibilidad con datos previos. */
+  @Column('text', { nullable: true })
+  usuarioId?: string | null;
+
+  /** Nombre del invitado, copiado del usuario al crear la invitación. */
   @Column('text')
   invitado!: string;
 

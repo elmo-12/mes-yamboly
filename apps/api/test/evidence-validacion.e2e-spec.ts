@@ -421,14 +421,31 @@ describe('evidencia · importación y validación de calidad (e2e)', () => {
     expect(vacio.body).toMatchObject({ invitados: 0, respuestas: 0, pctAcuerdo: null, estado: 'sin_datos' });
     expect(vacio.body.invitaciones).toHaveLength(0);
 
+    /* 422: el usuario no existe. */
+    await post('/evidencia/tsp/invitaciones')
+      .send({ usuarioId: 'USR-99' })
+      .expect(422)
+      .then(({ body }: { body: { details?: Record<string, string> } }) => {
+        expect(body.details?.usuarioId).toEqual(expect.any(String));
+      });
+
     const { body } = await post('/evidencia/tsp/invitaciones')
-      .send({ invitado: 'Jorge Quispe', rol: 'Maquinista' })
+      .send({ usuarioId: 'USR-02' })
       .expect(201);
-    const invitacion = body.invitacion as { token: string; url: string; respondida: boolean };
+    const invitacion = body.invitacion as {
+      token: string;
+      usuarioId: string;
+      url: string;
+      respondida: boolean;
+    };
     expect(invitacion.token).toMatch(/^tsp-\d{4}-01$/);
+    expect(invitacion.usuarioId).toBe('USR-02');
     expect(invitacion.url).toContain(`/encuesta/${invitacion.token}`);
     expect(invitacion.respondida).toBe(false);
     expect(body.resumen.invitados).toBe(1);
+
+    /* 409: el usuario ya tiene una invitación. */
+    await post('/evidencia/tsp/invitaciones').send({ usuarioId: 'USR-02' }).expect(409);
 
     const publica = await request(app.getHttpServer())
       .get(`/api/v1/encuesta/${invitacion.token}`)
@@ -442,12 +459,16 @@ describe('evidencia · importación y validación de calidad (e2e)', () => {
 
     const tsp = await get('/evidencia/tsp').expect(200);
     expect(tsp.body).toMatchObject({ respuestas: 1, invitados: 1, pctAcuerdo: 100, estado: 'cumple' });
-    expect(tsp.body.invitaciones[0]).toMatchObject({ invitado: 'Jorge Quispe', respondida: true });
+    expect(tsp.body.invitaciones[0]).toMatchObject({
+      invitado: 'Jorge Quispe',
+      rol: 'Maquinista',
+      respondida: true,
+    });
 
     await request(app.getHttpServer())
       .post('/api/v1/evidencia/tsp/invitaciones')
       .set('Authorization', `Bearer ${tokenMaquinista}`)
-      .send({ invitado: 'Ana Ríos' })
+      .send({ usuarioId: 'USR-03' })
       .expect(403);
   });
 

@@ -319,8 +319,11 @@ export interface ItemEncuesta {
 export interface InvitacionTSP {
   /** `tsp-2026-01` */
   token: string;
+  /** Id del usuario invitado (`GET /usuarios`); ausente en invitaciones legadas sin usuario. */
+  usuarioId?: string;
+  /** Nombre del invitado, derivado del usuario al crear la invitación. */
   invitado: string;
-  /** Rol declarado del invitado: `Maquinista`, `Supervisor`, … */
+  /** Rol legible del invitado (`ROLE_LABEL`), derivado del usuario: `Maquinista`, `Supervisor`, … */
   rol?: string;
   /** Enlace público completo: `http://localhost:3000/encuesta/tsp-2026-01`. */
   url: string;
@@ -352,9 +355,12 @@ export interface EvidenciaTSP {
  */
 export type EncuestaTSP = EvidenciaTSP;
 
+/**
+ * `invitado`/`rol` ya no se escriben a mano: la invitación es para un usuario
+ * del MES y ambos se derivan de su cuenta (`nombre`, `ROLE_LABEL[rol]`).
+ */
 export const crearInvitacionSchema = z.object({
-  invitado: z.string().min(3, 'Escribe el nombre del invitado').max(80, 'Máximo 80 caracteres'),
-  rol: z.string().max(60, 'Máximo 60 caracteres').optional(),
+  usuarioId: z.string().min(1, 'Selecciona un usuario'),
 });
 export type CrearInvitacionInput = z.infer<typeof crearInvitacionSchema>;
 

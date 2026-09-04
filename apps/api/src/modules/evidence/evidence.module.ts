@@ -16,6 +16,7 @@ import {
   SolicitudExterna,
   TransferenciaSap,
   Umbrales,
+  User,
   VerificacionFuncional,
 } from '../../database/entities';
 import { EvidenceController } from './evidence.controller';
@@ -37,6 +38,8 @@ import { EvidenceTriListener } from './evidence-tri.listener';
       VerificacionFuncional,
       RegistroEp,
       ExportJob,
+      /* Directorio de usuarios: resuelve el invitado/rol de una invitación TSP. */
+      User,
       /* Registros operativos que evalúa el motor de calidad (TCI). */
       Parada,
       Merma,

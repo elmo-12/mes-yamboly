@@ -17,6 +17,7 @@ import {
   formatNumber,
   segundosAMinutos,
 } from '@mes/shared';
+import { ROLE_LABEL } from '@mes/types';
 import type {
   EvidenciaCFS,
   EvidenciaEP,
@@ -31,13 +32,14 @@ import type {
   VerificacionCFS,
 } from '@mes/types';
 import type { EnvVars } from '../../config/env.validation';
-import { NoEncontradoException } from '../../common/exceptions';
+import { ConflictoException, NoEncontradoException, ValidationException } from '../../common/exceptions';
 import { ahoraIso, hoyIso, redondear } from '../../common/utils';
 import {
   EncuestaRespuesta,
   EncuestaSesion,
   RegistroEp,
   RegistroTiempo,
+  User,
   VerificacionFuncional,
 } from '../../database/entities';
 import { ITEMS_TSP } from '../../database/seeds/thesis-evidence.seed';
@@ -60,6 +62,7 @@ export class EvidenceService {
     @InjectRepository(EncuestaSesion) private readonly sesiones: Repository<EncuestaSesion>,
     @InjectRepository(VerificacionFuncional) private readonly verificaciones: Repository<VerificacionFuncional>,
     @InjectRepository(RegistroEp) private readonly registrosEp: Repository<RegistroEp>,
+    @InjectRepository(User) private readonly usuarios: Repository<User>,
     private readonly validacion: EvidenceValidationService,
     private readonly config: ConfigService<EnvVars, true>,
   ) {}
@@ -312,13 +315,27 @@ export class EvidenceService {
   }
 
   /**
-   * Crea una invitación nominal con token de un solo uso y devuelve su enlace
-   * público (`{WEB_URL ?? CORS_ORIGIN}/encuesta/<token>`).
+   * Crea una invitación nominal a un usuario del MES: `invitado`/`rol` se
+   * derivan de su cuenta (`nombre`, `ROLE_LABEL[rol]`), token de un solo uso y
+   * enlace público (`{WEB_URL ?? CORS_ORIGIN}/encuesta/<token>`).
    */
   async crearInvitacion(dto: CrearInvitacionDto): Promise<{ invitacion: InvitacionTSP; resumen: EvidenciaTSP }> {
+    const usuario = await this.usuarios.findOne({ where: { id: dto.usuarioId } });
+    if (!usuario) {
+      throw new ValidationException({ usuarioId: 'El usuario seleccionado no existe' });
+    }
+    if (!usuario.activo) {
+      throw new ValidationException({ usuarioId: `${usuario.nombre} está dado de baja` });
+    }
+
+    const existentes = await this.sesiones.find();
+    const yaInvitado = existentes.some((s) => s.usuarioId === usuario.id);
+    if (yaInvitado) {
+      throw new ConflictoException(`${usuario.nombre} ya tiene una invitación`, { usuarioId: usuario.id });
+    }
+
     const anio = new Date().getFullYear();
     const prefijo = `tsp-${anio}-`;
-    const existentes = await this.sesiones.find();
     const usados = existentes
       .filter((s) => s.token.startsWith(prefijo))
       .map((s) => Number(s.token.slice(prefijo.length)))
@@ -328,8 +345,9 @@ export class EvidenceService {
     const sesion = await this.sesiones.save(
       this.sesiones.create({
         token: `${prefijo}${String(siguiente).padStart(2, '0')}`,
-        invitado: dto.invitado,
-        rol: dto.rol ?? null,
+        usuarioId: usuario.id,
+        invitado: usuario.nombre,
+        rol: ROLE_LABEL[usuario.rol] ?? usuario.rol,
         respondida: false,
         respondidaEn: null,
         creadaEn: ahoraIso(),
@@ -342,6 +360,7 @@ export class EvidenceService {
   private aInvitacion(s: EncuestaSesion): InvitacionTSP {
     return {
       token: s.token,
+      ...(s.usuarioId ? { usuarioId: s.usuarioId } : {}),
       invitado: s.invitado,
       ...(s.rol ? { rol: s.rol } : {}),
       url: `${this.baseWeb()}/encuesta/${s.token}`,

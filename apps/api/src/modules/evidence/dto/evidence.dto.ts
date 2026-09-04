@@ -131,18 +131,15 @@ export const CLAVES_OVERRIDE: readonly ClaveCriterioTci[] = CLAVES_CRITERIO_TCI;
 
 /* --- Anexo 04 · invitación a la encuesta -------------------------- */
 
+/**
+ * `invitado`/`rol` ya no se escriben a mano: la invitación es nominal a un
+ * usuario del MES y ambos se derivan de su cuenta al crearla.
+ */
 export class CrearInvitacionDto {
-  @ApiProperty({ example: 'Jorge Quispe' })
-  @IsString({ message: 'Escribe el nombre del invitado' })
-  @MinLength(3, { message: 'Escribe el nombre del invitado' })
-  @MaxLength(80, { message: 'Máximo 80 caracteres' })
-  invitado!: string;
-
-  @ApiPropertyOptional({ example: 'Maquinista', maxLength: 60 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(60, { message: 'Máximo 60 caracteres' })
-  rol?: string;
+  @ApiProperty({ example: 'USR-02' })
+  @IsString({ message: 'Selecciona un usuario' })
+  @MinLength(1, { message: 'Selecciona un usuario' })
+  usuarioId!: string;
 }
 
 /* --- Fuentes externas · importación ------------------------------- */
