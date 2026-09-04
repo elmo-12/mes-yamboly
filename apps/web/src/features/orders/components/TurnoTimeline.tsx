@@ -41,7 +41,8 @@ export interface TurnoTimelineProps {
 export function TurnoTimeline({ inicio, fin, paradas }: TurnoTimelineProps) {
   const { segmentos, totalMin, etiquetas } = React.useMemo(() => {
     const t0 = new Date(inicio).getTime();
-    const t1 = fin ? new Date(fin).getTime() : t0 + 8 * 3600_000;
+    /* Turno D/N = 12 h: si aún no cierra, se estima el ancho del timeline sobre esa duración. */
+    const t1 = fin ? new Date(fin).getTime() : t0 + 12 * 3600_000;
     const total = Math.max(1, Math.round((t1 - t0) / 60_000));
 
     const intervalos = [...paradas]

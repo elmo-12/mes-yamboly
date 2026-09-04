@@ -336,7 +336,7 @@ export function AlertasPage() {
           <EmptyState
             icon={<Icon name="inbox" size={40} />}
             title="Sin alertas activas"
-            description="El modelo evaluará el próximo turno a las 14:00. Puedes ajustar los umbrales si esperabas recibir avisos antes."
+            description="El modelo reevalúa cada 5 minutos. Puedes ajustar los umbrales si esperabas recibir avisos antes."
             action={
               <Button
                 variant="secondary"

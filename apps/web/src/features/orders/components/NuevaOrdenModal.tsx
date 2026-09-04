@@ -45,7 +45,7 @@ export function NuevaOrdenModal({ open, onOpenChange }: NuevaOrdenModalProps) {
   } = useForm<NuevaOrdenInput>({
     resolver: zodResolver(nuevaOrdenSchema),
     /* `planificado` se deja sin valor para que el campo salga vacío. */
-    defaultValues: { lineaId: '', productoId: '', codigo: '', lote: '', turno: 'M' },
+    defaultValues: { lineaId: '', productoId: '', codigo: '', lote: '', turno: 'D' },
   });
 
   const lineaId = watch('lineaId');

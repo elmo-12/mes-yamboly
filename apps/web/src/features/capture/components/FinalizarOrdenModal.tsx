@@ -24,8 +24,8 @@ import { AdjuntarFoto } from './AdjuntarFoto';
 import { ContextoCaptura } from './ContextoCaptura';
 import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
 
-/** Minutos programados de un turno de planta (06:00–14:00). */
-const MINUTOS_TURNO = 480;
+/** Minutos programados de un turno de planta (D 06:00–18:00 / N 18:00–06:00). */
+const MINUTOS_TURNO = 720;
 /** Tolerancia del control cruzado producción ↔ codificadora (spec 04.J). */
 const TOLERANCIA_CONTEO_PCT = 0.5;
 

@@ -144,8 +144,8 @@ export interface RegistroPropio {
   estadoColor: BadgeColor;
 }
 
-/** Minutos de un turno completo, base del timeline de la Line card. */
-const MINUTOS_TURNO = 480;
+/** Minutos de un turno completo (D/N, 12 h cada uno), base del timeline de la Line card. */
+const MINUTOS_TURNO = 720;
 /** A partir de aquí el timeline se agrega: más tramos y la barra se vuelve ilegible. */
 const MAX_TRAMOS = 6;
 

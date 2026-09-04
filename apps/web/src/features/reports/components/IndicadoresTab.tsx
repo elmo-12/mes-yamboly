@@ -60,13 +60,13 @@ export function IndicadoresTab({ query, onLimpiar }: IndicadoresTabProps) {
 
       <SectionTitle
         title="Tendencia OEE diaria"
-        description={`OEE diario de las 5 líneas frente a la meta de 85 %. Fuente: registros MES ${rango}.`}
+        description={`OEE diario de las 9 líneas frente a la meta de 85 %. Fuente: registros MES ${rango}.`}
       />
       <TendenciaOeeChart puntos={data.tendenciaOee} subtitle={rango} />
 
       <SectionTitle
         title="Desglose por línea y turno"
-        description="OEE de cada línea frente a la meta de 85 % y comparación de los tres turnos con el periodo anterior."
+        description="OEE de cada línea frente a la meta de 85 % y comparación de los 2 turnos con el periodo anterior."
       />
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-5">
         <OeePorLineaChart lineas={data.oeePorLinea} subtitle={`${rango} · promedio ponderado`} />

@@ -3,7 +3,7 @@ import { Divider } from '@mes/ui';
 /** Cuentas del entorno de demostración (mocks msw). No forma parte del frame de Figma. */
 const CUENTAS = [
   { correo: 'jefe@yamboly.lat', rol: 'Jefe de producción' },
-  { correo: 'jorge.quispe@yamboly.lat', rol: 'Maquinista L2' },
+  { correo: 'jorge.quispe@yamboly.lat', rol: 'Maquinista' },
   { correo: 'ana.rios@yamboly.lat', rol: 'Supervisora' },
   { correo: 'maria.torres@yamboly.lat', rol: 'Encargada de merma' },
   { correo: 'investigador@yamboly.lat', rol: 'Investigador' },

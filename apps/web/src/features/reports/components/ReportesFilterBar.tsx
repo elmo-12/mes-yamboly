@@ -31,7 +31,7 @@ export function ReportesFilterBar({
   hayFiltros,
 }: ReportesFilterBarProps) {
   const { data: lineas } = useLineas();
-  const opcionesLinea = (lineas?.data ?? []).filter((l) => l.codigo.startsWith('L'));
+  const opcionesLinea = lineas?.data ?? [];
 
   const alternarLinea = (id: string) => {
     const actual = filtros.lineaId;

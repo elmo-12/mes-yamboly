@@ -2,13 +2,13 @@ import type { LineaEstado, TiempoRealResumen } from '@mes/types';
 
 /**
  * Contexto operativo que los overlays de captura precargan (spec 04.A:
- * "L2 · Conos · OF-2026-0815 · Turno Mañana · Jorge Quispe").
+ * "LLEN-M2 · Llenadora M2 · OF-2026-0815 · Turno Día · Jorge Quispe").
  */
 export interface ContextoLinea {
   lineaId: string;
   lineaCodigo: string;
   lineaNombre: string;
-  /** `L2 · Conos` */
+  /** `LLEN-M2 · Llenadora M2` */
   etiqueta: string;
   ordenId?: string;
   ordenCodigo?: string;

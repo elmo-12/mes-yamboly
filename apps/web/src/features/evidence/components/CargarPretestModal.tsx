@@ -11,8 +11,8 @@ export interface CargarPretestModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const EJEMPLO = `2026-08-24;Registro de producción OF-2026-0812 · L1 Paletas;08:12;3,1
-2026-08-24;Registro de parada PM-01 · Llenadora L1;09:41;2,8`;
+const EJEMPLO = `2026-08-24;Registro de producción OF-2026-0812 · Llenadora M2;08:12;3,1
+2026-08-24;Registro de parada PM-01 · Llenadora M2;09:41;2,8`;
 
 /**
  * Carga de la hoja de observación del pretest (TRI, Anexo 02). Acepta el CSV
