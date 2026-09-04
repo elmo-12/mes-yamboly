@@ -38,10 +38,11 @@ import { ESTADO_KPI_BADGE, ESTADO_KPI_LABEL, KpiRow, KpiTesisCard, formatValorKp
  * resumen de los cinco instrumentos.
  */
 export function ResumenTab({ resumen }: { resumen: EvidenciaResumen }) {
-  const datos = resumen.comparativaTri.map((punto) => ({
-    etapa: punto.etapa,
-    minutos: punto.minutos,
-  }));
+  /** El postest llega `null` mientras no haya capturas reales: no se dibuja. */
+  const datos = resumen.comparativaTri
+    .filter((punto): punto is { etapa: 'Pretest' | 'Postest'; minutos: number } => punto.minutos !== null)
+    .map((punto) => ({ etapa: punto.etapa, minutos: punto.minutos }));
+  const faltaPostest = !datos.some((punto) => punto.etapa === 'Postest');
 
   return (
     <div className="flex flex-col gap-6">
@@ -60,11 +61,17 @@ export function ResumenTab({ resumen }: { resumen: EvidenciaResumen }) {
       <ChartFrame
         className="max-w-[680px]"
         height={240}
-        note="Minutos por evento"
+        note={
+          faltaPostest
+            ? 'Minutos por evento · El postest se calcula con los registros reales'
+            : 'Minutos por evento'
+        }
         legend={
           <>
             <ChartLegendItem color={chartColors.reference} label="Pretest (registro manual)" />
-            <ChartLegendItem color={chartColors.primary} label="Postest (MES Yamboly)" />
+            {!faltaPostest && (
+              <ChartLegendItem color={chartColors.primary} label="Postest (MES Yamboly)" />
+            )}
           </>
         }
       >
@@ -122,7 +129,7 @@ export function ResumenTab({ resumen }: { resumen: EvidenciaResumen }) {
               <TCell muted className="tabular">
                 {kpi.formula}
               </TCell>
-              <TCell numeric className="font-medium">
+              <TCell numeric muted={kpi.valor === null} className={kpi.valor === null ? undefined : 'font-medium'}>
                 {formatValorKpi(kpi)}
               </TCell>
               <TCell muted>{kpi.meta}</TCell>

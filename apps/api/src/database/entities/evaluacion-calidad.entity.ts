@@ -1,66 +1,74 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
-import type { Turno } from '@mes/types';
+import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import type { ClaveCriterioTci, CriterioTCI, TipoRegistroTci, Turno } from '@mes/types';
 
 /**
  * Anexo 03 — Ficha de evaluación de la calidad de la información (TCI).
- * Los cuatro criterios se calculan por reglas sobre el registro evaluado y
- * pueden sobrescribirse manualmente (`override*`) desde la vista 09.C.
+ * Cada fila es un registro operativo (parada, merma o velocidad) contrastado
+ * contra las fuentes externas importadas. La produce
+ * `POST /evidencia/tci/validar`, que reemplaza las filas del rango validado
+ * conservando los `overrides` que el usuario haya puesto a mano.
  */
 @Entity('evaluacion_calidad')
 export class EvaluacionCalidad {
+  /** `TCI-<registroId>`: estable entre validaciones para conservar overrides. */
   @PrimaryColumn('text')
   id!: string;
 
   @Column('integer', { default: 0 })
   n!: number;
 
+  /** `YYYY-MM-DD` del registro evaluado. */
+  @Index()
   @Column('text')
   fecha!: string;
 
   @Column('text')
   turno!: Turno;
 
-  /** Texto del registro evaluado: `Parada 07:42 · PL-03-02 · L2`. */
+  @Index()
   @Column('text')
-  registro!: string;
+  tipoRegistro!: TipoRegistroTci;
 
-  /** Id del registro origen (parada/merma/velocidad) si existe. */
-  @Column('text', { nullable: true })
-  registroId?: string | null;
+  /** Id del registro operativo: `PAR-0815-03`, `MER-0815-01`, `VEL-0815-01`. */
+  @Index()
+  @Column('text')
+  registroId!: string;
 
-  /* --- Insumos de las reglas ------------------------------------- */
+  @Column('text')
+  lineaId!: string;
 
-  /** Campos obligatorios presentes → criterio «completo». */
-  @Column('boolean', { default: true })
-  camposObligatoriosCompletos!: boolean;
+  @Column('text', { default: '' })
+  lineaCodigo!: string;
 
-  /** Duración en minutos; > 0 es condición del criterio «preciso». */
-  @Column('real', { default: 0 })
-  duracionMin!: number;
+  /** Resumen legible del registro: `07:42 · PP-01-10 · 14 min`. */
+  @Column('text', { default: '' })
+  referencia!: string;
 
-  /** Causa de último nivel asignada → criterio «preciso». */
-  @Column('boolean', { default: true })
-  causaEspecifica!: boolean;
+  /**
+   * Resultado **de las reglas**, con su detalle legible y sin los overrides
+   * aplicados: así un override se puede quitar y recuperar el valor calculado.
+   */
+  @Column('simple-json', { default: '[]' })
+  criterios!: CriterioTCI[];
 
-  @Column('boolean', { default: true })
-  tieneOrden!: boolean;
+  /** Valores forzados a mano por criterio; `null` = no hay ningún override. */
+  @Column('simple-json', { nullable: true })
+  overrides!: Partial<Record<ClaveCriterioTci, boolean>> | null;
 
-  @Column('boolean', { default: true })
-  tieneLinea!: boolean;
+  /** `true` si todos los criterios del tipo se cumplen. */
+  @Column('boolean', { default: false })
+  valido!: boolean;
 
-  @Column('boolean', { default: true })
-  tieneResponsable!: boolean;
+  /** ISO-8601 de la validación que produjo la fila. */
+  @Column('text', { default: '' })
+  validadoEn!: string;
 
-  /* --- Override manual ------------------------------------------- */
+  /** `YYYY-MM-DD` del rango validado que generó la fila. */
+  @Column('text', { default: '' })
+  desde!: string;
 
-  @Column('boolean', { nullable: true })
-  overrideCompleto!: boolean | null;
-
-  @Column('boolean', { nullable: true })
-  overridePreciso!: boolean | null;
-
-  @Column('boolean', { nullable: true })
-  overrideTrazable!: boolean | null;
+  @Column('text', { default: '' })
+  hasta!: string;
 
   @Column('text', { default: '' })
   observacion!: string;

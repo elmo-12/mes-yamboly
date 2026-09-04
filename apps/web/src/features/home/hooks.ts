@@ -93,20 +93,26 @@ export function useResumenJefe() {
       });
     }
 
-    /* TRI (Anexo 02): tiempo medio de registro y su reducción frente al pretest. */
+    /* TRI (Anexo 02): tiempo medio de registro y su reducción frente al pretest.
+     * Se deriva de `/evidencia/resumen`; mientras el postest no tenga capturas
+     * reales el KPI llega con `valor: null` y la tarjeta no se muestra. */
     const tri = evidencia.data?.kpis.find((k) => k.id === 'TRI');
     const pretest = evidencia.data?.comparativaTri.find((c) => c.etapa === 'Pretest');
-    if (tri) {
+    const minutosPretest = pretest?.minutos ?? null;
+    if (tri && tri.valor !== null) {
+      const valorTri = tri.valor;
       const reduccion =
-        pretest && pretest.minutos > 0 ? ((tri.valor - pretest.minutos) / pretest.minutos) * 100 : undefined;
+        minutosPretest !== null && minutosPretest > 0
+          ? ((valorTri - minutosPretest) / minutosPretest) * 100
+          : undefined;
       filas.push({
         id: 'tri',
         label: 'Tiempo medio de registro',
-        value: formatMinutes(tri.valor),
+        value: formatMinutes(valorTri),
         delta: reduccion === undefined ? undefined : formatDelta(reduccion, '%', 0),
         trend: reduccion === undefined || reduccion === 0 ? 'flat' : reduccion < 0 ? 'down' : 'up',
         favorable: reduccion !== undefined && reduccion < 0,
-        context: pretest ? `vs pretest (${formatMinutes(pretest.minutos)})` : undefined,
+        context: minutosPretest !== null ? `vs pretest (${formatMinutes(minutosPretest)})` : undefined,
       });
     }
 

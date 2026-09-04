@@ -45,6 +45,9 @@ export function UmbralesTab() {
           probabilidadMinima: data.probabilidadMinima,
           notificarN8n: data.notificarN8n,
           mostrarTv: data.mostrarTv,
+          tciToleranciaMin: data.tciToleranciaMin,
+          tciToleranciaPct: data.tciToleranciaPct,
+          tciToleranciaDiasSap: data.tciToleranciaDiasSap,
         }
       : undefined,
   });
@@ -58,9 +61,13 @@ export function UmbralesTab() {
         probabilidadMinima: guardados.probabilidadMinima,
         notificarN8n: guardados.notificarN8n,
         mostrarTv: guardados.mostrarTv,
+        tciToleranciaMin: guardados.tciToleranciaMin,
+        tciToleranciaPct: guardados.tciToleranciaPct,
+        tciToleranciaDiasSap: guardados.tciToleranciaDiasSap,
       });
       toast.success('Umbrales actualizados', {
-        description: 'Se aplican a las 5 líneas en el próximo ciclo de evaluación.',
+        description:
+          'Las alertas se reevalúan en el próximo ciclo y las tolerancias del TCI, en la siguiente validación.',
       });
     } catch (err) {
       const prohibido = err instanceof ApiClientError && err.statusCode === 403;
@@ -217,6 +224,87 @@ export function UmbralesTab() {
                       label={field.value ? 'Activado' : 'Desactivado'}
                     />
                   )}
+                />
+              ),
+            },
+          ]}
+        />
+
+        <SectionTitle
+          title="Validación de calidad (TCI)"
+          description="Holguras con las que el motor de reglas contrasta cada captura del MES contra las fuentes externas importadas en Evidencia › TCI."
+          className="pt-6 pb-2"
+        />
+
+        <DescriptionList
+          labelWidth={320}
+          items={[
+            {
+              label: (
+                <Etiqueta
+                  titulo="Tolerancia en tiempos"
+                  apoyo="Diferencia admitida entre las horas registradas y las lecturas de sensor"
+                />
+              ),
+              value: (
+                <Input
+                  aria-label="Tolerancia en tiempos"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={60}
+                  suffix="min"
+                  className="max-w-[180px]"
+                  wrapperClassName="max-w-[180px]"
+                  {...register('tciToleranciaMin')}
+                  destructive={Boolean(errors.tciToleranciaMin)}
+                  hint={errors.tciToleranciaMin?.message}
+                />
+              ),
+            },
+            {
+              label: (
+                <Etiqueta
+                  titulo="Tolerancia en cantidad y velocidad"
+                  apoyo="Desviación admitida en kg de merma frente a SAP y en u/min frente al sensor"
+                />
+              ),
+              value: (
+                <Input
+                  aria-label="Tolerancia en cantidad y velocidad"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={50}
+                  suffix="%"
+                  className="max-w-[180px]"
+                  wrapperClassName="max-w-[180px]"
+                  {...register('tciToleranciaPct')}
+                  destructive={Boolean(errors.tciToleranciaPct)}
+                  hint={errors.tciToleranciaPct?.message}
+                />
+              ),
+            },
+            {
+              label: (
+                <Etiqueta
+                  titulo="Holgura de fecha en SAP"
+                  apoyo="Días entre la merma registrada y su transferencia de merma en SAP"
+                />
+              ),
+              value: (
+                <Input
+                  aria-label="Holgura de fecha en SAP"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={15}
+                  suffix="días"
+                  className="max-w-[180px]"
+                  wrapperClassName="max-w-[180px]"
+                  {...register('tciToleranciaDiasSap')}
+                  destructive={Boolean(errors.tciToleranciaDiasSap)}
+                  hint={errors.tciToleranciaDiasSap?.message}
                 />
               ),
             },

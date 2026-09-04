@@ -305,6 +305,10 @@ export class ThesisAlertsSeeder implements Seeder {
           probabilidadMinima: 70,
           notificarN8n: true,
           mostrarTv: true,
+          /* Tolerancias de la validación de calidad (TCI): ±5 min, ±5 %, ±1 día. */
+          tciToleranciaMin: 5,
+          tciToleranciaPct: 5,
+          tciToleranciaDiasSap: 1,
           actualizadoEn: iso(fechaMenos(3), '09:14'),
           actualizadoPor: 'Carlos Mendoza',
         }),

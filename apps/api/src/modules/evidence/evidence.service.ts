@@ -1,50 +1,48 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   METAS_TESIS,
   calcCfs,
-  calcEp,
-  calcTci,
+  calcEpOpcional,
   calcTri,
+  calcTriOpcional,
   calcTriReduccion,
   calcTsp,
   estadoCfs,
   estadoEp,
-  estadoTci,
   estadoTri,
   estadoTsp,
   formatNumber,
   segundosAMinutos,
 } from '@mes/shared';
 import type {
-  EncuestaTSP,
-  EstadoKpi,
-  EvaluacionTCI,
   EvidenciaCFS,
   EvidenciaEP,
   EvidenciaResumen,
-  EvidenciaTCI,
   EvidenciaTRI,
+  EvidenciaTSP,
+  InvitacionTSP,
   ItemEncuesta,
   KpiTesis,
   RegistroEP,
   RegistroTRI,
   VerificacionCFS,
 } from '@mes/types';
+import type { EnvVars } from '../../config/env.validation';
 import { NoEncontradoException } from '../../common/exceptions';
-import { hoyIso, redondear } from '../../common/utils';
+import { ahoraIso, hoyIso, redondear } from '../../common/utils';
 import {
   EncuestaRespuesta,
   EncuestaSesion,
-  EvaluacionCalidad,
   RegistroEp,
   RegistroTiempo,
   VerificacionFuncional,
 } from '../../database/entities';
 import { ITEMS_TSP } from '../../database/seeds/thesis-evidence.seed';
-import { evaluarCriterios } from './evidence.rules';
-import type { CargarPretestDto, OverrideTciDto, VerificacionCfsDto } from './dto/evidence.dto';
+import { EvidenceValidationService } from './evidence-validation.service';
+import type { CargarPretestDto, CrearInvitacionDto, VerificacionCfsDto } from './dto/evidence.dto';
 
 /** Ventanas de medición declaradas en la tesis (spec 09.A). */
 export const PERIODOS_TESIS = {
@@ -54,18 +52,16 @@ export const PERIODOS_TESIS = {
   postestHasta: '2026-12-19',
 } as const;
 
-/** Enlace público de la encuesta de satisfacción. */
-const ENLACE_ENCUESTA = '/encuesta/tsp-2026-20';
-
 @Injectable()
 export class EvidenceService {
   constructor(
     @InjectRepository(RegistroTiempo) private readonly tiempos: Repository<RegistroTiempo>,
-    @InjectRepository(EvaluacionCalidad) private readonly calidad: Repository<EvaluacionCalidad>,
     @InjectRepository(EncuestaRespuesta) private readonly encuestas: Repository<EncuestaRespuesta>,
     @InjectRepository(EncuestaSesion) private readonly sesiones: Repository<EncuestaSesion>,
     @InjectRepository(VerificacionFuncional) private readonly verificaciones: Repository<VerificacionFuncional>,
     @InjectRepository(RegistroEp) private readonly registrosEp: Repository<RegistroEp>,
+    private readonly validacion: EvidenceValidationService,
+    private readonly config: ConfigService<EnvVars, true>,
   ) {}
 
   /* ---------------------------------------------------------------- */
@@ -75,7 +71,7 @@ export class EvidenceService {
   async resumen(): Promise<EvidenciaResumen> {
     const [tri, tci, tsp, cfs, ep] = await Promise.all([
       this.tri(),
-      this.tci(),
+      this.validacion.resumen(),
       this.tsp(),
       this.cfs(),
       this.ep(),
@@ -92,7 +88,10 @@ export class EvidenceService {
         metaValor: METAS_TESIS.TRI_REDUCCION_PCT,
         estado: tri.estado,
         anexo: 'Anexo 02',
-        detalle: `${formatNumber(tri.promedioPostest, 1)} min frente a ${formatNumber(tri.promedioPretest, 1)} min del pretest (${formatNumber(tri.reduccionPct, 1)} %)`,
+        detalle:
+          tri.promedioPostest === null || tri.reduccionPct === null
+            ? `Se calcula con cada captura real del sistema; el pretest está en ${formatNumber(tri.promedioPretest, 1)} min`
+            : `${formatNumber(tri.promedioPostest, 1)} min frente a ${formatNumber(tri.promedioPretest, 1)} min del pretest (${formatNumber(tri.reduccionPct, 1)} %)`,
       },
       {
         id: 'TCI',
@@ -104,7 +103,10 @@ export class EvidenceService {
         metaValor: METAS_TESIS.TCI_PCT,
         estado: tci.estado,
         anexo: 'Anexo 03',
-        detalle: `${tci.registrosCorrectos} de ${tci.registrosTotales} registros cumplen los 4 criterios`,
+        detalle:
+          tci.registrosTotales === 0
+            ? 'Se calcula al validar las capturas contra las fuentes externas importadas (sensores, solicitudes y SAP)'
+            : `${tci.registrosCorrectos} de ${tci.registrosTotales} registros cumplen todos sus criterios`,
       },
       {
         id: 'TSP',
@@ -116,7 +118,12 @@ export class EvidenceService {
         metaValor: METAS_TESIS.TSP_PCT,
         estado: tsp.estado,
         anexo: 'Anexo 04',
-        detalle: `${tsp.respuestas} de ${tsp.invitados} encuestados · promedio ${formatNumber(tsp.promedio, 1)}`,
+        detalle:
+          tsp.respuestas > 0
+            ? `${tsp.respuestas} de ${tsp.invitados} encuestados · promedio ${formatNumber(tsp.promedio ?? 0, 1)}`
+            : tsp.invitados === 0
+              ? 'Se calcula con las respuestas de la encuesta; todavía no se ha emitido ninguna invitación'
+              : `Se calcula con las respuestas de la encuesta; ${tsp.invitados === 1 ? '1 invitación emitida' : `${tsp.invitados} invitaciones emitidas`} sin responder`,
       },
       {
         id: 'CFS',
@@ -140,7 +147,10 @@ export class EvidenceService {
         metaValor: METAS_TESIS.EP_PCT,
         estado: ep.estado,
         anexo: 'Anexo 06',
-        detalle: `${ep.prediccionesCorrectas} de ${ep.prediccionesTotales} predicciones confirmadas`,
+        detalle:
+          ep.prediccionesTotales === 0
+            ? 'Se calcula al confirmar el evento real de cada alerta en la bandeja de Alertas'
+            : `${ep.prediccionesCorrectas} de ${ep.prediccionesTotales} predicciones confirmadas`,
       },
     ];
 
@@ -163,7 +173,7 @@ export class EvidenceService {
     const postest = filas.filter((f) => f.etapa === 'postest').map((f) => this.aRegistroTri(f));
     const pretest = filas.filter((f) => f.etapa === 'pretest').map((f) => this.aRegistroTri(f));
 
-    const promedioPostest = calcTri(postest.map((r) => r.tiempoMin));
+    const promedioPostest = calcTriOpcional(postest.map((r) => r.tiempoMin));
     const promedioPretest = calcTri(pretest.map((r) => r.tiempoMin));
     const reduccionPct = calcTriReduccion(promedioPretest, promedioPostest);
 
@@ -250,57 +260,12 @@ export class EvidenceService {
   }
 
   /* ---------------------------------------------------------------- */
-  /* 09.C — TCI (Anexo 03)                                             */
-  /* ---------------------------------------------------------------- */
-
-  async tci(): Promise<EvidenciaTCI> {
-    const filas = await this.calidad.find({ order: { n: 'ASC' } });
-    const registros: EvaluacionTCI[] = filas.map((f) => this.aEvaluacionTci(f));
-    const registrosCorrectos = registros.filter((r) => r.valido).length;
-    const porcentaje = calcTci(registrosCorrectos, registros.length);
-    return {
-      registros,
-      registrosCorrectos,
-      registrosTotales: registros.length,
-      porcentaje,
-      meta: `≥ ${METAS_TESIS.TCI_PCT} %`,
-      estado: estadoTci(porcentaje),
-    };
-  }
-
-  /** Sobrescribe manualmente los criterios de una evaluación (vista 09.C). */
-  async overrideTci(id: string, dto: OverrideTciDto): Promise<{ item: EvaluacionTCI; resumen: EvidenciaTCI }> {
-    const fila = await this.calidad.findOne({ where: { id } });
-    if (!fila) throw new NoEncontradoException('Evaluación de calidad');
-    if (dto.completo !== undefined) fila.overrideCompleto = dto.completo;
-    if (dto.preciso !== undefined) fila.overridePreciso = dto.preciso;
-    if (dto.trazable !== undefined) fila.overrideTrazable = dto.trazable;
-    if (dto.observacion !== undefined) fila.observacion = dto.observacion;
-    await this.calidad.save(fila);
-    return { item: this.aEvaluacionTci(fila), resumen: await this.tci() };
-  }
-
-  private aEvaluacionTci(f: EvaluacionCalidad): EvaluacionTCI {
-    const criterios = evaluarCriterios(f);
-    return {
-      id: f.id,
-      n: f.n,
-      fecha: f.fecha,
-      turno: f.turno,
-      registro: f.registro,
-      ...criterios,
-      observacion: f.observacion,
-    };
-  }
-
-  /* ---------------------------------------------------------------- */
   /* 09.D — TSP (Anexo 04)                                             */
   /* ---------------------------------------------------------------- */
 
-  async tsp(): Promise<EncuestaTSP & { invitados: number }> {
-    const filas = await this.encuestas.find();
+  async tsp(): Promise<EvidenciaTSP> {
+    const [filas, sesiones] = await Promise.all([this.encuestas.find(), this.sesiones.find()]);
     const matriz = filas.map((f) => f.respuestas);
-    const invitados = await this.contarInvitados();
 
     const items: ItemEncuesta[] = ITEMS_TSP.map((texto, j) => {
       const columna = matriz.map((fila) => fila[j] ?? 0).filter((v) => v > 0);
@@ -309,8 +274,8 @@ export class EvidenceService {
       return {
         n: j + 1,
         texto,
-        promedio: columna.length ? Math.round((suma / columna.length) * 100) / 100 : 0,
-        pctAcuerdo: columna.length ? redondear((deAcuerdo / columna.length) * 100) : 0,
+        promedio: columna.length ? Math.round((suma / columna.length) * 100) / 100 : null,
+        pctAcuerdo: columna.length ? redondear((deAcuerdo / columna.length) * 100) : null,
       };
     });
 
@@ -326,20 +291,68 @@ export class EvidenceService {
     }
     const pctAcuerdo = calcTsp(deAcuerdo, total);
 
+    const invitaciones = sesiones
+      .map((s) => this.aInvitacion(s))
+      .sort((a, b) => a.creadaEn.localeCompare(b.creadaEn) || a.token.localeCompare(b.token));
+
     return {
       items,
+      invitaciones,
       respuestas: matriz.length,
-      invitados,
-      promedio: total ? Math.round((suma / total) * 100) / 100 : 0,
+      invitados: sesiones.length,
+      promedio: total ? Math.round((suma / total) * 100) / 100 : null,
       pctAcuerdo,
       meta: `≥ ${METAS_TESIS.TSP_PCT} % de acuerdo`,
       estado: estadoTsp(pctAcuerdo),
-      enlace: ENLACE_ENCUESTA,
+      enlace: invitaciones.length ? invitaciones[invitaciones.length - 1]!.url : '',
     };
   }
 
-  private async contarInvitados(): Promise<number> {
-    return this.sesiones.count();
+  /**
+   * Crea una invitación nominal con token de un solo uso y devuelve su enlace
+   * público (`{WEB_URL ?? CORS_ORIGIN}/encuesta/<token>`).
+   */
+  async crearInvitacion(dto: CrearInvitacionDto): Promise<{ invitacion: InvitacionTSP; resumen: EvidenciaTSP }> {
+    const anio = new Date().getFullYear();
+    const prefijo = `tsp-${anio}-`;
+    const existentes = await this.sesiones.find();
+    const usados = existentes
+      .filter((s) => s.token.startsWith(prefijo))
+      .map((s) => Number(s.token.slice(prefijo.length)))
+      .filter((n) => Number.isFinite(n));
+    const siguiente = (usados.length ? Math.max(...usados) : 0) + 1;
+
+    const sesion = await this.sesiones.save(
+      this.sesiones.create({
+        token: `${prefijo}${String(siguiente).padStart(2, '0')}`,
+        invitado: dto.invitado,
+        rol: dto.rol ?? null,
+        respondida: false,
+        respondidaEn: null,
+        creadaEn: ahoraIso(),
+      }),
+    );
+
+    return { invitacion: this.aInvitacion(sesion), resumen: await this.tsp() };
+  }
+
+  private aInvitacion(s: EncuestaSesion): InvitacionTSP {
+    return {
+      token: s.token,
+      invitado: s.invitado,
+      ...(s.rol ? { rol: s.rol } : {}),
+      url: `${this.baseWeb()}/encuesta/${s.token}`,
+      respondida: s.respondida,
+      ...(s.respondidaEn ? { respondidaEn: s.respondidaEn } : {}),
+      creadaEn: s.creadaEn || '',
+    };
+  }
+
+  /** Origen público de la web: `WEB_URL` y, si no está definida, `CORS_ORIGIN`. */
+  private baseWeb(): string {
+    const web = this.config.get('WEB_URL', { infer: true });
+    const origen = web && web.length > 0 ? web : this.config.get('CORS_ORIGIN', { infer: true });
+    return String(origen).split(',')[0]!.replace(/\/+$/, '');
   }
 
   /* ---------------------------------------------------------------- */
@@ -400,14 +413,14 @@ export class EvidenceService {
       alertaId: f.alertaId ?? undefined,
     }));
     const prediccionesCorrectas = registros.filter((r) => r.acierto).length;
-    const porcentaje = calcEp(prediccionesCorrectas, registros.length);
+    const porcentaje = calcEpOpcional(prediccionesCorrectas, registros.length);
     return {
       registros,
       prediccionesCorrectas,
       prediccionesTotales: registros.length,
       porcentaje,
       meta: `≥ ${METAS_TESIS.EP_PCT} %`,
-      estado: estadoEp(porcentaje) as EstadoKpi,
+      estado: estadoEp(porcentaje),
     };
   }
 }

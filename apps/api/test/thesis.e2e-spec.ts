@@ -4,8 +4,11 @@ import { CREDENCIALES, crearApp, login } from './app.factory';
 
 /**
  * Módulos de tesis (B2): reportes, alertas, analítica y evidencia.
- * Comprueba que los 5 KPI cierran con las cifras de los Anexos 02–06 y que
- * confirmar una alerta mueve el KPI EP.
+ *
+ * Desde la fase 3 el postest **no se siembra**: los instrumentos arrancan en
+ * «sin datos» y sólo el pretest del TRI y la lista de cotejo del CFS existen de
+ * antemano. El flujo completo (importar fuentes → validar → encuestar →
+ * confirmar alertas) vive en `evidence-validacion.e2e-spec.ts`.
  */
 describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
   let app: INestApplication;
@@ -30,7 +33,7 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
   /* ---------------------------------------------------------------- */
 
   describe('GET /evidencia/resumen', () => {
-    it('devuelve los 5 KPI de la tesis con las cifras de los anexos', async () => {
+    it('devuelve los 5 KPI con el postest todavía sin datos', async () => {
       const { body } = await get('/evidencia/resumen').expect(200);
 
       expect(body.pretestDesde).toBe('2026-08-24');
@@ -38,43 +41,64 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       expect(body.kpis).toHaveLength(5);
 
       const porId = Object.fromEntries(
-        (body.kpis as { id: string; valor: number; estado: string }[]).map((k) => [k.id, k]),
+        (body.kpis as { id: string; valor: number | null; estado: string; detalle: string }[]).map(
+          (k) => [k.id, k],
+        ),
       );
-      expect(porId.TRI).toMatchObject({ valor: 1.4, estado: 'cumple' });
-      expect(porId.TCI).toMatchObject({ valor: 93.3, estado: 'cumple' });
-      expect(porId.TSP).toMatchObject({ valor: 84.2, estado: 'cumple' });
-      expect(porId.CFS).toMatchObject({ valor: 100, estado: 'cumple' });
-      expect(porId.EP).toMatchObject({ valor: 83.5, estado: 'cumple' });
+      /* Los 4 instrumentos del postest se llenan con el uso real del sistema. */
+      expect(porId.TRI).toMatchObject({ valor: null, estado: 'sin_datos' });
+      expect(porId.TCI).toMatchObject({ valor: null, estado: 'sin_datos' });
+      expect(porId.TSP).toMatchObject({ valor: null, estado: 'sin_datos' });
+      expect(porId.EP).toMatchObject({ valor: null, estado: 'sin_datos' });
+      /* La lista de cotejo existe pero arranca sin ninguna funcionalidad marcada. */
+      expect(porId.CFS).toMatchObject({ valor: 0, estado: 'no_cumple' });
+      expect(porId.TCI!.detalle).toContain('fuentes externas');
 
       expect(body.comparativaTri).toEqual([
         { etapa: 'Pretest', minutos: 2.9 },
-        { etapa: 'Postest', minutos: 1.4 },
+        { etapa: 'Postest', minutos: null },
       ]);
     });
   });
 
-  it('GET /evidencia/tri devuelve −51,7 % frente al pretest', async () => {
+  it('GET /evidencia/tri conserva el pretest de 2,9 min y no tiene postest', async () => {
     const { body } = await get('/evidencia/tri').expect(200);
-    expect(body.promedioPostest).toBe(1.4);
     expect(body.promedioPretest).toBe(2.9);
-    expect(body.reduccionPct).toBe(-51.7);
-    expect(body.postest).toHaveLength(10);
+    expect(body.promedioPostest).toBeNull();
+    expect(body.reduccionPct).toBeNull();
+    expect(body.pretest).toHaveLength(10);
+    expect(body.postest).toHaveLength(0);
+    expect(body.estado).toBe('sin_datos');
   });
 
-  it('GET /evidencia/tci aplica las reglas de los 4 criterios: 28 / 30', async () => {
+  it('GET /evidencia/tci arranca vacío y expone el estado de las 3 fuentes', async () => {
     const { body } = await get('/evidencia/tci').expect(200);
-    expect(body.registrosCorrectos).toBe(28);
-    expect(body.registrosTotales).toBe(30);
-    expect(body.porcentaje).toBe(93.3);
-    const invalido = body.registros.find((r: { valido: boolean }) => !r.valido);
-    expect(invalido.preciso).toBe(false);
+    expect(body.data).toHaveLength(0);
+    expect(body.meta).toMatchObject({ page: 1, total: 0 });
+    expect(body.resumen).toMatchObject({
+      registrosCorrectos: 0,
+      registrosTotales: 0,
+      porcentaje: null,
+      estado: 'sin_datos',
+    });
+    expect(body.resumen.porTipo).toEqual({
+      parada: { correctos: 0, totales: 0 },
+      merma: { correctos: 0, totales: 0 },
+      velocidad: { correctos: 0, totales: 0 },
+    });
+    expect(body.resumen.fuentes.map((f: { tipo: string }) => f.tipo)).toEqual([
+      'sensores',
+      'solicitudes',
+      'sap_mermas',
+    ]);
   });
 
-  it('GET /evidencia/cfs devuelve 9 / 9 funcionalidades', async () => {
+  it('GET /evidencia/cfs lista las 9 funcionalidades sin verificar', async () => {
     const { body } = await get('/evidencia/cfs').expect(200);
-    expect(body.cumplidas).toBe(9);
+    expect(body.items).toHaveLength(9);
+    expect(body.cumplidas).toBe(0);
     expect(body.totales).toBe(9);
-    expect(body.porcentaje).toBe(100);
+    expect(body.porcentaje).toBe(0);
   });
 
   /* ---------------------------------------------------------------- */
@@ -82,12 +106,20 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
   /* ---------------------------------------------------------------- */
 
   describe('encuesta pública', () => {
-    /* `tsp-2026-21` y `tsp-2026-22` son los tokens sin responder de la semilla. */
-    const token21 = 'tsp-2026-21';
+    /* Ya no hay tokens sembrados: el investigador emite la invitación. */
+    let tokenEncuesta = '';
+
+    beforeAll(async () => {
+      const { body } = await post('/evidencia/tsp/invitaciones')
+        .send({ invitado: 'Rosa Huamán', rol: 'Supervisora' })
+        .expect(201);
+      tokenEncuesta = body.invitacion.token as string;
+      expect(body.invitacion.url).toContain(`/encuesta/${tokenEncuesta}`);
+    });
 
     it('GET /encuesta/:token responde sin autenticación con los 8 ítems', async () => {
       const { body } = await request(app.getHttpServer())
-        .get(`/api/v1/encuesta/${token21}`)
+        .get(`/api/v1/encuesta/${tokenEncuesta}`)
         .expect(200);
       expect(body.items).toHaveLength(8);
       expect(body.respondida).toBe(false);
@@ -97,21 +129,27 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       const respuestas = [5, 4, 4, 5, 4, 4, 5, 4];
 
       const primera = await request(app.getHttpServer())
-        .post(`/api/v1/encuesta/${token21}`)
+        .post(`/api/v1/encuesta/${tokenEncuesta}`)
         .send({ respuestas })
         .expect(201);
       expect(primera.body.recibido).toBe(true);
-      expect(primera.body.respuestas).toBe(20);
+      expect(primera.body.respuestas).toBe(1);
 
       await request(app.getHttpServer())
-        .post(`/api/v1/encuesta/${token21}`)
+        .post(`/api/v1/encuesta/${tokenEncuesta}`)
         .send({ respuestas })
         .expect(409);
+
+      const tsp = await get('/evidencia/tsp').expect(200);
+      expect(tsp.body).toMatchObject({ respuestas: 1, invitados: 1, pctAcuerdo: 100 });
     });
 
     it('rechaza respuestas fuera del rango 1–5', async () => {
+      const { body } = await post('/evidencia/tsp/invitaciones')
+        .send({ invitado: 'Pedro Ccahuana' })
+        .expect(201);
       await request(app.getHttpServer())
-        .post('/api/v1/encuesta/tsp-2026-22')
+        .post(`/api/v1/encuesta/${body.invitacion.token}`)
         .send({ respuestas: [5, 4, 4, 5, 4, 4, 5, 9] })
         .expect(422);
     });
@@ -134,13 +172,15 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
         pendientesConfirmar: 4,
         vencidas: 2,
       });
-      expect(body.epAcumulada).toBe(83.5);
+      /* Las alertas del seed son operativas: no generan filas del Anexo 06. */
+      expect(body.epAcumulada).toBe(0);
     });
 
     it('atender y luego confirmar una alerta mueve el KPI EP', async () => {
       const antes = await get('/evidencia/ep').expect(200);
-      expect(antes.body.prediccionesTotales).toBe(164);
-      expect(antes.body.porcentaje).toBe(83.5);
+      expect(antes.body.prediccionesTotales).toBe(0);
+      expect(antes.body.porcentaje).toBeNull();
+      expect(antes.body.estado).toBe('sin_datos');
 
       const atendida = await post('/alertas/ALE-001/atender')
         .send({ accionTomada: 'Se detuvo la línea y se purgó la boquilla de la envolvedora' })
@@ -154,14 +194,16 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       expect(confirmada.body.alerta.estado).toBe('confirmada');
       expect(confirmada.body.alerta.acierto).toBe(true);
       /* El contrato (@mes/types + mocks) define `ep` como la EP acumulada en %. */
-      expect(confirmada.body.ep).toBe(83.6);
+      expect(confirmada.body.ep).toBe(100);
 
       /* 409 al confirmar dos veces la misma alerta. */
       await post('/alertas/ALE-001/confirmar').send({ ocurrio: true }).expect(409);
 
       const despues = await get('/evidencia/ep').expect(200);
-      expect(despues.body.prediccionesTotales).toBe(165);
-      expect(despues.body.porcentaje).toBe(83.6);
+      expect(despues.body.prediccionesTotales).toBe(1);
+      expect(despues.body.prediccionesCorrectas).toBe(1);
+      expect(despues.body.porcentaje).toBe(100);
+      expect(despues.body.estado).toBe('cumple');
     });
 
     it('exige al menos 10 caracteres en la acción tomada', async () => {
@@ -181,6 +223,58 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
           mostrarTv: true,
         })
         .expect(403);
+    });
+
+    it('los umbrales incluyen las tolerancias de la validación de calidad (TCI)', async () => {
+      const vigentes = await get('/alertas/umbrales').expect(200);
+      expect(vigentes.body).toMatchObject({
+        tciToleranciaMin: 5,
+        tciToleranciaPct: 5,
+        tciToleranciaDiasSap: 1,
+      });
+
+      const { body } = await request(app.getHttpServer())
+        .put('/api/v1/alertas/umbrales')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          velocidadBajoEstandarPct: 5,
+          oeeMinimo: 75,
+          probabilidadMinima: 70,
+          notificarN8n: true,
+          mostrarTv: true,
+          tciToleranciaMin: 8,
+          tciToleranciaPct: 6,
+          tciToleranciaDiasSap: 2,
+        })
+        .expect(200);
+      expect(body).toMatchObject({ tciToleranciaMin: 8, tciToleranciaPct: 6, tciToleranciaDiasSap: 2 });
+
+      /* Un PUT sin las tolerancias conserva las vigentes. */
+      const sinTolerancias = await request(app.getHttpServer())
+        .put('/api/v1/alertas/umbrales')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          velocidadBajoEstandarPct: 5,
+          oeeMinimo: 75,
+          probabilidadMinima: 70,
+          notificarN8n: true,
+          mostrarTv: true,
+        })
+        .expect(200);
+      expect(sinTolerancias.body).toMatchObject({ tciToleranciaMin: 8, tciToleranciaDiasSap: 2 });
+
+      await request(app.getHttpServer())
+        .put('/api/v1/alertas/umbrales')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          velocidadBajoEstandarPct: 5,
+          oeeMinimo: 75,
+          probabilidadMinima: 70,
+          notificarN8n: true,
+          mostrarTv: true,
+          tciToleranciaMin: 120,
+        })
+        .expect(422);
     });
   });
 
@@ -309,8 +403,9 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       expect(modelo.body.metricas).toMatchObject({ registros: 2140, features: 14, auc: 0.86, f1: 0.79 });
       expect(modelo.body.variablesEntrada).toHaveLength(8);
 
+      /* 2 130 eventos migrados + 0 capturas del postest (el TRI arranca vacío). */
       const datos = await get('/analitica/estado-datos').expect(200);
-      expect(datos.body).toMatchObject({ eventos: 2140, requeridos: 2000, suficiente: true });
+      expect(datos.body).toMatchObject({ eventos: 2130, requeridos: 2000, suficiente: true });
 
       /* `?estado=insuficiente` fuerza el estado vacío de 08.E sin tocar los datos. */
       const insuficiente = await get('/analitica/estado-datos?estado=insuficiente').expect(200);

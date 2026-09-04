@@ -7,18 +7,23 @@ export const ESTADO_KPI_BADGE: Record<EstadoKpi, BadgeColor> = {
   cumple: 'success',
   en_riesgo: 'warning',
   no_cumple: 'critical',
+  sin_datos: 'neutral',
 };
 
 export const ESTADO_KPI_LABEL: Record<EstadoKpi, string> = {
   cumple: 'Cumple',
   en_riesgo: 'En riesgo',
   no_cumple: 'No cumple',
+  sin_datos: 'Pendiente',
 };
 
-/** `1,4 min` · `93,3 %`. */
+/** Texto único de los KPI todavía sin postest registrado. */
+export const SIN_DATOS = 'Sin datos';
+
+/** `1,4 min` · `93,3 %` · `Sin datos` cuando el postest aún no tiene registros. */
 export function formatValorKpi(kpi: Pick<KpiTesis, 'valor' | 'unidad'>): string {
-  const decimales = kpi.unidad === 'min' ? 1 : 1;
-  return `${formatNumber(kpi.valor, decimales)} ${kpi.unidad}`.trim();
+  if (kpi.valor === null) return SIN_DATOS;
+  return `${formatNumber(kpi.valor, 1)} ${kpi.unidad}`.trim();
 }
 
 /**
@@ -54,12 +59,21 @@ export interface KpiTesisCardProps {
   kpi: KpiTesis;
 }
 
+/**
+ * Valor de una KPI card que admite `null`: el número se pierde el tamaño
+ * `text-metric` para que «Sin datos» no desborde la tarjeta de 267 px.
+ */
+export function ValorKpi({ texto }: { texto: string }) {
+  if (texto !== SIN_DATOS) return <>{texto}</>;
+  return <span className="text-h3 text-text-secondary">{SIN_DATOS}</span>;
+}
+
 /** KPI card de la fila de Evidencia: valor + meta con Badge de estado + detalle. */
 export function KpiTesisCard({ kpi }: KpiTesisCardProps) {
   return (
     <KpiCard
       label={etiquetaKpi(kpi)}
-      value={formatValorKpi(kpi)}
+      value={<ValorKpi texto={formatValorKpi(kpi)} />}
       meta={
         <>
           <span>Meta {metaCorta(kpi)}</span>
@@ -82,7 +96,8 @@ export function KpiAnexoCard({
   context,
 }: {
   label: string;
-  value: React.ReactNode;
+  /** `null` cuando el instrumento todavía no tiene registros: muestra «Sin datos». */
+  value: React.ReactNode | null;
   meta?: string;
   estado?: EstadoKpi | 'referencia';
   context?: string;
@@ -90,7 +105,7 @@ export function KpiAnexoCard({
   return (
     <KpiCard
       label={label}
-      value={value}
+      value={value === null ? <ValorKpi texto={SIN_DATOS} /> : value}
       meta={
         meta ? (
           <>

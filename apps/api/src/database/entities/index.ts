@@ -39,3 +39,9 @@ export * from './encuesta-sesion.entity';
 export * from './encuesta-respuesta.entity';
 export * from './verificacion-funcional.entity';
 export * from './registro-ep.entity';
+
+/* --- Fuentes externas de la validación de calidad (TCI, fase 3) --- */
+export * from './importacion-fuente.entity';
+export * from './lectura-sensor.entity';
+export * from './solicitud-externa.entity';
+export * from './transferencia-sap.entity';

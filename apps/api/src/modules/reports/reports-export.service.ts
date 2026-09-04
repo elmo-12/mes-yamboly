@@ -288,8 +288,8 @@ export class ReportsExportService {
               Math.round((t.segundos / 60) * 10) / 10, 'min',
             ]),
             ...calidad.map((c): Fila => [
-              'Anexo 03 TCI', c.n, c.fecha, c.registro, c.turno,
-              c.camposObligatoriosCompletos && c.causaEspecifica && c.duracionMin > 0 ? 1 : 0, '0/1',
+              'Anexo 03 TCI', c.n, c.fecha, `${c.tipoRegistro} ${c.registroId} · ${c.referencia}`, c.turno,
+              c.valido ? 1 : 0, '0/1',
             ]),
           ],
         };

@@ -58,6 +58,11 @@ export const alertsHandlers = [
       probabilidadMinima: Number(body.probabilidadMinima ?? store.umbrales.probabilidadMinima),
       notificarN8n: Boolean(body.notificarN8n),
       mostrarTv: Boolean(body.mostrarTv),
+      tciToleranciaMin: Number(body.tciToleranciaMin ?? store.umbrales.tciToleranciaMin),
+      tciToleranciaPct: Number(body.tciToleranciaPct ?? store.umbrales.tciToleranciaPct),
+      tciToleranciaDiasSap: Number(
+        body.tciToleranciaDiasSap ?? store.umbrales.tciToleranciaDiasSap
+      ),
       actualizadoEn: ahoraIso(),
       actualizadoPor: 'Carlos Mendoza',
     };
@@ -136,8 +141,11 @@ export const alertsHandlers = [
     if (typeof body.ocurrio !== 'boolean') {
       return errores.validacion({ ocurrio: 'Indica si el evento ocurrió' });
     }
-    confirmarAcierto(alerta, body.ocurrio);
-    if (typeof body.observacion === 'string') alerta.observacion = body.observacion;
+    confirmarAcierto(
+      alerta,
+      body.ocurrio,
+      typeof body.observacion === 'string' ? body.observacion : undefined
+    );
     return HttpResponse.json({ alerta, resumen: resumen(), ep: epActual() });
   }),
 
@@ -154,9 +162,8 @@ export const alertsHandlers = [
     const actualizadas: Alerta[] = [];
     for (const c of confirmaciones) {
       const alerta = buscar(c.alertaId);
-      if (!alerta || alerta.acierto !== null) continue;
-      confirmarAcierto(alerta, c.ocurrio);
-      if (c.observacion) alerta.observacion = c.observacion;
+      if (!alerta || alerta.estado === 'confirmada') continue;
+      confirmarAcierto(alerta, c.ocurrio, c.observacion);
       actualizadas.push(alerta);
     }
     return HttpResponse.json({ data: actualizadas, resumen: resumen(), ep: epActual() });

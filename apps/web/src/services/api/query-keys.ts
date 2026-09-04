@@ -102,7 +102,14 @@ export const queryKeys = {
     all: ['evidence'] as const,
     resumen: () => [...queryKeys.evidence.all, 'resumen'] as const,
     tri: () => [...queryKeys.evidence.all, 'tri'] as const,
+    /** Raíz del TCI: invalidarla alcanza a la lista paginada y al resumen. */
     tci: () => [...queryKeys.evidence.all, 'tci'] as const,
+    tciList: (query: Record<string, unknown> = {}) =>
+      [...queryKeys.evidence.tci(), 'list', query] as const,
+    tciResumen: () => [...queryKeys.evidence.tci(), 'resumen'] as const,
+    /** Fuentes externas importadas (sensores, solicitudes, transferencias SAP). */
+    fuentes: () => [...queryKeys.evidence.all, 'fuentes'] as const,
+    importaciones: (tipo: string) => [...queryKeys.evidence.fuentes(), tipo, 'importaciones'] as const,
     tsp: () => [...queryKeys.evidence.all, 'tsp'] as const,
     cfs: () => [...queryKeys.evidence.all, 'cfs'] as const,
     ep: () => [...queryKeys.evidence.all, 'ep'] as const,

@@ -90,7 +90,9 @@ export default function DevApiPage() {
         <ul>
           {evidencia.data?.kpis.map((k) => (
             <li key={k.id}>
-              {k.id} · {k.valor} {k.unidad} · meta {k.meta} · {k.estado} · {k.detalle}
+              {/* `valor: null` = instrumento sin muestras todavía (estado `sin_datos`). */}
+              {k.id} · {k.valor === null ? 'sin datos' : `${k.valor} ${k.unidad}`} · meta {k.meta} ·{' '}
+              {k.estado} · {k.detalle}
             </li>
           ))}
         </ul>

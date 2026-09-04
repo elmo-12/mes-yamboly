@@ -105,6 +105,28 @@ async function request<T>(method: string, path: string, options: RequestOptions 
   return (texto ? JSON.parse(texto) : undefined) as T;
 }
 
+/**
+ * `POST` multipart. No fija `Content-Type`: el navegador añade el `boundary`
+ * del `FormData`. Lo usa la importación de fuentes externas del TCI.
+ */
+async function subirArchivo<T>(ruta: string, formData: FormData): Promise<T> {
+  const token = tokenGetter();
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetch(buildUrl(ruta), { method: 'POST', headers, body: formData });
+
+  if (!response.ok) {
+    const error = await parseError(response);
+    if (error.statusCode === 401) onUnauthorized?.();
+    throw new ApiClientError(error);
+  }
+
+  if (response.status === 204) return undefined as T;
+  const texto = await response.text();
+  return (texto ? JSON.parse(texto) : undefined) as T;
+}
+
 export const api = {
   get: <T>(path: string, params?: QueryParams, signal?: AbortSignal) =>
     request<T>('GET', path, { params, signal }),
@@ -113,6 +135,7 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, { body }),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, { body }),
   del: <T>(path: string, params?: QueryParams) => request<T>('DELETE', path, { params }),
+  subirArchivo,
 };
 
 /**

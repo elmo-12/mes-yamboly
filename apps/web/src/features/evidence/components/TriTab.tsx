@@ -3,6 +3,7 @@
 import * as React from 'react';
 import {
   Button,
+  EmptyState,
   Icon,
   SectionTitle,
   TBody,
@@ -26,13 +27,15 @@ import {
 /**
  * `Evidencia / TRI (Anexo 02)` — Figma 2163:4263.
  * KPI ΣTR/n, hoja de observación del postest (automática desde Captura) y
- * bloque del pretest manual con carga de la hoja digitalizada.
+ * bloque del pretest manual con carga de la hoja digitalizada. El postest
+ * empieza vacío: se llena con cada captura real registrada en el MES.
  */
 export function TriTab({ tri }: { tri: EvidenciaTRI }) {
   const [modalAbierto, setModalAbierto] = React.useState(false);
   const postest = usePaginaLocal(tri.postest);
   const pretest = usePaginaLocal(tri.pretest);
 
+  const hayPostest = tri.postest.length > 0;
   const sumaPostest = tri.postest.reduce((acc, r) => acc + r.tiempoMin, 0);
   const sumaPretest = tri.pretest.reduce((acc, r) => acc + r.tiempoMin, 0);
 
@@ -41,10 +44,14 @@ export function TriTab({ tri }: { tri: EvidenciaTRI }) {
       <KpiRow>
         <KpiAnexoCard
           label="TRI postest (MES)"
-          value={`${formatNumber(tri.promedioPostest, 2)} min`}
-          meta="≥ 40 % red."
-          estado={tri.estado}
-          context={`vs ${formatNumber(tri.promedioPretest, 2)} min pretest`}
+          value={hayPostest ? `${formatNumber(tri.promedioPostest ?? 0, 2)} min` : null}
+          meta={hayPostest ? '≥ 40 % red.' : 'Meta ≥ 40 % red.'}
+          estado={hayPostest ? tri.estado : 'sin_datos'}
+          context={
+            hayPostest
+              ? `vs ${formatNumber(tri.promedioPretest, 2)} min pretest`
+              : 'Se calcula con cada captura real del MES'
+          }
         />
         <KpiAnexoCard
           label="TRI pretest (manual)"
@@ -55,17 +62,17 @@ export function TriTab({ tri }: { tri: EvidenciaTRI }) {
         />
         <KpiAnexoCard
           label="Reducción lograda"
-          value={`${formatNumber(Math.abs(tri.reduccionPct), 1)} %`}
+          value={hayPostest ? `${formatNumber(Math.abs(tri.reduccionPct ?? 0), 1)} %` : null}
           meta="Meta ≥ 40 %"
-          estado={tri.estado}
+          estado={hayPostest ? tri.estado : 'sin_datos'}
           context="respecto al registro manual"
         />
         <KpiAnexoCard
           label="Eventos medidos"
-          value={`${tri.postest.length} / ${tri.postest.length}`}
-          meta={`Meta ≥ ${tri.postest.length} eventos`}
-          estado={tri.estado}
-          context="muestra completa"
+          value={tri.postest.length}
+          meta={hayPostest ? 'Muestra en curso' : 'Aún sin eventos'}
+          estado={hayPostest ? tri.estado : 'sin_datos'}
+          context="capturas cronometradas por el MES"
         />
       </KpiRow>
 
@@ -75,36 +82,44 @@ export function TriTab({ tri }: { tri: EvidenciaTRI }) {
         className="border-b border-divider pb-3"
       />
 
-      <div className="flex flex-col">
-        <TablaTri filas={postest.filas} />
-        <PieAnexo
-          texto={`Mostrando ${(postest.page - 1) * postest.pageSize + 1}–${
-            (postest.page - 1) * postest.pageSize + postest.filas.length
-          } de ${postest.total} eventos · ΣTR = ${formatNumber(sumaPostest, 1)} min · n = ${
-            tri.postest.length
-          } · TRI = ${formatNumber(tri.promedioPostest, 2)} min`}
-          actions={
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={postest.page <= 1}
-                onClick={() => postest.setPage(postest.page - 1)}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={postest.page >= postest.totalPages}
-                onClick={() => postest.setPage(postest.page + 1)}
-              >
-                Siguiente
-              </Button>
-            </>
-          }
+      {hayPostest ? (
+        <div className="flex flex-col">
+          <TablaTri filas={postest.filas} />
+          <PieAnexo
+            texto={`Mostrando ${(postest.page - 1) * postest.pageSize + 1}–${
+              (postest.page - 1) * postest.pageSize + postest.filas.length
+            } de ${postest.total} eventos · ΣTR = ${formatNumber(sumaPostest, 1)} min · n = ${
+              tri.postest.length
+            } · TRI = ${formatNumber(tri.promedioPostest ?? 0, 2)} min`}
+            actions={
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={postest.page <= 1}
+                  onClick={() => postest.setPage(postest.page - 1)}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={postest.page >= postest.totalPages}
+                  onClick={() => postest.setPage(postest.page + 1)}
+                >
+                  Siguiente
+                </Button>
+              </>
+            }
+          />
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Icon name="stopwatch" size={40} />}
+          title="Todavía no hay eventos del postest"
+          description="Se completa automáticamente con cada parada, merma, velocidad u orden registrada en el MES."
         />
-      </div>
+      )}
 
       <SectionTitle
         title="Pretest (registro manual)"
@@ -128,34 +143,47 @@ export function TriTab({ tri }: { tri: EvidenciaTRI }) {
         }
       />
 
-      <div className="flex flex-col">
-        <TablaTri filas={pretest.filas} />
-        <PieAnexo
-          texto={`Mostrando ${(pretest.page - 1) * pretest.pageSize + 1}–${
-            (pretest.page - 1) * pretest.pageSize + pretest.filas.length
-          } de ${pretest.total} eventos del pretest`}
-          actions={
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={pretest.page <= 1}
-                onClick={() => pretest.setPage(pretest.page - 1)}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={pretest.page >= pretest.totalPages}
-                onClick={() => pretest.setPage(pretest.page + 1)}
-              >
-                Siguiente
-              </Button>
-            </>
+      {tri.pretest.length > 0 ? (
+        <div className="flex flex-col">
+          <TablaTri filas={pretest.filas} />
+          <PieAnexo
+            texto={`Mostrando ${(pretest.page - 1) * pretest.pageSize + 1}–${
+              (pretest.page - 1) * pretest.pageSize + pretest.filas.length
+            } de ${pretest.total} eventos del pretest`}
+            actions={
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={pretest.page <= 1}
+                  onClick={() => pretest.setPage(pretest.page - 1)}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={pretest.page >= pretest.totalPages}
+                  onClick={() => pretest.setPage(pretest.page + 1)}
+                >
+                  Siguiente
+                </Button>
+              </>
+            }
+          />
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Icon name="upload" size={40} />}
+          title="Sin línea base cargada"
+          description="Carga la hoja de observación del pretest para poder contrastar el tiempo de registro manual con el del MES."
+          action={
+            <Button variant="secondary" onClick={() => setModalAbierto(true)}>
+              Cargar hoja
+            </Button>
           }
         />
-      </div>
+      )}
 
       <CargarPretestModal open={modalAbierto} onOpenChange={setModalAbierto} />
     </div>

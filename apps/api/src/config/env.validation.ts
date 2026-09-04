@@ -7,6 +7,8 @@ export const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('8h'),
   DB_PATH: z.string().default('./data/mes.sqlite'),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  /** Origen público de la web; si falta se usa `CORS_ORIGIN` (enlaces de encuesta). */
+  WEB_URL: z.string().optional(),
   PREDICTION_SERVICE_URL: z.string().url().optional().or(z.literal('')),
   PREDICTION_TIMEOUT_MS: z.coerce.number().default(1500),
   SWAGGER_PATH: z.string().default('docs'),

@@ -1,18 +1,26 @@
 import type {
-  EvaluacionTCI,
   EvidenciaCFS,
   EvidenciaEP,
   EvidenciaTCI,
   EvidenciaTRI,
-  EncuestaTSP,
-  ItemEncuesta,
-  RegistroEP,
+  EvidenciaTSP,
   RegistroTRI,
   VerificacionCFS,
 } from '@mes/types';
-import { fechaMenos, redondear } from './seed';
+import { METAS_TESIS, calcTri, estadoCfs } from '@mes/shared';
+import { fechaMenos } from './seed';
 
-/** Evidencia de tesis — spec 09. Los 5 KPI cierran con los valores del Anexo. */
+/**
+ * Evidencia de tesis — spec 09.
+ *
+ * El **postest está vacío a propósito**: TRI, TCI, TSP y EP se llenan con el uso
+ * real del sistema (cada captura cronometrada, cada importación validada, cada
+ * encuesta respondida, cada alerta confirmada). Aquí solo vive lo que ya está
+ * medido: la línea base del pretest (Anexo 02) y la ficha de las 9
+ * funcionalidades del CFS, todas sin verificar.
+ *
+ * Espejo de `apps/api/src/database/seeds/thesis-evidence.seed.ts`.
+ */
 
 export const PERIODOS_TESIS = {
   pretestDesde: '2026-08-24',
@@ -22,9 +30,10 @@ export const PERIODOS_TESIS = {
 } as const;
 
 /* ------------------------------------------------------------------ */
-/* TRI — Anexo 02 (10 filas postest, 10 pretest)                       */
+/* TRI — Anexo 02 · solo el pretest medido a mano                      */
 /* ------------------------------------------------------------------ */
 
+/** Eventos cronometrados en la hoja de cálculo del pretest. */
 const EVENTOS_TRI = [
   'Parada PP-01-10 · LLEN-A1 Llenadora A1',
   'Merma EP 3,2 kg · LLEN-A1 Llenadora A1',
@@ -38,106 +47,57 @@ const EVENTOS_TRI = [
   'Merma EP 2,4 kg · EXTR-2 Extrusora 2',
 ];
 
-const HORAS_POSTEST = ['07:42:18', '11:05:07', '09:10:33', '09:24:12', '11:18:41', '12:52:09', '12:40:55', '06:02:14', '13:47:26', '10:31:48'];
-const TIEMPOS_POSTEST = [1.2, 1.5, 1.3, 1.6, 1.1, 1.4, 1.5, 1.2, 1.7, 1.5];
 const HORAS_PRETEST = ['07:45:00', '11:12:00', '09:18:00', '09:31:00', '11:26:00', '13:02:00', '12:49:00', '06:09:00', '13:56:00', '10:40:00'];
-const TIEMPOS_PRETEST = [2.8, 3.1, 2.7, 3.4, 2.6, 3.0, 2.9, 2.5, 3.2, 2.8];
+/** Segundos cronometrados a mano: media 174 s = 2,9 min. */
+const SEGUNDOS_PRETEST = [168, 186, 162, 204, 156, 180, 174, 150, 192, 168];
 
-const triPostest: RegistroTRI[] = TIEMPOS_POSTEST.map((tiempoMin, i) => ({
-  id: `TRI-PO-${String(i + 1).padStart(2, '0')}`,
-  n: i + 1,
-  fecha: fechaMenos(i < 7 ? 0 : i - 6),
-  eventoRegistrado: EVENTOS_TRI[i]!,
-  horaInicioRegistro: HORAS_POSTEST[i]!,
-  tiempoMin,
-  etapa: 'postest',
-}));
-
-const triPretest: RegistroTRI[] = TIEMPOS_PRETEST.map((tiempoMin, i) => ({
+export const triPretest: RegistroTRI[] = SEGUNDOS_PRETEST.map((segundos, i) => ({
   id: `TRI-PR-${String(i + 1).padStart(2, '0')}`,
   n: i + 1,
   fecha: fechaMenos(30 + i),
   eventoRegistrado: EVENTOS_TRI[i]!,
   horaInicioRegistro: HORAS_PRETEST[i]!,
-  tiempoMin,
+  tiempoMin: Math.round((segundos / 60) * 10) / 10,
   etapa: 'pretest',
   observacion: 'Registro manual en hoja de cálculo',
 }));
 
-const promedioPostest = redondear(TIEMPOS_POSTEST.reduce((a, b) => a + b, 0) / TIEMPOS_POSTEST.length);
-const promedioPretest = redondear(TIEMPOS_PRETEST.reduce((a, b) => a + b, 0) / TIEMPOS_PRETEST.length);
+export const META_TRI = `Reducción ≥ ${METAS_TESIS.TRI_REDUCCION_PCT} % vs pretest`;
 
 export const evidenciaTri: EvidenciaTRI = {
-  postest: triPostest,
+  postest: [],
   pretest: triPretest,
-  promedioPostest,
-  promedioPretest,
-  reduccionPct: redondear(((promedioPostest - promedioPretest) / promedioPretest) * 100),
-  meta: 'Reducción ≥ 40 % vs pretest',
-  estado: 'cumple',
+  promedioPostest: null,
+  promedioPretest: calcTri(triPretest.map((r) => r.tiempoMin)),
+  reduccionPct: null,
+  meta: META_TRI,
+  estado: 'sin_datos',
 };
 
 /* ------------------------------------------------------------------ */
-/* TCI — Anexo 03 (30 evaluaciones, 28 correctas = 93,3 %)             */
+/* TCI — Anexo 03 · sin evaluaciones hasta la primera validación       */
 /* ------------------------------------------------------------------ */
 
-const REGISTROS_TCI = [
-  'Parada 07:42 · PP-01-10 · LLEN-A1',
-  'Merma EP 3,2 kg · MP-01-01 · LLEN-A1',
-  'Velocidad 131 u/min · LLEN-A1',
-  'Parada 09:24 · PN-04-01 · LLEN-A1',
-  'Parada 11:18 · PN-02-01 · LLEN-A1',
-  'Merma PT 1,8 kg · MP-02-01 · LLEN-A1',
-  'Parada 12:40 · PN-04-14 · LLEN-A1',
-  'Orden OF-2026-0814 · LLEN-M2',
-  'Parada 13:47 · PN-02-02 · MOLD-A3',
-  'Merma EP 2,4 kg · MP-01-01 · EXTR-2',
-];
+export const META_TCI = `≥ ${METAS_TESIS.TCI_PCT} %`;
 
-const OBSERVACION_INCORRECTA = [
-  'Sin acción tomada al momento del registro; se completó al día siguiente',
-  'Hora de fin registrada fuera del turno; se corrigió en bitácora',
-];
-
-function generarTci(): EvaluacionTCI[] {
-  const out: EvaluacionTCI[] = [];
-  const turnos: EvaluacionTCI['turno'][] = ['D', 'N'];
-  /** Índices (0-based) de los 2 registros que no cumplen los 4 criterios. */
-  const fallos = new Set([11, 23]);
-  for (let i = 0; i < 30; i += 1) {
-    const falla = fallos.has(i);
-    out.push({
-      id: `TCI-${String(i + 1).padStart(2, '0')}`,
-      n: i + 1,
-      fecha: fechaMenos(Math.floor(i / 2)),
-      turno: turnos[i % 2]!,
-      registro: REGISTROS_TCI[i % REGISTROS_TCI.length]!,
-      completo: !falla || i === 23,
-      preciso: !falla,
-      trazable: true,
-      valido: !falla,
-      observacion: falla
-        ? OBSERVACION_INCORRECTA[i === 11 ? 0 : 1]!
-        : 'Cumple los 4 criterios de calidad',
-    });
-  }
-  return out;
-}
-
-const registrosTci = generarTci();
-const correctosTci = registrosTci.filter((r) => r.completo && r.preciso && r.trazable && r.valido).length;
-
+/** Las evaluaciones nacen de `POST /evidencia/tci/validar`, nunca del seed. */
 export const evidenciaTci: EvidenciaTCI = {
-  registros: registrosTci,
-  registrosCorrectos: correctosTci,
-  registrosTotales: registrosTci.length,
-  porcentaje: redondear((correctosTci / registrosTci.length) * 100),
-  meta: '≥ 90 %',
-  estado: 'cumple',
+  registros: [],
+  registrosCorrectos: 0,
+  registrosTotales: 0,
+  porcentaje: null,
+  meta: META_TCI,
+  estado: 'sin_datos',
+  porTipo: {
+    parada: { correctos: 0, totales: 0 },
+    merma: { correctos: 0, totales: 0 },
+    velocidad: { correctos: 0, totales: 0 },
+  },
+  fuentes: [],
 };
 
 /* ------------------------------------------------------------------ */
-/* TSP — Anexo 04 (8 ítems Likert, 19 respuestas, 84,2 % de acuerdo)   */
+/* TSP — Anexo 04 · los 8 ítems del instrumento, sin respuestas        */
 /* ------------------------------------------------------------------ */
 
 export const ITEMS_TSP: string[] = [
@@ -151,100 +111,68 @@ export const ITEMS_TSP: string[] = [
   'Recomendaría seguir usando el sistema en mi área de trabajo.',
 ];
 
-const RESPUESTAS_TSP = 19;
-const INVITADOS_TSP = 22;
-const DE_ACUERDO_POR_ITEM = [17, 16, 15, 17, 16, 15, 16, 16];
-const PROMEDIO_POR_ITEM = [4.4, 4.2, 4.0, 4.5, 4.2, 3.9, 4.2, 4.1];
+export const META_TSP = `≥ ${METAS_TESIS.TSP_PCT} % de acuerdo`;
 
-const itemsTsp: ItemEncuesta[] = ITEMS_TSP.map((texto, i) => ({
-  n: i + 1,
-  texto,
-  promedio: PROMEDIO_POR_ITEM[i]!,
-  pctAcuerdo: redondear((DE_ACUERDO_POR_ITEM[i]! / RESPUESTAS_TSP) * 100),
-}));
+/** Título y ayuda de la encuesta pública (`/encuesta/:token`). */
+export const ENCUESTA_TITULO = 'Encuesta de satisfacción · MES Yamboly';
+export const ENCUESTA_DESCRIPCION =
+  'Ocho preguntas sobre tu experiencia registrando la producción con el sistema. Responde del 1 (totalmente en desacuerdo) al 5 (totalmente de acuerdo). Es anónima y toma menos de 3 minutos.';
 
-const totalDeAcuerdo = DE_ACUERDO_POR_ITEM.reduce((a, b) => a + b, 0);
-const totalRespuestas = RESPUESTAS_TSP * ITEMS_TSP.length;
-
-export const encuestaTsp: EncuestaTSP = {
-  items: itemsTsp,
-  respuestas: RESPUESTAS_TSP,
-  invitados: INVITADOS_TSP,
-  promedio: Math.round((PROMEDIO_POR_ITEM.reduce((a, b) => a + b, 0) / ITEMS_TSP.length) * 100) / 100,
-  pctAcuerdo: redondear((totalDeAcuerdo / totalRespuestas) * 100),
-  meta: '≥ 80 % de acuerdo',
-  estado: 'cumple',
-  enlace: '/encuesta/YMB-2026-TSP',
+/** Sin invitaciones ni respuestas: las crea el investigador desde la vista 09.D. */
+export const evidenciaTsp: EvidenciaTSP = {
+  items: ITEMS_TSP.map((texto, i) => ({ n: i + 1, texto, promedio: null, pctAcuerdo: null })),
+  invitaciones: [],
+  respuestas: 0,
+  invitados: 0,
+  promedio: null,
+  pctAcuerdo: null,
+  meta: META_TSP,
+  estado: 'sin_datos',
+  enlace: '',
 };
 
-export const TOKEN_ENCUESTA = 'YMB-2026-TSP';
-
 /* ------------------------------------------------------------------ */
-/* CFS — Anexo 05 (9 funcionalidades)                                  */
+/* CFS — Anexo 05 · 9 funcionalidades por verificar                    */
 /* ------------------------------------------------------------------ */
 
 export const verificacionesCfs: VerificacionCFS[] = [
-  { id: 'CFS-1', n: 1, rf: 'RF1', funcionalidad: 'Captura de datos productivos', cumple: true, observacion: 'Registro en 3 toques con cronómetro TRI en cada modal', ruta: '/tiempo-real' },
-  { id: 'CFS-2', n: 2, rf: 'RF2', funcionalidad: 'Registro de producción', cumple: true, observacion: 'Inicio y cierre de orden con conteo de codificadora', ruta: '/ordenes' },
-  { id: 'CFS-3', n: 3, rf: 'RF3', funcionalidad: 'Registro de paradas', cumple: true, observacion: 'Árbol de causas PP-01…PS-05 con acción tomada obligatoria', ruta: '/ordenes/ORD-0815' },
-  { id: 'CFS-4', n: 4, rf: 'RF4', funcionalidad: 'Registro de mermas', cumple: true, observacion: 'Tipos MP/EP/PT y árbol de causas MP-01…MP-05 con código de balde', ruta: '/ordenes/ORD-0815' },
-  { id: 'CFS-5', n: 5, rf: 'RF5', funcionalidad: 'Repositorio centralizado', cumple: true, observacion: 'Órdenes con filtros, búsqueda, exportación y bitácora', ruta: '/ordenes' },
-  { id: 'CFS-6', n: 6, rf: 'RF6', funcionalidad: 'Dashboard en tiempo real', cumple: true, observacion: '9 líneas con estado, avance y Modo TV', ruta: '/tiempo-real' },
-  { id: 'CFS-7', n: 7, rf: 'RF7', funcionalidad: 'Indicadores', cumple: true, observacion: 'OEE por línea, turno y periodo con comparativas', ruta: '/reportes' },
-  { id: 'CFS-8', n: 8, rf: 'RF8', funcionalidad: 'Analítica con IA', cumple: true, observacion: 'Modelo v3.2 CRISP-DM con patrones y predicciones', ruta: '/analitica' },
-  { id: 'CFS-9', n: 9, rf: 'RF9', funcionalidad: 'Alertas', cumple: true, observacion: 'Bandeja con umbrales configurables y confirmación de evento real', ruta: '/alertas' },
+  { id: 'CFS-1', n: 1, rf: 'RF1', funcionalidad: 'Captura de datos productivos', cumple: false, observacion: '', ruta: '/tiempo-real' },
+  { id: 'CFS-2', n: 2, rf: 'RF2', funcionalidad: 'Registro de producción', cumple: false, observacion: '', ruta: '/ordenes' },
+  { id: 'CFS-3', n: 3, rf: 'RF3', funcionalidad: 'Registro de paradas', cumple: false, observacion: '', ruta: '/ordenes/ORD-0815' },
+  { id: 'CFS-4', n: 4, rf: 'RF4', funcionalidad: 'Registro de mermas', cumple: false, observacion: '', ruta: '/ordenes/ORD-0815' },
+  { id: 'CFS-5', n: 5, rf: 'RF5', funcionalidad: 'Repositorio centralizado', cumple: false, observacion: '', ruta: '/ordenes' },
+  { id: 'CFS-6', n: 6, rf: 'RF6', funcionalidad: 'Dashboard en tiempo real', cumple: false, observacion: '', ruta: '/tiempo-real' },
+  { id: 'CFS-7', n: 7, rf: 'RF7', funcionalidad: 'Indicadores', cumple: false, observacion: '', ruta: '/reportes' },
+  { id: 'CFS-8', n: 8, rf: 'RF8', funcionalidad: 'Analítica con IA', cumple: false, observacion: '', ruta: '/analitica' },
+  { id: 'CFS-9', n: 9, rf: 'RF9', funcionalidad: 'Alertas', cumple: false, observacion: '', ruta: '/alertas' },
 ];
+
+export const META_CFS = `${METAS_TESIS.CFS_TOTAL} / ${METAS_TESIS.CFS_TOTAL} funcionalidades`;
 
 export const evidenciaCfs: EvidenciaCFS = {
   items: verificacionesCfs,
-  cumplidas: verificacionesCfs.filter((v) => v.cumple).length,
+  cumplidas: 0,
   totales: verificacionesCfs.length,
-  porcentaje: 100,
-  meta: '9 / 9 funcionalidades',
-  estado: 'cumple',
+  porcentaje: 0,
+  meta: META_CFS,
+  estado: estadoCfs(0),
 };
 
 /* ------------------------------------------------------------------ */
-/* EP — Anexo 06 (137 / 164 = 83,5 %)                                  */
+/* EP — Anexo 06 · sin predicciones contrastadas                       */
 /* ------------------------------------------------------------------ */
 
-export const EP_CORRECTAS_BASE = 137;
-export const EP_TOTALES_BASE = 164;
+export const META_EP = `≥ ${METAS_TESIS.EP_PCT} %`;
 
-const TIPOS_EP = [
-  'Parada prevista · LLEN-A1 Llenadora A1',
-  'Merma prevista · MOLD-A3 Moldeadora A3',
-  'Velocidad baja · LLEN-M2 Llenadora M2',
-  'OEE bajo umbral · LLEN-A2 Llenadora A2',
-  'Parada prevista · EXTR-2 Extrusora 2',
-  'Parada prevista · MOLD-A4 Moldeadora A4',
-];
-
-function generarEp(): RegistroEP[] {
-  const out: RegistroEP[] = [];
-  for (let i = 0; i < 18; i += 1) {
-    const acierto = i % 6 !== 5;
-    out.push({
-      id: `EP-${String(i + 1).padStart(2, '0')}`,
-      n: i + 1,
-      fecha: fechaMenos(Math.floor(i / 2)),
-      tipoPrediccion: TIPOS_EP[i % TIPOS_EP.length]!,
-      eventoReal: acierto
-        ? 'El evento ocurrió dentro de la ventana prevista'
-        : 'No se observó el evento en la ventana',
-      acierto,
-      observacion: acierto ? 'Confirmado por el supervisor de turno' : 'Se aplicó acción preventiva antes de la ventana',
-      alertaId: i < 6 ? `ALE-${String(i + 18).padStart(3, '0')}` : undefined,
-    });
-  }
-  return out;
-}
-
+/**
+ * El Anexo 06 se llena confirmando alertas en `/alertas`. Las alertas del seed
+ * marcadas como «confirmadas» son demo operativa y no cuentan como evidencia.
+ */
 export const evidenciaEp: EvidenciaEP = {
-  registros: generarEp(),
-  prediccionesCorrectas: EP_CORRECTAS_BASE,
-  prediccionesTotales: EP_TOTALES_BASE,
-  porcentaje: redondear((EP_CORRECTAS_BASE / EP_TOTALES_BASE) * 100),
-  meta: '≥ 80 %',
-  estado: 'cumple',
+  registros: [],
+  prediccionesCorrectas: 0,
+  prediccionesTotales: 0,
+  porcentaje: null,
+  meta: META_EP,
+  estado: 'sin_datos',
 };

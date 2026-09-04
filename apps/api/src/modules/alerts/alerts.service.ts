@@ -194,7 +194,11 @@ export class AlertsService {
     const fila =
       (await this.umbrales.findOne({ where: { id: UMBRALES_ID } })) ??
       this.umbrales.create({ id: UMBRALES_ID });
-    Object.assign(fila, dto, { actualizadoEn: ahoraIso(), actualizadoPor: usuario });
+    /* Las tolerancias TCI son opcionales: si no vienen, se conservan las vigentes. */
+    const cambios = Object.fromEntries(
+      Object.entries(dto).filter(([, valor]) => valor !== undefined),
+    );
+    Object.assign(fila, cambios, { actualizadoEn: ahoraIso(), actualizadoPor: usuario });
     await this.umbrales.save(fila);
     return this.aUmbralesDto(fila);
   }
@@ -206,6 +210,9 @@ export class AlertsService {
       probabilidadMinima: fila.probabilidadMinima,
       notificarN8n: fila.notificarN8n,
       mostrarTv: fila.mostrarTv,
+      tciToleranciaMin: fila.tciToleranciaMin,
+      tciToleranciaPct: fila.tciToleranciaPct,
+      tciToleranciaDiasSap: fila.tciToleranciaDiasSap,
       actualizadoEn: fila.actualizadoEn,
       actualizadoPor: fila.actualizadoPor,
     };

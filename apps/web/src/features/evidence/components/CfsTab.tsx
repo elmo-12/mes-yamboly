@@ -2,9 +2,9 @@
 
 import * as React from 'react';
 import {
-  Checkbox,
   Input,
   SectionTitle,
+  Switch,
   TBody,
   TCell,
   TH,
@@ -25,15 +25,20 @@ import { KpiAnexoCard, KpiRow, PieAnexo } from './evidencia-format';
  * observación editable y enlace a la pantalla que evidencia el requisito.
  */
 export function CfsTab({ cfs }: { cfs: EvidenciaCFS }) {
+  const hayVerificadas = cfs.cumplidas > 0;
   return (
     <div className="flex flex-col gap-6">
       <KpiRow>
         <KpiAnexoCard
           label="CFS · Cumplimiento"
-          value={`${formatNumber(cfs.porcentaje, 0)} %`}
+          value={hayVerificadas ? `${formatNumber(cfs.porcentaje, 0)} %` : null}
           meta={cfs.meta}
           estado={cfs.estado}
-          context={`${cfs.cumplidas}/${cfs.totales} funcionalidades`}
+          context={
+            hayVerificadas
+              ? `${cfs.cumplidas}/${cfs.totales} funcionalidades`
+              : 'Marca cada funcionalidad verificada en la ficha'
+          }
         />
         <KpiAnexoCard
           label="Implementadas (FRI)"
@@ -120,18 +125,14 @@ function FilaCfs({ item }: { item: VerificacionCFS }) {
         {item.rf} · {item.funcionalidad}
       </TCell>
       <TCell className="py-2.5">
-        <span className="flex items-center gap-2">
-          <Checkbox
-            size="sm"
-            checked={item.cumple}
-            disabled={actualizar.isPending}
-            aria-label={`${item.rf} cumple`}
-            onCheckedChange={(valor) =>
-              void guardar({ cumple: valor === true, observacion })
-            }
-          />
-          <span className="text-text-primary">{item.cumple ? 'Sí' : 'No'}</span>
-        </span>
+        <Switch
+          size="sm"
+          checked={item.cumple}
+          disabled={actualizar.isPending}
+          aria-label={`${item.rf} cumple`}
+          label={item.cumple ? 'Sí' : 'No'}
+          onCheckedChange={(valor) => void guardar({ cumple: valor, observacion })}
+        />
       </TCell>
       <TCell className="py-2">
         <Input

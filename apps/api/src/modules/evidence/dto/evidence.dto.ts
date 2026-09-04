@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Matches,
@@ -15,7 +16,17 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { FORMATOS_EXPORT, KPIS_TESIS, type FormatoExport, type KpiTesisId } from '@mes/types';
+import {
+  CLAVES_CRITERIO_TCI,
+  FORMATOS_EXPORT,
+  KPIS_TESIS,
+  TIPOS_REGISTRO_TCI,
+  type ClaveCriterioTci,
+  type FormatoExport,
+  type KpiTesisId,
+  type TipoRegistroTci,
+} from '@mes/types';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const HORA = /^\d{2}:\d{2}(:\d{2})?$/;
@@ -57,29 +68,94 @@ export class CargarPretestDto {
   registros!: RegistroPretestDto[];
 }
 
-/* --- Anexo 03 · override manual de criterios TCI ------------------ */
+/* --- Anexo 03 · validación de calidad (TCI) ----------------------- */
+
+export class ValidarTciDto {
+  @ApiPropertyOptional({ example: '2026-08-28', description: 'Por defecto, el primer día con captura del postest' })
+  @IsOptional()
+  @Matches(FECHA, { message: 'desde debe tener formato YYYY-MM-DD' })
+  desde?: string;
+
+  @ApiPropertyOptional({ example: '2026-08-28', description: 'Por defecto, hoy' })
+  @IsOptional()
+  @Matches(FECHA, { message: 'hasta debe tener formato YYYY-MM-DD' })
+  hasta?: string;
+
+  @ApiPropertyOptional({ isArray: true, enum: TIPOS_REGISTRO_TCI, description: 'Por defecto, los tres tipos' })
+  @IsOptional()
+  @IsArray({ message: 'tipos debe ser una lista' })
+  @ArrayMinSize(1, { message: 'Selecciona al menos un tipo' })
+  @IsIn(TIPOS_REGISTRO_TCI, { each: true, message: 'Tipo de registro no reconocido' })
+  tipos?: TipoRegistroTci[];
+}
+
+export class TciQueryDto extends PaginationDto {
+  @ApiPropertyOptional({ enum: TIPOS_REGISTRO_TCI, isArray: true, description: 'Repetible o separado por comas' })
+  @IsOptional()
+  tipo?: TipoRegistroTci | TipoRegistroTci[];
+
+  @ApiPropertyOptional({ enum: ['valido', 'invalido'] })
+  @IsOptional()
+  @IsIn(['valido', 'invalido'], { message: 'resultado debe ser valido o invalido' })
+  resultado?: 'valido' | 'invalido';
+
+  @ApiPropertyOptional({ example: '2026-08-01' })
+  @IsOptional()
+  @Matches(FECHA, { message: 'desde debe tener formato YYYY-MM-DD' })
+  desde?: string;
+
+  @ApiPropertyOptional({ example: '2026-08-31' })
+  @IsOptional()
+  @Matches(FECHA, { message: 'hasta debe tener formato YYYY-MM-DD' })
+  hasta?: string;
+}
 
 export class OverrideTciDto {
-  @ApiPropertyOptional({ description: 'Fuerza el criterio «completo»; `null` vuelve a la regla' })
+  @ApiPropertyOptional({
+    example: { sensor: true, solicitud: null },
+    description: 'Fuerza criterios por clave; `null` devuelve el criterio a la regla',
+  })
   @IsOptional()
-  @IsBoolean({ message: 'completo debe ser booleano' })
-  completo?: boolean | null;
-
-  @ApiPropertyOptional({ description: 'Fuerza el criterio «preciso»' })
-  @IsOptional()
-  @IsBoolean({ message: 'preciso debe ser booleano' })
-  preciso?: boolean | null;
-
-  @ApiPropertyOptional({ description: 'Fuerza el criterio «trazable»' })
-  @IsOptional()
-  @IsBoolean({ message: 'trazable debe ser booleano' })
-  trazable?: boolean | null;
+  @IsObject({ message: 'overrides debe ser un objeto' })
+  overrides?: Partial<Record<ClaveCriterioTci, boolean | null>>;
 
   @ApiPropertyOptional({ maxLength: 300 })
   @IsOptional()
   @IsString()
   @MaxLength(300, { message: 'Máximo 300 caracteres' })
   observacion?: string;
+}
+
+/** Claves de criterio admitidas por `PATCH /evidencia/tci/:id`. */
+export const CLAVES_OVERRIDE: readonly ClaveCriterioTci[] = CLAVES_CRITERIO_TCI;
+
+/* --- Anexo 04 · invitación a la encuesta -------------------------- */
+
+export class CrearInvitacionDto {
+  @ApiProperty({ example: 'Jorge Quispe' })
+  @IsString({ message: 'Escribe el nombre del invitado' })
+  @MinLength(3, { message: 'Escribe el nombre del invitado' })
+  @MaxLength(80, { message: 'Máximo 80 caracteres' })
+  invitado!: string;
+
+  @ApiPropertyOptional({ example: 'Maquinista', maxLength: 60 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60, { message: 'Máximo 60 caracteres' })
+  rol?: string;
+}
+
+/* --- Fuentes externas · importación ------------------------------- */
+
+export class ImportarFuenteDto {
+  @ApiPropertyOptional({
+    type: 'string',
+    example: '{"fecha_hora":"Timestamp"}',
+    description: 'JSON `{columnaEsperada: cabeceraDelArchivo}` para corregir columnas',
+  })
+  @IsOptional()
+  @IsString({ message: 'mapeo debe ser un JSON en texto' })
+  mapeo?: string;
 }
 
 /* --- Anexo 05 · lista de cotejo CFS ------------------------------- */
