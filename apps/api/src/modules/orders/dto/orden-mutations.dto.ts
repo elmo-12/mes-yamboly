@@ -20,12 +20,12 @@ export class CreateOrdenDto {
   @Matches(/^OF-\d{4}-\d{4}$/, { message: 'Formato esperado OF-2026-0815' })
   codigo!: string;
 
-  @ApiProperty({ example: 'LIN-02' })
+  @ApiProperty({ example: 'LIN-LLEN-M2' })
   @IsString()
   @IsNotEmpty({ message: 'Selecciona una línea' })
   lineaId!: string;
 
-  @ApiProperty({ example: 'PRD-003' })
+  @ApiProperty({ example: 'PRD-1110001' })
   @IsString()
   @IsNotEmpty({ message: 'Selecciona un producto' })
   productoId!: string;
@@ -39,7 +39,7 @@ export class CreateOrdenDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Fecha inválida' })
   vencimiento!: string;
 
-  @ApiProperty({ enum: TURNOS, example: 'M' })
+  @ApiProperty({ enum: TURNOS, example: 'D' })
   @IsIn(TURNOS)
   turno!: Turno;
 

@@ -8,7 +8,9 @@ import {
   Maquina,
   OrdenFabricacion,
   Producto,
+  Sabor,
   User,
+  VelocidadEstandar,
 } from '../database/entities';
 import { LookupsService } from './mappers/lookups.service';
 import { AuditService } from './services/audit.service';
@@ -20,6 +22,8 @@ import { AuditService } from './services/audit.service';
     TypeOrmModule.forFeature([
       Linea,
       Producto,
+      Sabor,
+      VelocidadEstandar,
       Maquina,
       CausaParada,
       CausaMerma,

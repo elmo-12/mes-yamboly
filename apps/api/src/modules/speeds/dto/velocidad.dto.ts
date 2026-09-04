@@ -19,7 +19,7 @@ export class CreateVelocidadDto {
   @IsNotEmpty({ message: 'Orden requerida' })
   ordenId!: string;
 
-  @ApiProperty({ example: 'LIN-02' })
+  @ApiProperty({ example: 'LIN-LLEN-M2' })
   @IsString()
   @IsNotEmpty({ message: 'Selecciona una línea' })
   lineaId!: string;

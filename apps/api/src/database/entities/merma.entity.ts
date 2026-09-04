@@ -23,8 +23,21 @@ export class Merma {
   @Column('text')
   sabor!: string;
 
+  /** Raíz del árbol de causas de merma (`nivel: 'tipo'`), p. ej. `CME-MP-01`. */
+  @Column('text', { default: '' })
+  tipoCausaId!: string;
+
+  /** Nivel intermedio (`nivel: 'clasificacion'`); `null` si la causa cuelga del tipo. */
+  @Column('text', { nullable: true })
+  clasificacionId!: string | null;
+
+  /** Hoja seleccionada (`nivel: 'causa'`), p. ej. `CME-MP-01-01`. */
   @Column('text')
   causaId!: string;
+
+  /** N.º de solicitud exigido por causas con `requiereSolicitud`. */
+  @Column('text', { nullable: true })
+  numeroSolicitud!: string | null;
 
   @Column('text')
   responsableId!: string;

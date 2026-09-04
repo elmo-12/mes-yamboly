@@ -41,4 +41,8 @@ export class CausaParada {
 
   @Column('integer', { default: 0 })
   paradasHistoricas!: number;
+
+  /** Código del sistema original (`PNP`, `RUT04`, `FAL02`, `IMP10`); `null` si no existía. */
+  @Column('text', { nullable: true })
+  codigoLegado!: string | null;
 }

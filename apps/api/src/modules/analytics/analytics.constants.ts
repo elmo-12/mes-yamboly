@@ -9,39 +9,39 @@ export const INSIGHTS: InsightCard[] = [
   {
     id: 'INS-01',
     tono: 'warning',
-    texto: 'L2 Conos concentra 34 % de paradas mecánicas en turno Tarde',
-    soporte: '48 de 142 eventos PM-01 de los últimos 30 días',
+    texto: 'LLEN-M2 concentra 34 % de las paradas por falla de mantto en turno Noche',
+    soporte: '48 de 142 eventos PN-02-01 de los últimos 30 días',
   },
   {
     id: 'INS-02',
     tono: 'info',
-    texto: 'Cambios PC-04 después de las 12:00 duran 40 % más',
+    texto: 'Las limpiezas PP-01-C después de las 12:00 duran 40 % más',
     soporte: 'Media 42 min frente a 30 min del estándar',
   },
   {
     id: 'INS-03',
     tono: 'warning',
-    texto: 'Merma EP sube 1,8 pp en arranques con Sabor Lúcuma',
-    soporte: '19 arranques analizados en L3 Vasos',
+    texto: 'La merma EP sube 1,8 pp en los arranques de las extrusoras',
+    soporte: '19 arranques analizados en EXTR-2 y EXTR-3',
   },
 ];
 
 /** Riesgo 0–100 estimado por el modelo para el próximo turno. */
 export const RIESGO_POR_LINEA: Omit<RiesgoLinea, 'turnoObjetivo'>[] = [
-  { lineaId: 'LIN-02', lineaCodigo: 'L2', lineaNombre: 'Conos', riesgo: 78, causaProbable: 'PM-01 Falla mecánica · Envolvedora L2' },
-  { lineaId: 'LIN-04', lineaCodigo: 'L4', lineaNombre: 'Sándwich', riesgo: 71, causaProbable: 'PM-01 Desalineación de moldes' },
-  { lineaId: 'LIN-03', lineaCodigo: 'L3', lineaNombre: 'Vasos', riesgo: 64, causaProbable: 'PE-02 Falla de variador' },
-  { lineaId: 'LIN-01', lineaCodigo: 'L1', lineaNombre: 'Paletas', riesgo: 46, causaProbable: 'PO-06 Ajuste de temperatura' },
-  { lineaId: 'LIN-05', lineaCodigo: 'L5', lineaNombre: 'Bombones', riesgo: 38, causaProbable: 'PA-05 Falta de cobertura' },
+  { lineaId: 'LIN-LLEN-M2', lineaCodigo: 'LLEN-M2', lineaNombre: 'Llenadora M2', riesgo: 78, causaProbable: 'PN-02-01 Falla mantto · Envolvedora' },
+  { lineaId: 'LIN-MOLD-A4', lineaCodigo: 'MOLD-A4', lineaNombre: 'Moldeadora A4', riesgo: 71, causaProbable: 'PN-04-15 Falla de equipo · Descargador' },
+  { lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2', riesgo: 64, causaProbable: 'PN-02-02 Falla operacional · Túnel de frío' },
+  { lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1', riesgo: 46, causaProbable: 'PN-04-02 Insumo / MP · Dosificadora' },
+  { lineaId: 'LIN-MOLD-A2', lineaCodigo: 'MOLD-A2', lineaNombre: 'Moldeadora A2', riesgo: 38, causaProbable: 'PN-04-16 Falla operativa · Pinzas' },
 ];
 
 export const RECURRENCIAS: Recurrencia[] = [
-  { id: 'REC-01', patron: 'PM-01 en Envolvedora L2 tras cambio de producto', frecuencia: 9, impactoMin: 118, lineas: ['L2'], confianza: 88 },
-  { id: 'REC-02', patron: 'PC-04 después de las 12:00 excede el tiempo estándar', frecuencia: 12, impactoMin: 96, lineas: ['L1', 'L2', 'L4'], confianza: 84 },
-  { id: 'REC-03', patron: 'Merma EP alta en arranque con sabor Lúcuma', frecuencia: 7, impactoMin: 0, lineas: ['L3'], confianza: 81 },
-  { id: 'REC-04', patron: 'PE-02 en Selladora L3 en turno Tarde', frecuencia: 5, impactoMin: 74, lineas: ['L3'], confianza: 76 },
-  { id: 'REC-05', patron: 'PS-07 en turno Noche por refrigerio no cubierto', frecuencia: 4, impactoMin: 48, lineas: ['L4', 'L5'], confianza: 72 },
-  { id: 'REC-06', patron: 'PA-05 falta de bobina al final del turno Mañana', frecuencia: 6, impactoMin: 62, lineas: ['L2', 'L5'], confianza: 69 },
+  { id: 'REC-01', patron: 'PN-02-01 en la envolvedora de LLEN-M2 tras cambio de producto', frecuencia: 9, impactoMin: 118, lineas: ['LLEN-M2'], confianza: 88 },
+  { id: 'REC-02', patron: 'PP-01-C limpieza después de las 12:00 excede el tiempo estándar', frecuencia: 12, impactoMin: 96, lineas: ['LLEN-M1', 'LLEN-M2', 'MOLD-A4'], confianza: 84 },
+  { id: 'REC-03', patron: 'Merma EP alta en el arranque de las extrusoras', frecuencia: 7, impactoMin: 0, lineas: ['EXTR-2', 'EXTR-3'], confianza: 81 },
+  { id: 'REC-04', patron: 'PN-02-02 en el túnel de frío de EXTR-2 en turno Noche', frecuencia: 5, impactoMin: 74, lineas: ['EXTR-2'], confianza: 76 },
+  { id: 'REC-05', patron: 'PS-05-E refrigerio no cubierto en turno Noche', frecuencia: 4, impactoMin: 48, lineas: ['MOLD-A3', 'MOLD-A4'], confianza: 72 },
+  { id: 'REC-06', patron: 'PN-04-02 falta de insumo al final del turno Día', frecuencia: 6, impactoMin: 62, lineas: ['LLEN-A1', 'LLEN-A2'], confianza: 69 },
 ];
 
 export const VARIABLES_ENTRADA: VariableEntrada[] = [
@@ -80,7 +80,7 @@ export const FASES_DESCRIPCION = [
   {
     id: 'comprension_negocio' as const,
     nombre: 'Comprensión del negocio',
-    descripcion: 'Objetivo: anticipar paradas y mermas para reducir el tiempo perdido en las 5 líneas.',
+    descripcion: 'Objetivo: anticipar paradas y mermas para reducir el tiempo perdido en las 9 líneas.',
     metricas: [{ label: 'Objetivos', valor: '3' }, { label: 'RF cubiertos', valor: 'RF8, RF9' }],
   },
   {

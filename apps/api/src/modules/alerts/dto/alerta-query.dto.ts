@@ -15,7 +15,7 @@ export class AlertaQueryDto extends PaginationDto {
   @IsOptional()
   severidad?: SeveridadAlerta | SeveridadAlerta[];
 
-  @ApiPropertyOptional({ example: 'LIN-02' })
+  @ApiPropertyOptional({ example: 'LIN-LLEN-M2' })
   @IsOptional()
   lineaId?: string | string[];
 

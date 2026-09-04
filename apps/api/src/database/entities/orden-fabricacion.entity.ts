@@ -38,8 +38,16 @@ export class OrdenFabricacion {
   @Column('integer', { default: 0 })
   conteoCodificadora!: number;
 
-  @Column('integer', { default: 0 })
+  /**
+   * Velocidad estándar en **unidades por minuto**, congelada al iniciar la orden
+   * desde el par producto × línea vigente (`VelocidadEstandar.velocidadUnidMin`).
+   */
+  @Column('real', { default: 0 })
   velocidadEstandar!: number;
+
+  /** Par producto × línea del que se copió `velocidadEstandar` (`VE-0002`). */
+  @Column('text', { nullable: true })
+  velocidadEstandarId!: string | null;
 
   @Column('text', { default: 'en_curso' })
   estado!: EstadoOrden;

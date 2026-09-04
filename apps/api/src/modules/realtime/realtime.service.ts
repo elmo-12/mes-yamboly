@@ -250,8 +250,14 @@ export class RealtimeService {
 
     const orden = ctx.orden;
     const producto = orden ? lookups.productos.get(orden.productoId) : undefined;
+    /* Estándar: el congelado en la orden → el par vigente → la capacidad de la línea. */
+    const parVigente = orden
+      ? LookupsService.parActivo(lookups, orden.productoId, orden.lineaId)
+      : undefined;
     const velocidadEstandar =
-      producto?.velocidadEstandar ?? orden?.velocidadEstandar ?? linea.capacidadUnidadesMin;
+      orden?.velocidadEstandar ||
+      parVigente?.velocidadUnidMin ||
+      linea.capacidadUnidadesMin;
     const detenida = estado === 'parada' || estado === 'sugerida' || estado === 'sin_orden';
 
     const maquinista = orden

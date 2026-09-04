@@ -63,16 +63,39 @@ export function enriquecerParada(parada: Parada, lookups: Lookups): ParadaListIt
 
 export function enriquecerMerma(merma: Merma, lookups: Lookups): MermaListItem {
   const causa = lookups.causasMerma.get(merma.causaId);
+  const cadena = cadenaCausaMerma(lookups, merma.causaId);
+  const tipoId = merma.tipoCausaId || (cadena.tipo?.id ?? '');
+  const clasificacionId = merma.clasificacionId ?? cadena.clasificacion?.id ?? null;
   return {
     ...merma,
     codigoBalde: opcional(merma.codigoBalde),
     observacion: opcional(merma.observacion),
+    numeroSolicitud: merma.numeroSolicitud ?? null,
+    tipoCausaId: tipoId,
+    clasificacionId,
     lineaCodigo: lookups.lineas.get(merma.lineaId)?.codigo ?? GUION,
     causaCodigo: causa?.codigo ?? GUION,
     causaNombre: causa?.nombre ?? GUION,
+    tipoCausaNombre: lookups.causasMerma.get(tipoId)?.nombre ?? GUION,
+    clasificacionNombre: clasificacionId
+      ? (lookups.causasMerma.get(clasificacionId)?.nombre ?? GUION)
+      : null,
     responsableNombre: nombreUsuario(lookups, merma.responsableId),
     ordenCodigo: codigoOrden(lookups, merma.ordenId),
   };
+}
+
+/**
+ * Cadena de ascendencia de una causa de merma: `causa` (hoja) →
+ * `clasificacion` (nivel intermedio, opcional) → `tipo` (raíz).
+ */
+export function cadenaCausaMerma(lookups: Lookups, causaId: string) {
+  const causa = lookups.causasMerma.get(causaId);
+  const padre = causa?.parentId ? lookups.causasMerma.get(causa.parentId) : undefined;
+  const abuelo = padre?.parentId ? lookups.causasMerma.get(padre.parentId) : undefined;
+  if (abuelo) return { causa, clasificacion: padre, tipo: abuelo };
+  if (padre) return { causa, clasificacion: undefined, tipo: padre };
+  return { causa, clasificacion: undefined, tipo: causa };
 }
 
 export function enriquecerVelocidad(

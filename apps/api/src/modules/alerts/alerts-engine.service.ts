@@ -80,7 +80,7 @@ export class AlertsEngineService {
       disparos.push({
         tipo: 'parada_prevista',
         severidad: senal.eventos7d >= 5 ? 'critica' : 'alta',
-        texto: `Parada PM-01 en ${senal.lineaCodigo} en ${VENTANA_MIN.parada_prevista} min`,
+        texto: `Parada por falla (PN-02) en ${senal.lineaCodigo} en ${VENTANA_MIN.parada_prevista} min`,
       });
     }
 

@@ -15,7 +15,11 @@ import type {
 import { computeOee, rangoPeriodo } from '@mes/shared';
 import type { AuthUser } from '../../common/decorators/current-user';
 import { TRI_REGISTRO_EVENT, type TriRegistroEvent } from '../../common/events/tri.event';
-import { ConflictoException, NoEncontradoException } from '../../common/exceptions/business.exception';
+import {
+  ConflictoException,
+  NoEncontradoException,
+  ValidationException,
+} from '../../common/exceptions/business.exception';
 import {
   enriquecerMerma,
   enriquecerOrden,
@@ -133,6 +137,19 @@ export class OrdersService {
     }
     const lookups = await this.lookups.load();
     const producto = lookups.productos.get(dto.productoId);
+
+    /*
+     * La velocidad estándar se resuelve del par producto × línea vigente y se
+     * congela en u/min: si el par no existe (o está inactivo) la orden no puede
+     * iniciarse, porque el OEE quedaría sin referencia de desempeño.
+     */
+    const par = LookupsService.parActivo(lookups, dto.productoId, dto.lineaId);
+    if (!par) {
+      throw new ValidationException({
+        productoId: 'El producto no tiene velocidad estándar en esta línea',
+      });
+    }
+
     const colaboradorIds = dto.colaboradorIds ?? [];
     const colaboradores: Colaborador[] =
       colaboradorIds.length > 0
@@ -152,7 +169,8 @@ export class OrdersService {
       planificado: dto.planificado,
       producido: 0,
       conteoCodificadora: 0,
-      velocidadEstandar: producto?.velocidadEstandar ?? 100,
+      velocidadEstandar: par.velocidadUnidMin,
+      velocidadEstandarId: par.id,
       estado: 'en_curso',
       maquinistaId: dto.maquinistaId,
       supervisorId: dto.supervisorId,

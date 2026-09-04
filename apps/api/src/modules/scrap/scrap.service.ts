@@ -6,8 +6,8 @@ import type { MermaListItem, Paginated } from '@mes/types';
 import type { AuthUser } from '../../common/decorators/current-user';
 import { TRI_REGISTRO_EVENT, type TriRegistroEvent } from '../../common/events/tri.event';
 import { NoEncontradoException, ValidationException } from '../../common/exceptions/business.exception';
-import { enriquecerMerma } from '../../common/mappers/enrich';
-import { LookupsService } from '../../common/mappers/lookups.service';
+import { cadenaCausaMerma, enriquecerMerma } from '../../common/mappers/enrich';
+import { LookupsService, type Lookups } from '../../common/mappers/lookups.service';
 import { AuditService } from '../../common/services/audit.service';
 import { paginate } from '../../common/utils/paginate';
 import { ahoraIso, toList } from '../../common/utils/query';
@@ -47,15 +47,64 @@ export class ScrapService {
     );
   }
 
-  async crear(dto: CreateMermaDto, usuario: AuthUser): Promise<MermaListItem> {
-    const lookups = await this.lookups.load();
+  /**
+   * Valida el árbol de causas de merma: la causa elegida debe ser una **hoja
+   * activa** (`nivel: 'causa'`) y su cadena de padres debe coincidir con la
+   * clasificación y el tipo enviados (si no vienen, se derivan de la hoja).
+   * Además exige `observacion` / `numeroSolicitud` cuando la causa lo marca.
+   */
+  private validarCausa(
+    lookups: Lookups,
+    dto: CreateMermaDto,
+  ): { causaId: string; tipoCausaId: string; clasificacionId: string | null } {
     const causa = lookups.causasMerma.get(dto.causaId);
     if (!causa) throw new ValidationException({ causaId: 'La causa seleccionada no existe' });
-    if (!causa.aplicaA.includes(dto.tipo)) {
+    if (causa.nivel !== 'causa') {
+      throw new ValidationException({
+        causaId: `${causa.codigo} es un nivel «${causa.nivel}»: elige una causa final del árbol`,
+      });
+    }
+    if (causa.estado !== 'activo') {
+      throw new ValidationException({ causaId: `La causa ${causa.codigo} está dada de baja` });
+    }
+    if (causa.aplicaA.length > 0 && !causa.aplicaA.includes(dto.tipo)) {
       throw new ValidationException({
         causaId: `La causa ${causa.codigo} no aplica a mermas de tipo ${dto.tipo}`,
       });
     }
+
+    const cadena = cadenaCausaMerma(lookups, causa.id);
+    const tipoCausaId = cadena.tipo?.id ?? '';
+    const clasificacionId = cadena.clasificacion?.id ?? null;
+
+    if (dto.tipoCausaId && dto.tipoCausaId !== tipoCausaId) {
+      throw new ValidationException({
+        tipoCausaId: `La causa ${causa.codigo} no pertenece al tipo de producción seleccionado`,
+      });
+    }
+    if (dto.clasificacionId && dto.clasificacionId !== clasificacionId) {
+      throw new ValidationException({
+        clasificacionId: `La causa ${causa.codigo} no pertenece a la clasificación seleccionada`,
+      });
+    }
+    if (causa.requiereComentario && !dto.observacion?.trim()) {
+      throw new ValidationException({
+        observacion: `La causa ${causa.codigo} exige un comentario`,
+      });
+    }
+    if (causa.requiereSolicitud && !dto.numeroSolicitud?.trim()) {
+      throw new ValidationException({
+        numeroSolicitud: `La causa ${causa.codigo} exige un n.º de solicitud`,
+      });
+    }
+
+    return { causaId: causa.id, tipoCausaId, clasificacionId };
+  }
+
+  async crear(dto: CreateMermaDto, usuario: AuthUser): Promise<MermaListItem> {
+    const lookups = await this.lookups.load();
+    const jerarquia = this.validarCausa(lookups, dto);
+    const causa = lookups.causasMerma.get(jerarquia.causaId)!;
     const orden = await this.orders.buscar(dto.ordenId);
 
     const registradaEn = ahoraIso();
@@ -67,7 +116,10 @@ export class ScrapService {
       tipo: dto.tipo,
       cantidadKg: dto.cantidadKg,
       sabor: dto.sabor,
-      causaId: causa.id,
+      tipoCausaId: jerarquia.tipoCausaId,
+      clasificacionId: jerarquia.clasificacionId,
+      causaId: jerarquia.causaId,
+      numeroSolicitud: dto.numeroSolicitud ?? null,
       responsableId: dto.responsableId,
       codigoBalde: dto.codigoBalde ?? null,
       enviarPasteurizacion: dto.enviarPasteurizacion ?? false,
@@ -103,19 +155,33 @@ export class ScrapService {
     if (!merma) throw new NoEncontradoException('Merma');
     const lookups = await this.lookups.load();
 
-    if (dto.causaId && !lookups.causasMerma.has(dto.causaId)) {
-      throw new ValidationException({ causaId: 'La causa seleccionada no existe' });
-    }
     if (dto.cantidadKg !== undefined && dto.cantidadKg <= 0) {
       throw new ValidationException({ cantidadKg: 'La cantidad debe ser mayor que 0' });
     }
+
+    /* Al reclasificar se revalida el árbol completo con los valores resultantes. */
+    const jerarquia = dto.causaId
+      ? this.validarCausa(lookups, {
+          ...dto,
+          tipo: dto.tipo ?? merma.tipo,
+          causaId: dto.causaId,
+          observacion: dto.observacion ?? merma.observacion ?? undefined,
+          numeroSolicitud: dto.numeroSolicitud ?? merma.numeroSolicitud ?? undefined,
+        } as CreateMermaDto)
+      : null;
 
     const anterior = { tipo: merma.tipo, cantidadKg: merma.cantidadKg, causaId: merma.causaId };
     Object.assign(merma, {
       ...dto,
       codigoBalde: dto.codigoBalde ?? merma.codigoBalde,
       observacion: dto.observacion ?? merma.observacion,
+      numeroSolicitud: dto.numeroSolicitud ?? merma.numeroSolicitud,
     });
+    if (jerarquia) {
+      merma.causaId = jerarquia.causaId;
+      merma.tipoCausaId = jerarquia.tipoCausaId;
+      merma.clasificacionId = jerarquia.clasificacionId;
+    }
     await this.mermas.save(merma);
     await this.actualizarOrden(merma.ordenId);
 

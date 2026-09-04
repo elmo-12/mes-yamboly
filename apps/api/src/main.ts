@@ -12,8 +12,8 @@ import { crearValidationPipe } from './common/pipes/validation.pipe';
 
 const TAGS: Array<[string, string]> = [
   ['auth', 'Sesión: login con correo o DNI, perfil y cierre'],
-  ['users', 'Directorio de usuarios y sedes'],
-  ['catalogs', 'Turnos, líneas, productos, máquinas y causas'],
+  ['users', 'Directorio y mantenedor de usuarios'],
+  ['catalogs', 'Turnos, sedes, sabores, líneas, productos, velocidades, máquinas y causas'],
   ['orders', 'Órdenes de fabricación, cierre, validación y bitácora RF12'],
   ['downtimes', 'Paradas y detecciones IoT'],
   ['scrap', 'Mermas MP · EP · PT'],

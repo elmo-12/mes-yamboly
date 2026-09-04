@@ -4,12 +4,12 @@ import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'clas
 import { ESTADOS_MAQUINA, type EstadoMaquina } from '@mes/types';
 
 export class CreateMaquinaDto {
-  @ApiProperty({ example: 'MQ-L2-02', description: 'Formato MQ-<línea>-<nn>' })
+  @ApiProperty({ example: 'MQ-LLENM2-01', description: 'Formato MQ-<línea>-<nn>' })
   @IsString()
-  @Matches(/^MQ-[A-Z0-9]+-\d{2}$/, { message: 'Formato esperado MQ-L2-02' })
+  @Matches(/^MQ-[A-Z0-9]{2,6}-\d{2}$/, { message: 'Formato esperado MQ-LLENM2-01' })
   codigo!: string;
 
-  @ApiProperty({ example: 'Envolvedora L2' })
+  @ApiProperty({ example: 'Envolvedora' })
   @IsString()
   @MinLength(3, { message: 'El nombre es obligatorio' })
   nombre!: string;
@@ -19,7 +19,7 @@ export class CreateMaquinaDto {
   @MinLength(3, { message: 'El tipo es obligatorio' })
   tipo!: string;
 
-  @ApiProperty({ example: 'LIN-02' })
+  @ApiProperty({ example: 'LIN-LLEN-M2' })
   @IsString()
   @IsNotEmpty({ message: 'Selecciona una línea' })
   lineaId!: string;
@@ -33,7 +33,7 @@ export class CreateMaquinaDto {
 export class UpdateMaquinaDto extends PartialType(CreateMaquinaDto) {}
 
 export class MaquinaQueryDto {
-  @ApiPropertyOptional({ example: 'LIN-02' })
+  @ApiPropertyOptional({ example: 'LIN-LLEN-M2' })
   @IsOptional()
   @IsString()
   lineaId?: string;

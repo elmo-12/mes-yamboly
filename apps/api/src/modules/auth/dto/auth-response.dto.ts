@@ -9,7 +9,7 @@ export class UserDto {
   @ApiProperty({ enum: ROLES, example: 'jefe' }) rol!: Role;
   @ApiProperty({ example: 'Jefe de producción' }) cargo!: string;
   @ApiProperty({ example: 'SED-01' }) sedeId!: string;
-  @ApiProperty({ required: false, example: 'LIN-02' }) lineaId?: string;
+  @ApiProperty({ required: false, example: 'LIN-LLEN-M2' }) lineaId?: string;
   @ApiProperty({ example: 'CM' }) iniciales!: string;
   @ApiProperty({ required: false }) avatarUrl?: string;
   @ApiProperty({ example: true }) activo!: boolean;

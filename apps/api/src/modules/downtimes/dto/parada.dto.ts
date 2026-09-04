@@ -25,7 +25,7 @@ export class CreateParadaDto {
   @IsNotEmpty({ message: 'Orden requerida' })
   ordenId!: string;
 
-  @ApiProperty({ example: 'LIN-02' })
+  @ApiProperty({ example: 'LIN-LLEN-M2' })
   @IsString()
   @IsNotEmpty({ message: 'Selecciona una línea' })
   lineaId!: string;
@@ -35,12 +35,12 @@ export class CreateParadaDto {
   @IsNotEmpty({ message: 'Selecciona una máquina' })
   maquinaId!: string;
 
-  @ApiPropertyOptional({ example: 'CPA-PM-01', description: 'Se deduce de la causa si se omite' })
+  @ApiPropertyOptional({ example: 'CPA-PN-02', description: 'Se deduce de la causa si se omite' })
   @IsOptional()
   @IsString()
   tipoCausaId?: string;
 
-  @ApiProperty({ example: 'CPA-PM-01-03' })
+  @ApiProperty({ example: 'CPA-PN-02-01' })
   @IsString()
   @IsNotEmpty({ message: 'Selecciona la causa específica' })
   causaId!: string;
@@ -159,7 +159,7 @@ export class ParadaQueryDto extends PaginationDto {
 }
 
 export class ConfirmarDeteccionDto {
-  @ApiProperty({ example: 'CPA-PM-01-03' })
+  @ApiProperty({ example: 'CPA-PN-02-01' })
   @IsString()
   @IsNotEmpty({ message: 'Selecciona una causa' })
   causaId!: string;
