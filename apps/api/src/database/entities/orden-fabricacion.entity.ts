@@ -1,5 +1,9 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { Colaborador, EstadoOrden, OeeDetalle, Turno as TurnoCodigo } from '@mes/types';
+import { Linea } from './linea.entity';
+import { Producto } from './producto.entity';
+import { User } from './user.entity';
+import { VelocidadEstandar } from './velocidad-estandar.entity';
 
 @Entity('orden_fabricacion')
 export class OrdenFabricacion {
@@ -81,4 +85,34 @@ export class OrdenFabricacion {
 
   @Column('text', { nullable: true })
   observacion?: string | null;
+
+  /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => Linea, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'lineaId' })
+  linea?: Linea | null;
+
+  /** FK real sobre `productoId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => Producto, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'productoId' })
+  producto?: Producto | null;
+
+  /** FK real sobre `velocidadEstandarId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => VelocidadEstandar, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'velocidadEstandarId' })
+  parProductoLinea?: VelocidadEstandar | null;
+
+  /** FK real sobre `maquinistaId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => User, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'maquinistaId' })
+  maquinista?: User | null;
+
+  /** FK real sobre `supervisorId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => User, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'supervisorId' })
+  supervisor?: User | null;
 }

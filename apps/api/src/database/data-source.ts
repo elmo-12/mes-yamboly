@@ -48,5 +48,12 @@ export async function vaciarTablas(dataSource: DataSource): Promise<void> {
     await dataSource.query(`TRUNCATE TABLE ${lista} RESTART IDENTITY CASCADE`);
     return;
   }
-  for (const tabla of tablas) await dataSource.query(`DELETE FROM "${tabla}"`);
+  /* SQLite comprueba las FKs fila a fila: se desactivan para poder borrar en
+   * cualquier orden y se vuelven a activar al terminar. */
+  await dataSource.query('PRAGMA foreign_keys = OFF');
+  try {
+    for (const tabla of tablas) await dataSource.query(`DELETE FROM "${tabla}"`);
+  } finally {
+    await dataSource.query('PRAGMA foreign_keys = ON');
+  }
 }

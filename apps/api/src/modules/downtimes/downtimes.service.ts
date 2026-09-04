@@ -76,6 +76,10 @@ export class DowntimesService {
     if (causa.estado === 'inactivo') {
       throw new ValidationException({ causaId: 'La causa está dada de baja' });
     }
+    /* La validación de negocio se adelanta a la FK: 422 en vez de 500. */
+    if (!lookups.usuarios.has(dto.responsableId)) {
+      throw new ValidationException({ responsableId: 'El responsable indicado no existe' });
+    }
     if (causa.requiereSolicitud && !dto.numeroSolicitud) {
       throw new ValidationException({
         numeroSolicitud: `La causa ${causa.codigo} exige el número de solicitud de mantenimiento`,

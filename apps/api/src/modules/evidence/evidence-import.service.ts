@@ -324,10 +324,10 @@ export class EvidenceImportService {
       fechas.push(leido.fecha);
     }
 
-    await this.guardar(tipo, nuevos);
     fechas.sort();
     const periodo = fechas.length ? { desde: fechas[0]!, hasta: fechas[fechas.length - 1]! } : undefined;
 
+    /* La cabecera va **antes** que las filas: `importacionId` es una FK real. */
     await this.importaciones.save(
       this.importaciones.create({
         id,
@@ -342,6 +342,7 @@ export class EvidenceImportService {
         hasta: periodo?.hasta ?? null,
       }),
     );
+    await this.guardar(tipo, nuevos);
 
     return {
       id,

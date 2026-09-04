@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { User } from './user.entity';
 
 /**
  * Token de un solo uso de la encuesta de satisfacción (Anexo 04).
@@ -29,4 +30,10 @@ export class EncuestaSesion {
   /** ISO-8601 en que el investigador emitió la invitación. */
   @Column('text', { default: '' })
   creadaEn!: string;
+
+  /** FK real sobre `usuarioId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'usuarioId' })
+  usuario?: User | null;
 }

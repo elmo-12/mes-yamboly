@@ -74,8 +74,13 @@ export class ScrapService {
     }
 
     const cadena = cadenaCausaMerma(lookups, causa.id);
-    const tipoCausaId = cadena.tipo?.id ?? '';
+    const tipoCausaId = cadena.tipo?.id;
     const clasificacionId = cadena.clasificacion?.id ?? null;
+    if (!tipoCausaId) {
+      throw new ValidationException({
+        causaId: `La causa ${causa.codigo} no cuelga de ningún tipo de merma`,
+      });
+    }
 
     if (dto.tipoCausaId && dto.tipoCausaId !== tipoCausaId) {
       throw new ValidationException({
@@ -104,6 +109,13 @@ export class ScrapService {
   async crear(dto: CreateMermaDto, usuario: AuthUser): Promise<MermaListItem> {
     const lookups = await this.lookups.load();
     const jerarquia = this.validarCausa(lookups, dto);
+    /* Las validaciones de negocio se adelantan a las FKs: 422 en vez de 500. */
+    if (!lookups.lineas.has(dto.lineaId)) {
+      throw new ValidationException({ lineaId: 'La línea seleccionada no existe' });
+    }
+    if (!lookups.usuarios.has(dto.responsableId)) {
+      throw new ValidationException({ responsableId: 'El responsable indicado no existe' });
+    }
     const causa = lookups.causasMerma.get(jerarquia.causaId)!;
     const orden = await this.orders.buscar(dto.ordenId);
 

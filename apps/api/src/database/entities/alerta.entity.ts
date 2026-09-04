@@ -1,5 +1,6 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { EstadoAlerta, FactorAlerta, SeveridadAlerta, TipoAlerta } from '@mes/types';
+import { Linea } from './linea.entity';
 
 /** Alerta predictiva del motor de reglas / modelo IA (spec 07). */
 @Entity('alerta')
@@ -63,4 +64,9 @@ export class Alerta {
 
   @Column('text', { nullable: true })
   atendidaEn?: string | null;
+
+  /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
+  @ManyToOne(() => Linea, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'lineaId' })
+  linea?: Linea | null;
 }

@@ -154,6 +154,14 @@ export class OrdersService {
       });
     }
 
+    /* Las validaciones de negocio se adelantan a las FKs: 422 en vez de 500. */
+    if (!lookups.usuarios.has(dto.maquinistaId)) {
+      throw new ValidationException({ maquinistaId: 'El maquinista indicado no existe' });
+    }
+    if (!lookups.usuarios.has(dto.supervisorId)) {
+      throw new ValidationException({ supervisorId: 'El supervisor indicado no existe' });
+    }
+
     const colaboradorIds = dto.colaboradorIds ?? [];
     const colaboradores: Colaborador[] =
       colaboradorIds.length > 0

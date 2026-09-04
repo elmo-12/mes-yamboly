@@ -1,5 +1,6 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { EstadoCatalogo } from '@mes/types';
+import { Sabor } from './sabor.entity';
 
 /**
  * Producto terminado del maestro real (código de 7 dígitos).
@@ -53,4 +54,10 @@ export class Producto {
 
   @Column('text', { default: 'activo' })
   estado!: EstadoCatalogo;
+
+  /** FK real sobre `saborId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => Sabor, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'saborId' })
+  saborRef?: Sabor | null;
 }

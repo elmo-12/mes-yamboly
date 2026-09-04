@@ -1,5 +1,6 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import type { DatasetExport, EstadoExport, FormatoExport } from '@mes/types';
+import { Linea } from './linea.entity';
 
 /** Trabajo de exportación de Reportes (spec 06.D) y de Evidencia (spec 09.F). */
 @Entity('export_job')
@@ -43,4 +44,10 @@ export class ExportJob {
 
   @Column('text', { nullable: true })
   lineaId?: string | null;
+
+  /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => Linea, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'lineaId' })
+  linea?: Linea | null;
 }

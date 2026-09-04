@@ -1,4 +1,5 @@
-import { Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { Alerta } from './alerta.entity';
 
 /**
  * Anexo 06 — registro de exactitud de las predicciones (EP).
@@ -32,4 +33,10 @@ export class RegistroEp {
 
   @Column('text', { nullable: true })
   alertaId?: string | null;
+
+  /** FK real sobre `alertaId` — no se carga (los servicios usan la columna escalar). */
+  @Index()
+  @ManyToOne(() => Alerta, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'alertaId' })
+  alerta?: Alerta | null;
 }
