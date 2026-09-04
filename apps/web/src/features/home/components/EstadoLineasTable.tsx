@@ -29,14 +29,18 @@ const ESTADO: Record<EstadoLinea, { label: string; color: BadgeColor }> = {
   sin_orden: { label: 'Sin orden', color: 'neutral' },
 };
 
-/** Anchos verificados en Figma; suman los 1116 px del contenido. */
+/**
+ * Anchos verificados en Figma; suman los 1116 px del contenido. La columna de
+ * línea se ensancha respecto al frame para que el nombre real de la máquina
+ * ("MOLD-A4 · Moldeadora A4") entre completo en una sola línea.
+ */
 const COLS = {
-  linea: 'w-[140px]',
+  linea: 'w-[200px]',
   estado: 'w-[120px]',
-  of: 'w-[140px]',
-  producto: 'w-[220px]',
-  producido: 'w-[160px]',
-  velocidad: 'w-[140px]',
+  of: 'w-[130px]',
+  producto: 'w-[200px]',
+  producido: 'w-[150px]',
+  velocidad: 'w-[120px]',
   parada: 'w-[196px]',
 } as const;
 
@@ -96,7 +100,7 @@ export function EstadoLineasTable({ lineas, turnoLabel }: EstadoLineasTableProps
               const avance = linea.plan > 0 ? Math.min(100, (linea.producido / linea.plan) * 100) : 0;
               return (
                 <TRow key={linea.lineaId}>
-                  <TCell className={`${COLS.linea} font-medium`}>
+                  <TCell className={`${COLS.linea} font-medium whitespace-nowrap`}>
                     {linea.lineaCodigo} · {linea.lineaNombre}
                   </TCell>
                   <TCell className={COLS.estado}>

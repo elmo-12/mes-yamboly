@@ -31,7 +31,6 @@ describe('usuarios (e2e)', () => {
     dni: '99988877',
     rol: 'calidad',
     cargo: 'Analista de calidad e2e',
-    sedeId: 'SED-LIMA',
     password: 'ClaveTest2026',
   };
   let nuevoUsuarioId: string;
@@ -169,20 +168,18 @@ describe('usuarios (e2e)', () => {
   /* ------------------------------------------------------------------ */
 
   describe('edición de usuario', () => {
-    it('el jefe edita rol, sede, línea y cargo', async () => {
+    it('el jefe edita rol, línea y cargo', async () => {
       const { body } = await request(server())
         .patch(`/api/v1/usuarios/${nuevoUsuarioId}`)
         .set(jefe())
         .send({
           rol: 'supervisor',
-          sedeId: 'SED-AREQUIPA',
           lineaId: 'LIN-LLEN-M2',
           cargo: 'Supervisora de turno e2e',
         })
         .expect(200);
       expect(body).toMatchObject({
         rol: 'supervisor',
-        sedeId: 'SED-AREQUIPA',
         lineaId: 'LIN-LLEN-M2',
         cargo: 'Supervisora de turno e2e',
       });

@@ -153,14 +153,14 @@ export function Select({
 /* ------------------------------------------------------------------ */
 
 export interface SelectInlineProps extends Omit<SelectProps, 'hint' | 'destructive' | 'size'> {
-  /** Etiqueta a la izquierda del valor ("Sede", "Turno", "Periodo"). */
+  /** Etiqueta a la izquierda del valor ("Turno", "Periodo"). */
   label?: string;
 }
 
 /**
  * Dropdown inline del MDS (442:58): sin borde, `padding 6/8`, radio 8, gap 6;
  * label 14/400 `text/secondary` + valor 14/500 `text/primary` + chevron 16.
- * Se usa en barras de herramientas (selector de sede/turno), nunca en formularios.
+ * Se usa en barras de herramientas (selector de turno/periodo), nunca en formularios.
  */
 export function SelectInline({
   label,

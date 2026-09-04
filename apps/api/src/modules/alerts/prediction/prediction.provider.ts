@@ -8,8 +8,6 @@ export interface PredictionContext {
   tipo: TipoAlerta;
   lineaId: string;
   lineaCodigo: string;
-  maquinaId?: string;
-  maquinaNombre?: string;
   /** Turno objetivo de la ventana (`M` · `T` · `N`). */
   turno: string;
   /** Paradas de la línea en los últimos 7 días. */

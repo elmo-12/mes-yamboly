@@ -105,6 +105,53 @@ Limpia (0 errores, 0 warnings) en todas las rutas recorridas, en ambos modos (`m
 
 ---
 
+## QA fase 2b (4-sep-2026, tarde)
+
+Fecha: 2026-09-04 (tarde) · Verificado en ambos modos (`NEXT_PUBLIC_DATA_SOURCE=mock` y `api`, backend NestJS en
+`:4000`) · Rama `feat/ajustes-configuracion` (commit `19172ce`, sobre `feat/maestros-reales`) · Referencia:
+`docs/figma-map.md`, `docs/figma-specs-modulos.md`, `docs/api-contracts.md` y el archivo Figma
+`WOfwZEmPx1Hcw7ehaIsnpx`.
+
+**Método.** QA de integración del ajuste de configuración y tiempo real que sigue al cierre de la fase 2 el mismo
+día: se retira el nivel máquina/equipo (la parada llega hasta línea) y el catálogo de sedes (única sede Lima); la
+pestaña Máquinas pasa a ser Líneas con mantenedor completo; "Ver velocidades" pasa a un modal; las tarjetas de
+tiempo real se amplían y pierden el filtro de línea y el selector de sede.
+
+### Verificado
+
+| # | Verificación | Resultado |
+|---|---|---|
+| 1 | Tiempo real en 1440 / 1024 / 390 sin desbordamiento, con las 9 `LineCard` ampliadas (2 columnas ≥1280, métricas 2×2, progreso etiquetado, mensaje contextual) | OK |
+| 2 | ⌘K abre la búsqueda global sin error de consola (`e.key` indefinido corregido en `AppShell.tsx`) | OK |
+| 3 | Configuración › Líneas contra la API real: alta, edición y baja lógica (`POST/PATCH/DELETE /lineas`) | OK |
+| 4 | Configuración › Usuarios contra la API real: alta, edición, estado y restablecer contraseña, sin campo de sede | OK |
+| 5 | Modal de velocidades (`VelocidadesModal`): alta, edición y baja anidadas dentro del modal, sobre la matriz producto × línea | OK |
+| 6 | Wizard de parada sin paso Máquina: 3 pasos (Causa · Detalle · Confirmar), el paso Detalle ya no pide máquina | OK |
+| 7 | Suite e2e | **114/114** en 7 suites (auth, orders, downtimes, realtime, thesis, catalogs-crud, users) |
+| 8 | `pnpm typecheck` / `pnpm lint` / `pnpm build` | Verdes |
+
+### Pendientes de esta fase
+
+| # | Pendiente | Nota |
+|---|---|---|
+| 1 | El overlay del modal anidado (alta/edición/baja de velocidad) no oscurece el `VelocidadesModal` base | `--z-overlay` (60) queda por debajo de `--z-modal` (70) en `packages/ui/src/tokens/theme.css` — el modal anidado se abre visualmente "plano" sobre el base en vez de sobre un scrim oscurecido |
+| 2 | `LineaEstado.oeeTurnoPct` no existe en el contrato de tiempo real | La `LineCard` ampliada no puede mostrar un OEE de turno; en su lugar muestra «Última parada» |
+| 3 | `DashboardMaquinista` en revisión | Pendiente de verificar que la vista del maquinista queda coherente con la `LineCard` ampliada de `/tiempo-real` |
+
+### Desviaciones de modelo (frente a Figma y a la fase 2)
+
+- Wizard de parada **sin paso Máquina** (frame Figma **2156:8367**, que en la lectura original mostraba un Dropdown
+  "Máquina").
+- Pestaña de Configuración **Máquinas → Líneas** (frame Figma **2165:11984**).
+- **Sin sedes**: la app opera una única sede (Lima); sin selector en el topbar ni en el tiempo real.
+- Tarjetas de tiempo real **ampliadas** (frame Figma **2156:3936**), sin filtro de línea.
+- "Ver velocidades" **en modal** en vez del panel inferior embebido de la fase 2.
+
+Detalle completo en `docs/implementation-summary.md` (sección «Fase 2b — ajustes del 4-sep») y en
+`docs/product-backlog.md` (E2-02, E2-08, E8-03/E8-04, E8-06, E8-08 Descartada, E8-09, E12-01 Descartada, E12-08).
+
+---
+
 ## QA fase 1 (28-ago-2026)
 
 Fecha: 2026-08-28 · App en `NEXT_PUBLIC_DATA_SOURCE=mock` (`next dev -p 3000`) · Referencia: `docs/figma-map.md`,

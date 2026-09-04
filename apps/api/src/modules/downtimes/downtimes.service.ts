@@ -65,15 +65,16 @@ export class DowntimesService {
 
   async crear(dto: CreateParadaDto, usuario: AuthUser): Promise<ParadaListItem> {
     const lookups = await this.lookups.load();
+    /* La parada se registra hasta la línea: no existe nivel máquina. */
+    if (!lookups.lineas.has(dto.lineaId)) {
+      throw new ValidationException({ lineaId: 'La línea seleccionada no existe' });
+    }
     const causa = lookups.causasParada.get(dto.causaId);
     if (!causa) {
       throw new ValidationException({ causaId: 'La causa seleccionada no existe' });
     }
     if (causa.estado === 'inactivo') {
       throw new ValidationException({ causaId: 'La causa está dada de baja' });
-    }
-    if (!lookups.maquinas.has(dto.maquinaId)) {
-      throw new ValidationException({ maquinaId: 'La máquina seleccionada no existe' });
     }
     if (causa.requiereSolicitud && !dto.numeroSolicitud) {
       throw new ValidationException({
@@ -88,7 +89,6 @@ export class DowntimesService {
       id: `PAR-${orden.id.slice(4)}-N${total + 1}`,
       ordenId: orden.id,
       lineaId: dto.lineaId,
-      maquinaId: dto.maquinaId,
       causaId: causa.id,
       tipoCausaId: dto.tipoCausaId ?? tipo?.id ?? causa.id,
       inicio: dto.inicio,
@@ -141,12 +141,6 @@ export class DowntimesService {
       parada.causaId = nueva.id;
       parada.tipoCausaId = tipoDeCausa(lookups, nueva.id)?.id ?? nueva.id;
       parada.afectaOee = dto.afectaOee ?? nueva.afectaOee;
-    }
-    if (dto.maquinaId && dto.maquinaId !== parada.maquinaId) {
-      cambios.push(
-        `máquina: ${lookups.maquinas.get(parada.maquinaId)?.codigo ?? parada.maquinaId} → ${lookups.maquinas.get(dto.maquinaId)?.codigo ?? dto.maquinaId}`,
-      );
-      parada.maquinaId = dto.maquinaId;
     }
     if (dto.accionTomada && dto.accionTomada !== parada.accionTomada) {
       cambios.push('acción tomada actualizada');
@@ -240,7 +234,6 @@ export class DowntimesService {
       {
         ordenId: ordenAbierta.id,
         lineaId: deteccion.lineaId,
-        maquinaId: dto.maquinaId,
         causaId: dto.causaId,
         inicio: deteccion.detectadaEn,
         accionTomada: dto.accionTomada,
@@ -277,7 +270,6 @@ export class DowntimesService {
   private toDeteccionDto(d: DeteccionIoT): DeteccionDto {
     return {
       ...d,
-      maquinaId: d.maquinaId ?? undefined,
       paradaId: d.paradaId ?? undefined,
     };
   }

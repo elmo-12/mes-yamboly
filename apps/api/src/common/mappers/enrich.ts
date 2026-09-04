@@ -51,7 +51,6 @@ export function enriquecerParada(parada: Parada, lookups: Lookups): ParadaListIt
     deteccionId: opcional(parada.deteccionId),
     comentarioCierre: opcional(parada.comentarioCierre),
     lineaCodigo: lookups.lineas.get(parada.lineaId)?.codigo ?? GUION,
-    maquinaNombre: lookups.maquinas.get(parada.maquinaId)?.nombre ?? GUION,
     causaCodigo: causa?.codigo ?? GUION,
     causaNombre: causa?.nombre ?? GUION,
     tipoCausaCodigo: tipo?.codigo ?? GUION,

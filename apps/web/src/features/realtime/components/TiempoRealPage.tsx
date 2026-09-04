@@ -3,8 +3,6 @@
 import * as React from 'react';
 import { Button, Divider, EmptyState, Icon, SectionTitle, toast } from '@mes/ui';
 import type { LineaEstado } from '@mes/types';
-import { useSessionStore } from '@/features/auth/session-store';
-import { useSedes } from '@/features/catalogs/hooks';
 import { useDescartarDeteccion } from '@/features/downtimes/hooks';
 import {
   FinalizarOrdenModal,
@@ -35,15 +33,12 @@ type Overlay = Exclude<AccionLinea, 'descartar-iot'>;
  * (OE1 · KPI TRI).
  */
 export function TiempoRealPage() {
-  /* Sede de trabajo: la del usuario en sesión y, si no la tuviera, Lima. */
-  const usuario = useSessionStore((s) => s.user);
-  const [sedeId, setSedeId] = React.useState(usuario?.sedeId ?? 'SED-LIMA');
   const [filtros, setFiltros] = React.useState<FiltrosLineas>(FILTROS_VACIOS);
   const [overlay, setOverlay] = React.useState<Overlay | null>(null);
   const [lineaSel, setLineaSel] = React.useState<LineaEstado | null>(null);
 
-  const { data: sedes } = useSedes();
-  const { data, isPending, isError, error, refetch } = useLineasTiempoReal({ sedeId });
+  /* Yamboly opera una única planta (Lima): el tablero pide todas las líneas. */
+  const { data, isPending, isError, error, refetch } = useLineasTiempoReal();
   const descartar = useDescartarDeteccion();
 
   const lineas = data?.lineas ?? [];
@@ -81,7 +76,7 @@ export function TiempoRealPage() {
     if (!abierto) setOverlay(null);
   };
 
-  const hayFiltros = filtros.linea.length > 0 || filtros.estado.length > 0;
+  const hayFiltros = filtros.estado.length > 0;
 
   return (
     <>
@@ -89,27 +84,20 @@ export function TiempoRealPage() {
         actualizadoEn={data?.actualizadoEn}
         turnoLabel={turnoLabel}
         turnoRango={turnoRango}
-        lineas={lineas.length}
         overlayAbierto={overlay !== null}
         onIniciarOrden={() => abrir('iniciar-orden', null)}
       />
 
       {!isError && lineas.length > 0 && (
-        <LineasFilterBar
-          lineas={lineas}
-          sedes={sedes?.data ?? []}
-          sedeId={sedeId}
-          onSedeChange={setSedeId}
-          value={filtros}
-          onChange={setFiltros}
-        />
+        <>
+          <LineasFilterBar lineas={lineas} value={filtros} onChange={setFiltros} />
+          <Divider />
+        </>
       )}
-
-      {!isError && lineas.length > 0 && <Divider />}
 
       <SectionTitle
         title="Líneas de producción"
-        description={`${lineas.length > 0 ? `${lineas.length} puestos monitoreados · ` : ''}lectura de sensores cada 5 s · toca una tarjeta para ver el detalle del turno`}
+        description="Lectura de sensores cada 5 s · toca una tarjeta para ver el detalle del turno"
       />
 
       {isError ? (
@@ -133,7 +121,7 @@ export function TiempoRealPage() {
           variant="no-results"
           icon={<Icon name="search" size={40} />}
           title="Ninguna línea coincide con los filtros"
-          description="Prueba con otra línea o quita los filtros de estado."
+          description="Prueba con otro estado o quita los filtros."
           action={
             <Button variant="secondary" onClick={() => setFiltros(FILTROS_VACIOS)}>
               Limpiar filtros

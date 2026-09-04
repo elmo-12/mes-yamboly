@@ -35,7 +35,7 @@ import {
   SEVERIDAD_BADGE,
   esperaConfirmacion,
   formatVentana,
-  lineaMaquina,
+  etiquetaLinea,
   toneFactor,
   ventanaCerrada,
 } from './alerta-format';
@@ -49,7 +49,7 @@ export interface AlertaDrawerProps {
 const MOTIVOS = [
   { value: 'falso_positivo', label: 'Falso positivo del modelo' },
   { value: 'ya_atendida', label: 'La condición ya fue atendida' },
-  { value: 'mantenimiento', label: 'Máquina en mantenimiento programado' },
+  { value: 'mantenimiento', label: 'Línea en mantenimiento programado' },
   { value: 'sin_produccion', label: 'La línea no está produciendo' },
   { value: 'otro', label: 'Otro motivo' },
 ];
@@ -139,7 +139,7 @@ function CuerpoAlerta({ alerta, onClose }: { alerta: Alerta; onClose: () => void
         className="text-body-sm"
         items={[
           { label: 'Tipo', value: TIPO_ALERTA_LABEL[alerta.tipo] },
-          { label: 'Línea / Máquina', value: lineaMaquina(alerta) },
+          { label: 'Línea', value: etiquetaLinea(alerta) },
           { label: 'Ventana', value: formatVentana(alerta.ventanaInicio, alerta.ventanaFin) },
           { label: 'Probabilidad', value: `${alerta.probabilidad} %` },
           { label: 'Generada', value: formatDateTime(alerta.generadaEn) },
@@ -263,7 +263,7 @@ function BloqueAtender({ alerta }: { alerta: Alerta }) {
             onChange={(e) => setAccion(e.target.value)}
             destructive={Boolean(error)}
             hint={error ?? 'Qué se hizo para evitar el evento previsto (mínimo 10 caracteres).'}
-            placeholder="Se adelanta el mantenimiento preventivo de la envolvedora"
+            placeholder="Se adelanta el mantenimiento preventivo de la línea"
           />
           <div className="flex items-center gap-3">
             <Button variant="primary" onClick={confirmarAtender} loading={atender.isPending}>
@@ -321,7 +321,7 @@ function BloqueAtender({ alerta }: { alerta: Alerta }) {
               value={detalle}
               maxLength={280}
               onChange={(e) => setDetalle(e.target.value)}
-              placeholder="La envolvedora entró a mantenimiento a las 14:10"
+              placeholder="La línea entró a mantenimiento a las 14:10"
             />
           </div>
         </ModalContent>

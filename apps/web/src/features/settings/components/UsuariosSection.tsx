@@ -30,7 +30,7 @@ import type { BadgeColor } from '@mes/ui';
 import { ROLES, ROLE_LABEL } from '@mes/types';
 import type { Role, User } from '@mes/types';
 import { formatDateTime, formatNumber } from '@mes/shared';
-import { useCambiarEstadoUsuario, useLineas, useSedes, useUsuarios } from '@/features/catalogs/hooks';
+import { useCambiarEstadoUsuario, useLineas, useUsuarios } from '@/features/catalogs/hooks';
 import { useSession } from '@/hooks/use-session';
 import { DesactivarUsuarioModal } from './DesactivarUsuarioModal';
 import { RestablecerPasswordModal } from './RestablecerPasswordModal';
@@ -62,7 +62,7 @@ function activoDesde(filtro: string): boolean | undefined {
 }
 
 /**
- * `Configuración / Sedes y usuarios` — directorio con alta, edición,
+ * `Configuración / Usuarios` — directorio con alta, edición,
  * restablecimiento de contraseña y activación/desactivación. Es el único
  * `Button variant="primary"` de la pestaña.
  */
@@ -70,15 +70,12 @@ export function UsuariosSection() {
   const { user } = useSession();
   const [busqueda, setBusqueda] = React.useState('');
   const [rol, setRol] = React.useState<string>(TODOS);
-  const [sedeId, setSedeId] = React.useState<string>(TODOS);
   const [estado, setEstado] = React.useState<string>(TODOS);
 
   const usuarios = useUsuarios({
     rol: rol === TODOS ? undefined : [rol as Role],
-    sedeId: sedeId === TODOS ? undefined : sedeId,
     activo: activoDesde(estado),
   });
-  const sedes = useSedes();
   const lineas = useLineas();
   const cambiarEstado = useCambiarEstadoUsuario();
 
@@ -91,16 +88,12 @@ export function UsuariosSection() {
     const l = (lineas.data?.data ?? []).find((x) => x.id === id);
     return l ? `${l.codigo} · ${l.nombre}` : id;
   };
-  const nombreSede = (id: string) => {
-    const s = (sedes.data?.data ?? []).find((x) => x.id === id);
-    return s ? `${s.codigo} · ${s.nombre}` : id;
-  };
 
   const filtro = busqueda.trim().toLowerCase();
   const filas = (usuarios.data?.data ?? []).filter(
     (u) => !filtro || `${u.nombre} ${u.email} ${u.dni} ${u.cargo}`.toLowerCase().includes(filtro),
   );
-  const hayFiltros = filtro !== '' || rol !== TODOS || sedeId !== TODOS || estado !== TODOS;
+  const hayFiltros = filtro !== '' || rol !== TODOS || estado !== TODOS;
 
   const activar = async (usuario: User) => {
     try {
@@ -118,7 +111,6 @@ export function UsuariosSection() {
   const limpiar = () => {
     setBusqueda('');
     setRol(TODOS);
-    setSedeId(TODOS);
     setEstado(TODOS);
   };
 
@@ -169,18 +161,6 @@ export function UsuariosSection() {
               onValueChange={setRol}
             />
             <SelectInline
-              label="Sede"
-              options={[
-                { value: TODOS, label: 'Todas' },
-                ...(sedes.data?.data ?? []).map((s) => ({
-                  value: s.id,
-                  label: `${s.codigo} · ${s.nombre}`,
-                })),
-              ]}
-              value={sedeId}
-              onValueChange={setSedeId}
-            />
-            <SelectInline
               label="Estado"
               options={ESTADO_OPCIONES}
               value={estado}
@@ -206,7 +186,7 @@ export function UsuariosSection() {
             variant="no-results"
             icon={<Icon name="search" size={40} />}
             title="Sin personas para esos filtros"
-            description="Prueba con otro rol o sede, o busca por nombre, correo o DNI."
+            description="Prueba con otro rol o estado, o busca por nombre, correo o DNI."
             action={
               <Button variant="secondary" onClick={limpiar}>
                 Limpiar filtros
@@ -230,7 +210,6 @@ export function UsuariosSection() {
                 <TH className="w-[110px]">DNI</TH>
                 <TH className="w-[150px]">Rol</TH>
                 <TH className="w-[190px]">Cargo</TH>
-                <TH className="w-[180px]">Sede</TH>
                 <TH className="w-[190px]">Línea asignada</TH>
                 <TH className="w-[170px]">Último acceso</TH>
                 <TH className="w-[110px]">Estado</TH>
@@ -256,7 +235,6 @@ export function UsuariosSection() {
                       <Badge color={ROL_COLOR[u.rol]}>{ROLE_LABEL[u.rol]}</Badge>
                     </TCell>
                     <TCell className="text-neutral-text">{u.cargo}</TCell>
-                    <TCell className="text-neutral-text">{nombreSede(u.sedeId)}</TCell>
                     <TCell className="text-neutral-text">{nombreLinea(u.lineaId)}</TCell>
                     <TCell className="text-neutral-text">
                       {u.ultimoAcceso ? formatDateTime(u.ultimoAcceso) : GUION}

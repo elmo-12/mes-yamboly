@@ -63,7 +63,7 @@ export interface ProductoDrawerProps {
 
 /**
  * `Configuración / Productos y velocidades` — drawer de alta y edición del
- * maestro de productos (Figma 2165:11984, mismo patrón que `MaquinaDrawer`).
+ * maestro de productos (Figma 2165:11984, mismo patrón que `LineaDrawer`).
  * El código (7 dígitos del maestro original) no se edita una vez creado; la
  * descripción corta hace de `nombre` visible en tablas y selects, así que no
  * se pide por separado, se sincroniza en cada cambio.

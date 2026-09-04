@@ -52,9 +52,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   /* La navegación móvil se cierra al cambiar de ruta. */
   React.useEffect(() => setNavAbierta(false), [pathname]);
 
-  /* Atajo ⌘K / Ctrl+K → foco en la búsqueda global. */
+  /* Atajo ⌘K / Ctrl+K → foco en la búsqueda global.
+     `e.key` no siempre es un string: el autocompletado del navegador, los IME y
+     los eventos sintéticos disparan `keydown` sin `key`, y llamar a
+     `toLowerCase()` sobre `undefined` rompía el shell entero. */
   React.useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      if (typeof e.key !== 'string') return;
       if (e.key.toLowerCase() !== 'k' || !(e.metaKey || e.ctrlKey)) return;
       e.preventDefault();
       document.getElementById(SEARCH_ID)?.focus();
@@ -171,7 +175,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onMenuClick={() => setNavAbierta(true)}
           onSearchSubmit={buscar}
           searchId={SEARCH_ID}
-          site="Lima"
           notificationsSlot={<CampanaNotificaciones count={alertas} />}
           userSlot={usuario ? <MenuUsuario nombre={usuario.name} onSalir={salir} /> : undefined}
         />

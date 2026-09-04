@@ -1,15 +1,15 @@
 # Product Backlog — MES Yamboly
 
-Fecha de corte: 4-sep-2026 (cierre de la fase 2 "maestros reales"; corte anterior 3-sep-2026 con 8 historias `En curso`) · Rama `feat/maestros-reales` (base `main` en `2bb7f89`) · Producto: MES con analítica IA para Helatony's S.A.C. (Yamboly).
-Fuente de estado: `git log --oneline`, `git status` y el código en `apps/api`, `apps/web`, `packages/types` al momento del corte, más el QA de integración de fase 2 (`docs/qa-report.md`).
+Fecha de corte: 4-sep-2026, tarde (ajustes de configuración y tiempo real: sin máquina/equipo, mantenedor de líneas, sin sedes; corte anterior 4-sep-2026 con el cierre de la fase 2 "maestros reales"; corte previo 3-sep-2026 con 8 historias `En curso`) · Rama `feat/ajustes-configuracion` (sobre `feat/maestros-reales`, base `main` en `2bb7f89`) · Producto: MES con analítica IA para Helatony's S.A.C. (Yamboly).
+Fuente de estado: `git log --oneline`, `git status` y el código en `apps/api`, `apps/web`, `packages/types` al momento del corte, más el QA de integración de fase 2 y fase 2b (`docs/qa-report.md`).
 
 ---
 
 ## 1. Visión y objetivos
 
-Yamboly opera 9 líneas de envasado (4 llenadoras, 2 extrusoras, 3 moldeadoras) repartidas en 9 sedes, en 2 turnos diarios. Antes del proyecto, el registro de paradas, mermas y velocidad se hacía en papel o en hojas de cálculo dispersas: los maquinistas anotaban las incidencias al final del turno, con datos incompletos y sin relación con la orden de fabricación en curso, y la planta no tenía forma de anticipar una parada o una merma antes de que ocurriera. El resultado era un OEE calculado tarde, con baja confianza, y decisiones de mantenimiento y de línea tomadas sin evidencia.
+Yamboly opera 9 líneas de envasado (4 llenadoras, 2 extrusoras, 3 moldeadoras) en su planta de Lima, en 2 turnos diarios. Cada línea es la máquina física de planta: no existe un nivel de equipo por debajo, la parada se registra hasta la línea. Antes del proyecto, el registro de paradas, mermas y velocidad se hacía en papel o en hojas de cálculo dispersas: los maquinistas anotaban las incidencias al final del turno, con datos incompletos y sin relación con la orden de fabricación en curso, y la planta no tenía forma de anticipar una parada o una merma antes de que ocurriera. El resultado era un OEE calculado tarde, con baja confianza, y decisiones de mantenimiento y de línea tomadas sin evidencia.
 
-El MES Yamboly es el sistema construido para la tesis *"Implementación de un MES con analítica inteligente basada en IA para el control y monitoreo de la producción en la empresa Yamboly, Lima, 2026"* (UNT). Su objetivo es doble: (1) dar a la planta una herramienta real de captura en tiempo real, indicadores OEE, alertas predictivas y evidencia auditable, y (2) servir de instrumento experimental para demostrar, con datos medibles, que el registro de datos deja de tomar minutos y pasa a tomar segundos, que la información capturada es confiable, y que las alertas predictivas aciertan con la frecuencia suficiente para ser útiles. Todo el diseño viene de un Master Design System validado en Figma (57 pantallas) y todo el modelo de datos —líneas, máquinas, productos, velocidades y causas— viene de la extracción real del sistema anterior (Strapi/Postgres), no de datos inventados.
+El MES Yamboly es el sistema construido para la tesis *"Implementación de un MES con analítica inteligente basada en IA para el control y monitoreo de la producción en la empresa Yamboly, Lima, 2026"* (UNT). Su objetivo es doble: (1) dar a la planta una herramienta real de captura en tiempo real, indicadores OEE, alertas predictivas y evidencia auditable, y (2) servir de instrumento experimental para demostrar, con datos medibles, que el registro de datos deja de tomar minutos y pasa a tomar segundos, que la información capturada es confiable, y que las alertas predictivas aciertan con la frecuencia suficiente para ser útiles. Todo el diseño viene de un Master Design System validado en Figma (57 pantallas) y todo el modelo de datos —líneas, productos, velocidades y causas— viene de la extracción real del sistema anterior (Strapi/Postgres), no de datos inventados.
 
 El sistema se evalúa con 5 KPIs de tesis, cada uno con una meta y un valor demostrado sobre los datos de evidencia (Anexos 02–06):
 
@@ -29,7 +29,7 @@ Este backlog documenta el trabajo necesario para sostener esos 5 KPIs con datos 
 
 | Rol | Necesidad principal |
 | --- | --- |
-| **Jefe de producción** | Ver el estado consolidado de las 9 líneas y los indicadores OEE del día, y administrar los mantenedores (causas, máquinas, productos, sedes, usuarios) sin depender de TI. |
+| **Jefe de producción** | Ver el estado consolidado de las 9 líneas y los indicadores OEE del día, y administrar los mantenedores (causas, líneas, productos, usuarios) sin depender de TI. |
 | **Supervisor de turno** | Atender alertas y validar órdenes de fabricación en tiempo real, con evidencia suficiente para no reabrir discusiones al cierre del turno. |
 | **Maquinista** | Registrar una parada, una merma o una lectura de velocidad en segundos, sin abandonar la máquina ni perder el hilo de la producción. |
 | **Calidad** | Confirmar que la merma y la parada están correctamente clasificadas y que las 9 funcionalidades del sistema siguen cumpliéndose (CFS). |
@@ -42,7 +42,7 @@ Este backlog documenta el trabajo necesario para sostener esos 5 KPIs con datos 
 
 - **Prioridad (MoSCoW):** `Must` (bloquea la tesis o la operación diaria) · `Should` (valor claro, no bloqueante) · `Could` (mejora deseable) · `Won't` (fuera de este alcance).
 - **Estimación:** puntos de historia, escala Fibonacci (1, 2, 3, 5, 8, 13, 21).
-- **Estados:** `Hecho` (código en `main`/rama de fase, verificado) · `En curso` (código presente pero incompleto o con cambios sin commitear) · `Pendiente` (no iniciado).
+- **Estados:** `Hecho` (código en `main`/rama de fase, verificado) · `En curso` (código presente pero incompleto o con cambios sin commitear) · `Pendiente` (no iniciado) · `Descartada` (se retira del alcance por una decisión explícita del producto, documentada en la propia historia con fecha; **sus puntos no se computan** en ningún total de la sección 6 "Métricas del backlog" — se muestran aparte).
 - **Sprints:** `S1–S4` = fase Figma → código (ago-2026, base `2bb7f89`, 57/57 frames) · `S5` = fase actual "maestros reales" (mantenedores completos + datos reales, en curso) · `S6+` = pendientes sin fecha asignada.
 - **Definición de Terminado (DoD):** `pnpm --filter @mes/types build && pnpm typecheck && pnpm lint && pnpm build` en verde · suite e2e correspondiente en verde · paridad mock↔API (mismos datos, mismo contrato) · fidelidad a Figma o desviación justificada por documento · todos los estados de UI cubiertos (loading / empty / no-results / error / success+toast / validación / confirmación / forbidden) · un único `Button variant="primary"` por pantalla · baja lógica con modal de confirmación en toda acción Danger.
 
@@ -85,13 +85,14 @@ Como **maquinista**, quiero que al iniciar una orden el sistema resuelva automá
 - Al finalizar: `producido`, `conteoCodificadora`, evidencia y comentario opcional; la orden pasa a `por_validar`.
 - **Cierre (4-sep-2026):** `IniciarOrdenWizard.tsx` conectado y commiteado (`fadc3fc`, `f8ed869`); el 422 bajo `productoId` sin par vigente se verificó en UI durante el QA de fase 2.
 
-**E2-02 — Registrar parada con cronómetro TRI y máquina-equipo obligatoria**
+**E2-02 — Registrar parada con cronómetro TRI hasta línea (sin equipo)**
 `Prioridad: Must · Puntos: 8 · Estado: Hecho · Sprint: S2`
-Como **maquinista**, quiero registrar una parada en segundos, con cronómetro visible y seleccionando la máquina-equipo exacta (envolvedora, codificadora, pinzas…), para que el tiempo de registro (TRI) sea mínimo y la causa quede trazada a nivel de equipo.
-- Selector jerárquico de causa (árbol TT-GG-EE) + máquina-equipo de la línea, ambos obligatorios.
+Como **maquinista**, quiero registrar una parada en segundos, con cronómetro visible y seleccionando la causa sobre la línea en la que ocurre, para que el tiempo de registro (TRI) sea mínimo y la causa quede trazada sin pedirme un nivel de detalle que la planta no tiene.
+- Selector jerárquico de causa (árbol TT-GG-EE), obligatorio; la parada se registra hasta la **línea** (`lineaId`), no hay paso de equipo.
 - `tiempoRegistroSeg` se envía en cada creación y alimenta el Anexo 02 (TRI) automáticamente.
 - `accionTomada` obligatoria; `numeroSolicitud` condicional si la causa lo exige.
 - Parada reabre con `fin: null` y recalcula `duracionMin` al cerrarse (spec 05.F).
+- **Ajuste (4-sep-2026, tarde):** decisión del producto — no existe el nivel máquina/equipo; línea = máquina física de planta. `ParadaWizard.tsx` pierde el paso "Máquina" (frame Figma 2156:8367 quedó sin ese Dropdown, ver `docs/figma-map.md`); `maquinaId` se elimina de `CreateParada`, de `Maquina` (entidad, tipos, API, mocks) y del detalle/edición de parada (`ParadaForm.tsx`, `OrdenParadasTab.tsx`, `ParadaDrawer.tsx`). Verificado: e2e 114/114; el wizard conserva sus 3 pasos (Causa · Detalle · Confirmar), el paso Detalle pierde el campo Máquina.
 
 **E2-03 — Registrar merma con selector jerárquico tipo → clasificación → causa**
 `Prioridad: Must · Puntos: 8 · Estado: Hecho · Sprint: S5`
@@ -115,7 +116,7 @@ Como **maquinista**, quiero registrar la velocidad real de la línea y ver el de
 Como **supervisor de turno**, quiero revisar una parada sugerida por un sensor IoT y confirmarla o descartarla en un clic, para no perder detecciones automáticas ni duplicar el registro manual.
 - `GET /detecciones-iot?estado=sugerida` lista pendientes; confirmar crea la `ParadaListItem` (201); descartar solo cambia estado.
 - 409 si la detección ya fue procesada.
-- Confirmar pide causa, máquina, acción tomada y tiempo de registro (mismo formulario que una parada manual).
+- Confirmar pide causa, acción tomada y tiempo de registro (mismo formulario que una parada manual, sin campo de máquina desde el ajuste del 4-sep-2026 tarde — ver E2-02).
 
 **E2-06 — 9 LineCards en tiempo real y Modo TV con 9 filas**
 `Prioridad: Must · Puntos: 8 · Estado: Hecho · Sprint: S5`
@@ -130,6 +131,13 @@ Como **encargado de mermas**, quiero que la foto de evidencia que adjunto al reg
 - Hoy `Merma.evidenciaUrl` no se persiste: la foto sólo se exige como validación en el cliente (`AdjuntarFoto`), el backend no la recibe ni la guarda.
 - Requiere un endpoint de subida (multipart o presigned URL) y que `POST /mermas` acepte `evidenciaUrl` resuelta.
 - Detectado en el QA de fase 2 (4-sep-2026).
+
+**E2-08 — Tarjetas por línea ampliadas y filtros simplificados**
+`Prioridad: Should · Puntos: 5 · Estado: Hecho · Sprint: S5`
+Como **supervisor de turno**, quiero que cada `LineCard` de `/tiempo-real` muestre más información sin necesidad de abrir el drawer, y que el panel ya no me pida filtrar por línea o por sede (solo hay una planta), para leer el estado de la planta más rápido con una sola mirada.
+- `LineCard` ampliada: 2 columnas en pantallas ≥1280 px, métricas en grilla 2×2, barra de progreso etiquetada (no solo el número), mensaje contextual según el estado de la línea.
+- `LineasFilterBar` pierde el filtro de línea (9 tarjetas siempre visibles) y el selector de sede del header (`TiempoRealHeader`); `GET /tiempo-real/lineas` deja de aceptar `sedeId`.
+- **Cierre (4-sep-2026, tarde):** commit `19172ce`; `LineasGrid.tsx`, `TiempoRealHeader.tsx`, `TiempoRealPage.tsx` y `linea-view.ts` migrados; frame Figma 2156:3936 documentado como desviación (grid de tarjetas más grandes, sin selector de sede) en `docs/figma-map.md`/`docs/figma-specs-modulos.md`. Verificado responsive 1440/1024/390 sin desbordamiento (`docs/qa-report.md`, QA fase 2b).
 
 ---
 
@@ -320,18 +328,18 @@ Como **encargado de mermas**, quiero un árbol de causas de merma con la misma m
 - `GET /causas-merma?formato=arbol|plano&nivel&tipo&lineaId`, CRUD completo, baja lógica con `mermasConservadas`.
 - 56 causas reales cargadas (5 tipos de producción, 11 clasificaciones, 40 causas hoja), materializadas por par (tipo, clasificación) donde el dump tenía relaciones muchos-a-muchos.
 
-**E8-03 — Máquinas-equipo: alta y baja lógica**
+**E8-03 — Líneas: alta y baja lógica**
 `Prioridad: Must · Puntos: 5 · Estado: Hecho · Sprint: S5`
-Como **jefe de producción**, quiero dar de alta una máquina-equipo (envolvedora, codificadora, pinzas, faja…) y darla de baja sin perder su histórico de paradas, para mantener el catálogo de equipos por línea al día.
-- `MaquinasTab.tsx` con `MaquinaDrawer` de alta (`codigo` regex `MQ-XXXXXX-NN`, `tipo`, `lineaId`).
-- Cambio de estado (`operativa|mantenimiento|baja`) desde menú contextual, con `actualizar.mutateAsync`.
-- 409 código duplicado, 422 validación.
+Como **jefe de producción**, quiero dar de alta una línea de planta y darla de baja sin perder su histórico de órdenes y paradas, para mantener el catálogo de líneas (= máquinas físicas) al día sin depender de TI.
+- `LineasTab.tsx` con `LineaDrawer` de alta (`codigo` formato `LLEN-M2`/`EXTR-2`/`MOLD-A3`, `nombre`, `nombreCorto`, `tipoProceso`, `capacidadUnidadesMin?`), `DesactivarLineaModal` para la baja lógica.
+- `POST /lineas` (403 fuera de `jefe`/`supervisor`, 409 código duplicado, 422); `DELETE /lineas/:id` → `BajaLogicaResponse` (`estado: 'inactivo'`), conserva órdenes y paradas.
+- **Ajuste (4-sep-2026, tarde):** reemplaza el mantenedor de "Máquinas-equipo" que tenía esta misma historia hasta el cierre de fase 2 — decisión del producto: no existe el nivel máquina/equipo, la línea *es* la máquina física (ver E2-02). `MaquinasTab.tsx`, `MaquinaDrawer.tsx` y `EliminarMaquinaModal.tsx` se eliminaron; la pestaña de Configuración pasa de **Máquinas** a **Líneas**. Verificado contra la API real (`?tab=lineas`, frame Figma 2165:11984 con desviación documentada en `docs/figma-map.md`).
 
-**E8-04 — Máquinas-equipo: edición**
+**E8-04 — Mantenedor de líneas (alta/edición/baja)**
 `Prioridad: Must · Puntos: 3 · Estado: Hecho · Sprint: S5`
-Como **jefe de producción**, quiero editar el nombre, tipo o línea de una máquina existente (no solo su estado), para corregir datos sin dar de baja y volver a crear.
-- El endpoint `PATCH /maquinas/:id` ya acepta `Partial<MaquinaInput>` completo.
-- **Cierre (4-sep-2026):** `MaquinaDrawer` gana modo edición (precarga desde una máquina existente) en `2d9ee38`; verificado en el QA de fase 2 (`?tab=maquinas`, frame 2165:11984, alta fidelidad).
+Como **jefe de producción**, quiero también editar el código, nombre, nombre corto, tipo de proceso, capacidad o estado de una línea existente (no solo darla de alta o de baja), para completar el mantenedor de líneas de punta a punta sin dar de baja y volver a crear.
+- `PATCH /lineas/:id` acepta `Partial<CreateLinea>` completo; `LineaDrawer` gana modo edición (precarga desde una línea existente).
+- **Ajuste (4-sep-2026, tarde, commit `19172ce`):** historia renombrada de "Máquinas-equipo: edición" — junto con la alta y la baja de E8-03, cierra el **mantenedor completo de líneas** que sustituye al de máquinas-equipo (nivel descartado por decisión del producto). Verificado en el QA de fase 2b (`docs/qa-report.md`), e2e 114/114.
 
 **E8-05 — Productos: alta, edición y baja**
 `Prioridad: Must · Puntos: 5 · Estado: Hecho · Sprint: S5`
@@ -344,6 +352,7 @@ Como **jefe de producción**, quiero dar de alta, editar y dar de baja productos
 Como **jefe de producción**, quiero una matriz editable de producto × línea donde cada celda es la velocidad estándar de ese par, para reflejar que un mismo producto rinde distinto según en qué línea se fabrique (333 pares reales sembrados, 12–483,3 u/min).
 - API completa: `GET/POST/PATCH/DELETE /velocidades-estandar`, unicidad `(productoId, lineaId)`, 409 en par duplicado.
 - **Cierre (4-sep-2026):** `MatrizVelocidades` (tabla producto × 9 líneas, columna por tipo de proceso) y `VelocidadEstandarModal`/`EliminarVelocidadModal` commiteados (`2d9ee38`, `9f43e2a`); scroll automático a la matriz al elegir producto; verificado en el QA de fase 2, alta fidelidad. Bug corregido en la misma fase: ids `VE-` duplicados al crear velocidades.
+- **Ajuste (4-sep-2026, tarde):** "Ver velocidades" ya no despliega el panel inferior con la matriz embebida: abre un `VelocidadesModal` (alta/edición/baja anidadas dentro del modal). Pendiente de QA fase 2b: el overlay del modal anidado no oscurece el modal base (`--z-overlay` 60 < `--z-modal` 70) — ver `docs/qa-report.md`.
 
 **E8-07 — Umbrales de alerta configurables**
 `Prioridad: Should · Puntos: 3 · Estado: Hecho · Sprint: S3`
@@ -352,16 +361,18 @@ Como **jefe de producción**, quiero ajustar los umbrales que disparan una alert
 - `Umbrales{velocidadBajoEstandarPct, oeeMinimo, probabilidadMinima, notificarN8n, mostrarTv}`.
 
 **E8-08 — Sedes: alta y edición**
-`Prioridad: Should · Puntos: 3 · Estado: Hecho · Sprint: S5`
-Como **jefe de producción**, quiero dar de alta o editar una sede (de las 9 reales: Arequipa, Ayacucho, Chiclayo, Huancayo, Iquitos, Lima, Moyobamba, Pucallpa, Tarapoto), para mantener el catálogo sin pedirlo a TI.
-- API lista: `POST/PATCH /sedes` (restringido a `jefe`), `GET` movida desde `users` a `catalogs`.
-- **Cierre (4-sep-2026):** `SedesUsuariosTab.tsx` deja de ser de solo lectura; `SedeDrawer` de alta/edición y `DesactivarSedeModal` commiteados (`2d9ee38`); comentario obsoleto sobre Personal/RR. HH. retirado; verificado en el QA de fase 2, alta fidelidad.
+`Prioridad: Should · Puntos: 3 · Estado: Descartada — decisión del producto, 4-sep-2026: solo existe la planta de Lima · Sprint: S5`
+Como **jefe de producción**, quería dar de alta o editar una sede (de las 9 originalmente extraídas del dump: Arequipa, Ayacucho, Chiclayo, Huancayo, Iquitos, Lima, Moyobamba, Pucallpa, Tarapoto), para mantener el catálogo sin pedirlo a TI.
+- Llegó a completarse (**Hecho** hasta el corte de la tarde del 4-sep-2026): API `POST/PATCH /sedes` (restringido a `jefe`, movida desde `users` a `catalogs`), `SedesUsuariosTab.tsx` con `SedeDrawer` de alta/edición y `DesactivarSedeModal` (`2d9ee38`), verificado en el QA de fase 2, alta fidelidad.
+- **Descartada (4-sep-2026, tarde, commit `19172ce`):** el producto decidió que Yamboly opera una **única sede** (Lima); el resto del catálogo de sedes del dump queda fuera de alcance. `GET/POST/PATCH /sedes` se retiraron de la API, `Sede` se retiró de `@mes/types`/mocks; `SEDE_UNICA_ID` queda como constante interna sin exponerse. `SedeDrawer.tsx`, `DesactivarSedeModal.tsx` y `SedesUsuariosTab.tsx` se eliminaron; la pestaña de Configuración pasa a llamarse **Usuarios**, sin selector de sede (ver E8-09); el topbar pierde el selector de sede y su tiempo real.
+- **Puntos no computables:** excluidos de los totales de la sección 6 "Métricas del backlog" (regla de la convención `Descartada`, sección 3).
 
 **E8-09 — Usuarios: alta, edición, estado y restablecer contraseña**
 `Prioridad: Must · Puntos: 8 · Estado: Hecho · Sprint: S5`
 Como **jefe de producción**, quiero crear usuarios, editarlos, activarlos/desactivarlos y restablecerles la contraseña desde Configuración, para no depender de un script cuando cambia el personal de planta.
 - API completa: `POST /usuarios` (bcrypt, iniciales derivadas, 409 email/dni), `PATCH /usuarios/:id` (sin password), `POST /usuarios/:id/estado` (409 si es uno mismo), `POST /usuarios/:id/restablecer-password`.
-- **Cierre (4-sep-2026):** `UsuarioDrawer`, `RestablecerPasswordModal` y `DesactivarUsuarioModal` commiteados y conectados desde `SedesUsuariosTab.tsx` (`2d9ee38`); `UsuarioDrawer` filtra sólo sedes activas (corrección de QA, `9f43e2a`); verificado en el QA de fase 2, alta fidelidad.
+- **Cierre (4-sep-2026):** `UsuarioDrawer`, `RestablecerPasswordModal` y `DesactivarUsuarioModal` commiteados y conectados desde `SedesUsuariosTab.tsx` (`2d9ee38`); verificado en el QA de fase 2, alta fidelidad.
+- **Ajuste (4-sep-2026, tarde):** usuarios **sin sede** (decisión del producto, ver E8-08 Descartada) — `sedeId` se retira de `CreateUsuario`/`User`, del filtro `GET /usuarios` y del `UsuarioDrawer` (ya no filtra "sólo sedes activas", ese campo no existe). La pestaña pasa de `SedesUsuariosTab.tsx` a `UsuariosTab.tsx`, mantenedor exclusivo de personas. Verificado en el QA de fase 2b contra la API real.
 
 **E8-10 — Umbrales de alerta: modelo completo según Figma**
 `Prioridad: Could · Puntos: 3 · Estado: Pendiente · Sprint: S6`
@@ -372,6 +383,13 @@ Como **jefe de producción**, quiero ajustar los 8 umbrales y acciones de cabece
 ---
 
 ### E9 — Datos maestros reales y migración
+
+> **Nota (4-sep-2026, tarde):** tras el cierre de esta épica (3–4-sep) el producto decidió retirar del alcance el
+> nivel **máquina/equipo** y el catálogo de **sedes** — la parada llega hasta línea (línea = máquina física) y
+> Yamboly opera una única sede (Lima). Ver E2-02, E8-03/E8-04 (mantenedor de líneas) y E8-08 (Descartada)/E8-09. Las
+> historias E9-01 y E9-03 de abajo describen fielmente el estado en el momento de su cierre (incluyen `sedes.json` y
+> las 33 máquinas curadas a mano, ambas retiradas después); no se reescribieron para no perder el registro histórico
+> de la extracción.
 
 **E9-01 — Extracción del dump Strapi a JSON**
 `Prioridad: Must · Puntos: 8 · Estado: Hecho · Sprint: S5`
@@ -505,8 +523,9 @@ Como **jefe de producción**, quiero backups automáticos de la base de datos y 
 ### E12 — Mejoras UX detectadas
 
 **E12-01 — Agrupar filtro de líneas por proceso**
-`Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S6`
-Como **supervisor de turno**, quiero que el filtro de líneas agrupe por tipo de proceso (llenadora/extrusora/moldeadora), para encontrar mi línea entre 9 opciones sin leerlas una por una.
+`Prioridad: Could · Puntos: 2 · Estado: Descartada — decisión del producto, 4-sep-2026: tiempo real ya no filtra por línea · Sprint: S6`
+Como **supervisor de turno**, quería que el filtro de líneas agrupe por tipo de proceso (llenadora/extrusora/moldeadora), para encontrar mi línea entre 9 opciones sin leerlas una por una.
+- **Descartada (4-sep-2026, tarde):** ya no aplica — `/tiempo-real` retiró el filtro de línea (y el de sede) a favor de mostrar siempre las 9 `LineCard` ampliadas (ver E2-08). Puntos no computables, excluidos de los totales (sección 6).
 
 **E12-02 — `TvRow` con código de OF y producto**
 `Prioridad: Could · Puntos: 2 · Estado: Pendiente · Sprint: S6`
@@ -536,34 +555,50 @@ Como **supervisor de turno**, quiero que una línea sin orden activa muestre cla
 - Hoy la `LineCard` en estado `sin_orden` sigue mostrando la última OF cerrada de esa línea.
 - Detectado en el QA de fase 2 (4-sep-2026).
 
+**E12-08 — Corrección de ⌘K (búsqueda global)**
+`Prioridad: Must · Puntos: 1 · Estado: Hecho · Sprint: S5`
+Como **cualquier persona con sesión iniciada**, quiero que el atajo ⌘K abra la búsqueda global de forma confiable, para llegar a una OF, lote o línea sin tocar el mouse.
+- Bug: `AppShell.tsx` leía `e.key` sin comprobar que existiera, y el listener del atajo fallaba con `e.key` indefinido (algunos eventos de teclado sintéticos/composición no lo traen).
+- **Cierre (4-sep-2026, tarde, commit `19172ce`):** guarda añadida antes de comparar `e.key === 'k'`; verificado sin error de consola en el QA de fase 2b (`docs/qa-report.md`).
+
 ---
 
 ## 5. Resumen por sprint
 
-| Sprint | Objetivo | Historias | Puntos | Estado |
+| Sprint | Objetivo | Historias | Puntos (computables) | Estado |
 | --- | --- | --- | --- | --- |
 | **S1** | Base del shell, Design System y seguridad JWT/roles | 3 | 29 | Hecho |
 | **S2** | Órdenes, captura básica (parada/IoT), responsive, validación 422 | 8 | 44 | Hecho |
 | **S3** | Reportes, alertas, analítica IA (motor de reglas) | 11 | 57 | Hecho |
 | **S4** | Evidencia de tesis: los 5 KPIs y su exportación | 6 | 31 | Hecho |
-| **S5** | Maestros reales: 9 líneas, par producto×línea, árbol de merma, mantenedores completos, usuarios | 21 | 137 | **Hecho** |
-| **S6+** | Microservicio Python, históricos reales, PostgreSQL, seguridad avanzada, despliegue, mejoras UX | 22 | 92 | Pendiente |
-| **Total** | — | **71** | **390** | — |
+| **S5** | Maestros reales + ajustes del 4-sep tarde: 9 líneas, par producto×línea, árbol de merma, mantenedor de líneas, usuarios sin sede, tarjetas de tiempo real ampliadas | 23 | 140 | **22 Hecho · 1 Descartada** |
+| **S6+** | Microservicio Python, históricos reales, PostgreSQL, seguridad avanzada, despliegue, mejoras UX | 22 | 90 | **21 Pendiente · 1 Descartada** |
+| **Total** | — | **73** | **391** | — |
 
-Cierre de S5 (4-sep-2026): las 8 historias que estaban `En curso` (E2-01, E2-03, E2-04, E8-04, E8-05, E8-06, E8-08, E8-09)
-se completaron, commitearon y verificaron (`pnpm typecheck` 7/7 · `pnpm lint` limpio · `pnpm build` 4/4 ·
-`pnpm --filter @mes/api test:e2e` 118/118); además `E12-06` (filtro `?periodo=hoy` anclado al día operativo) se
+Cierre de S5 (4-sep-2026, mañana): las 8 historias que estaban `En curso` (E2-01, E2-03, E2-04, E8-04, E8-05, E8-06,
+E8-08, E8-09) se completaron, commitearon y verificaron (`pnpm typecheck` 7/7 · `pnpm lint` limpio · `pnpm build` 4/4
+· `pnpm --filter @mes/api test:e2e` 118/118); además `E12-06` (filtro `?periodo=hoy` anclado al día operativo) se
 resolvió en el mismo QA de cierre y se reclasifica de `S6+` a `S5`. Detalle completo en «QA fase 2 · maestros
-reales y mantenedores (4-sep-2026)» al inicio de `docs/qa-report.md`.
+reales y mantenedores (4-sep-2026)» en `docs/qa-report.md`.
+
+Ajustes de S5 (4-sep-2026, tarde, commit `19172ce`): decisión del producto — se descarta el nivel máquina/equipo
+(la parada llega hasta línea) y el catálogo de sedes (única sede Lima). `E8-08` (Sedes) pasa de `Hecho` a
+`Descartada` (−3 puntos computables); `E8-03`/`E8-04` se reescriben como mantenedor de líneas; se suman dos
+historias `Hecho` nuevas — `E2-08` (tarjetas ampliadas y filtros simplificados, +5 puntos) y `E12-08` (corrección de
+⌘K, +1 punto) — y `E12-01` (agrupar filtro de líneas por proceso) pasa de `Pendiente` a `Descartada` en `S6+`
+(−2 puntos computables, ya no aplica sin filtro de línea). `pnpm typecheck`/`lint`/`build` en verde ·
+`pnpm --filter @mes/api test:e2e` **114/114** en 7 suites. Detalle en «QA fase 2b (4-sep-2026 tarde)» en
+`docs/qa-report.md`.
 
 ### Riesgos y dependencias
 
 - **Microservicio Python (E6-05):** sin él, la analítica IA sigue operando con reglas (`RuleBasedPredictionProvider`); el capítulo de analítica de la tesis debe dejar explícito que el modelo entrenado es un hito posterior al periodo experimental actual.
 - **Calidad de los datos del dump (E9-01/E9-06/E9-11):** la extracción dedujo sabor por coincidencia de texto (sin FK en el dump original), descartó filas de prueba/duplicadas y es anterior a `tiempoEstandarMin` (queda en 0 en las 52 causas específicas); una nueva extracción de históricos (E9-06) hereda el mismo riesgo de datos sucios y debe reportar % resuelto igual que la extracción de catálogos.
 - **Sabor sin relación FK (E2-03/E9-01):** `Producto.sabor` es informativo (heurística de texto); el wizard de merma usa `/sabores` como catálogo independiente, no como validación cruzada contra el producto.
-- **Adopción en planta (transversal):** el diseño reduce el TRI en la medición controlada del experimento; la adopción real por 9 sedes con turnos D/N depende de capacitación que no está en este backlog (fuera del alcance de la tesis, pero condiciona si el sistema se sostiene después del periodo experimental).
+- **Adopción en planta (transversal):** el diseño reduce el TRI en la medición controlada del experimento; la adopción real en la planta de Lima, con turnos D/N, depende de capacitación que no está en este backlog (fuera del alcance de la tesis, pero condiciona si el sistema se sostiene después del periodo experimental).
 - **Paridad mock↔API residual (E9-09):** el snapshot mock de `lineaEstados`, escrito a mano, difiere de la API en 3 líneas y en el turno — riesgo de demostrar un estado de planta distinto según el modo elegido hasta que se resuelva.
 - **Reloj real vs. día operativo fijo en los seeds de tesis (E9-10):** mientras `thesis-seed.util.ts: hoy()` no se ancle a la misma constante `HOY` que usa el mock, una demo contra la API en una fecha distinta puede mostrar una referencia temporal distinta a la del mock (los totales de los 5 KPIs no cambian, sólo la fecha de referencia).
+- **Modal anidado sin oscurecer el modal base (nuevo, QA fase 2b):** en `VelocidadesModal` (E8-06), `--z-overlay` (60) queda por debajo de `--z-modal` (70), así que el overlay del modal anidado de alta/edición/baja no oscurece el modal de velocidades que queda debajo.
 
 ---
 
@@ -571,30 +606,37 @@ reales y mantenedores (4-sep-2026)» al inicio de `docs/qa-report.md`.
 
 ### Por estado
 
-| Estado | Historias | % | Puntos | % |
+Los puntos de las historias `Descartada` **no se computan** (convención, sección 3); se listan aparte y quedan
+fuera de la base de cálculo del % de puntos.
+
+| Estado | Historias | % historias | Puntos | % puntos |
 | --- | --- | --- | --- | --- |
-| Hecho | 49 | 69,0 % | 298 | 76,4 % |
+| Hecho | 50 | 68,5 % | 301 | 77,0 % |
 | En curso | 0 | 0 % | 0 | 0 % |
-| Pendiente | 22 | 31,0 % | 92 | 23,6 % |
-| **Total** | **71** | **100 %** | **390** | **100 %** |
+| Pendiente | 21 | 28,8 % | 90 | 23,0 % |
+| Descartada | 2 | 2,7 % | 5 (no computable) | — |
+| **Total** | **73** | **100 %** | **391** (computables) | **100 %** |
+
+Historias `Descartada`: **E8-08** (Sedes: alta y edición, 3 pts) y **E12-01** (Agrupar filtro de líneas por proceso,
+2 pts) — ambas por la decisión del producto del 4-sep-2026 tarde (sin sedes, sin filtro de línea en tiempo real).
 
 ### Por épica
 
-| Épica | Historias | Puntos | Hecho | En curso | Pendiente |
-| --- | --- | --- | --- | --- | --- |
-| E1 — Shell y Design System | 3 | 26 | 3 | 0 | 0 |
-| E2 — Tiempo real y captura | 7 | 45 | 6 | 0 | 1 |
-| E3 — Órdenes de fabricación | 4 | 21 | 4 | 0 | 0 |
-| E4 — Reportes | 5 | 28 | 4 | 0 | 1 |
-| E5 — Alertas y motor de reglas | 4 | 21 | 4 | 0 | 0 |
-| E6 — Analítica IA | 5 | 36 | 4 | 0 | 1 |
-| E7 — Evidencia de tesis | 6 | 31 | 6 | 0 | 0 |
-| E8 — Configuración y mantenedores | 10 | 54 | 9 | 0 | 1 |
-| E9 — Datos maestros reales y migración | 11 | 64 | 5 | 0 | 6 |
-| E10 — Backend, seguridad y calidad | 6 | 36 | 3 | 0 | 3 |
-| E11 — Despliegue y operación | 3 | 13 | 0 | 0 | 3 |
-| E12 — Mejoras UX detectadas | 7 | 15 | 1 | 0 | 6 |
-| **Total** | **71** | **390** | **49** | **0** | **22** |
+| Épica | Historias | Puntos (computables) | Hecho | En curso | Pendiente | Descartada |
+| --- | --- | --- | --- | --- | --- | --- |
+| E1 — Shell y Design System | 3 | 26 | 3 | 0 | 0 | 0 |
+| E2 — Tiempo real y captura | 8 | 50 | 7 | 0 | 1 | 0 |
+| E3 — Órdenes de fabricación | 4 | 21 | 4 | 0 | 0 | 0 |
+| E4 — Reportes | 5 | 28 | 4 | 0 | 1 | 0 |
+| E5 — Alertas y motor de reglas | 4 | 21 | 4 | 0 | 0 | 0 |
+| E6 — Analítica IA | 5 | 36 | 4 | 0 | 1 | 0 |
+| E7 — Evidencia de tesis | 6 | 31 | 6 | 0 | 0 | 0 |
+| E8 — Configuración y mantenedores | 10 | 51 | 8 | 0 | 1 | 1 |
+| E9 — Datos maestros reales y migración | 11 | 64 | 5 | 0 | 6 | 0 |
+| E10 — Backend, seguridad y calidad | 6 | 36 | 3 | 0 | 3 | 0 |
+| E11 — Despliegue y operación | 3 | 13 | 0 | 0 | 3 | 0 |
+| E12 — Mejoras UX detectadas | 8 | 14 | 2 | 0 | 5 | 1 |
+| **Total** | **73** | **391** | **50** | **0** | **21** | **2** |
 
 ---
 
@@ -604,10 +646,10 @@ reales y mantenedores (4-sep-2026)» al inicio de `docs/qa-report.md`.
 | --- | --- |
 | Captura de datos | E2-01 a E2-07 |
 | Registro de producción | E2-01, E3-01 a E3-04 |
-| Registro de paradas | E2-02, E8-01, E8-03, E8-04 |
+| Registro de paradas | E2-02, E8-01, E8-03, E8-04 (mantenedor de líneas; el nivel máquina/equipo se descartó, ver nota de la épica E9) |
 | Registro de mermas | E2-03, E2-07, E8-02 |
 | Repositorio centralizado | E9-01 a E9-05, E3-04, E10-01 a E10-03 |
-| Dashboard en tiempo real | E1-01, E2-06 |
+| Dashboard en tiempo real | E1-01, E2-06, E2-08 |
 | Indicadores | E4-01 a E4-05 |
 | Analítica IA | E6-01 a E6-05 |
 | Alertas y predicciones | E5-01 a E5-04, E6-05, E8-07 |
@@ -622,9 +664,16 @@ reales y mantenedores (4-sep-2026)» al inicio de `docs/qa-report.md`.
 
 ---
 
-*Documento actualizado a partir del estado real del código en `feat/maestros-reales` (commits `2bb7f89`…`9f43e2a`,
-rama íntegramente commiteada salvo este archivo) al 4-sep-2026, cierre de la fase 2 "maestros reales". Las 8
-historias que quedaban `En curso` al 3-sep-2026 se completaron y verificaron (`pnpm typecheck` 7/7 · `pnpm lint`
-limpio · `pnpm build` 4/4 · `pnpm --filter @mes/api test:e2e` 118/118 en 7 suites); `docs/api-contracts.md`,
-`docs/implementation-summary.md` y `docs/qa-report.md` se actualizaron en la misma fase y ya no reflejan el modelo
-anterior a esta fase (5 líneas + PT-01, turnos M/T/N, `/pasteurizacion` y `/personal` activos).*
+*Documento actualizado a partir del estado real del código en `feat/ajustes-configuracion` (sobre `feat/maestros-reales`,
+commits `2bb7f89`…`19172ce`, rama íntegramente commiteada salvo esta carpeta `docs/`) al 4-sep-2026 tarde, tras el
+cierre de la fase 2 "maestros reales" (mañana) y los ajustes de configuración y tiempo real (tarde, commit `19172ce`):
+sin nivel máquina/equipo (la parada llega hasta línea), pestaña Máquinas → Líneas con mantenedor completo, sin
+catálogo de sedes (única sede Lima), "Ver velocidades" en modal, tarjetas de tiempo real ampliadas y filtros
+simplificados, corrección de ⌘K. Las 8 historias que quedaban `En curso` al 3-sep-2026 se completaron y verificaron
+por la mañana (`pnpm typecheck` 7/7 · `pnpm lint` limpio · `pnpm build` 4/4 · `pnpm --filter @mes/api test:e2e`
+118/118 en 7 suites); los ajustes de la tarde bajaron la suite a **114/114** (−10 casos de máquinas/sedes, +6 de
+líneas) en verde. `docs/api-contracts.md`, `README.md` y `docs/BRIEF-agentes.md` se actualizaron por la tarea de
+código en el mismo commit; `docs/implementation-summary.md` y `docs/qa-report.md` se actualizaron en esta misma
+revisión de `docs/`. Ninguno de los documentos refleja ya el modelo anterior a la fase 2 (5 líneas + PT-01, turnos
+M/T/N, `/pasteurizacion` y `/personal` activos) ni el modelo intermedio del cierre de fase 2 (máquinas-equipo, 9
+sedes) que la tarde del 4-sep-2026 descartó.*

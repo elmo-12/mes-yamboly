@@ -28,11 +28,11 @@ export const INSIGHTS: InsightCard[] = [
 
 /** Riesgo 0–100 estimado por el modelo para el próximo turno. */
 export const RIESGO_POR_LINEA: Omit<RiesgoLinea, 'turnoObjetivo'>[] = [
-  { lineaId: 'LIN-LLEN-M2', lineaCodigo: 'LLEN-M2', lineaNombre: 'Llenadora M2', riesgo: 78, causaProbable: 'PN-02-01 Falla mantto · Envolvedora' },
-  { lineaId: 'LIN-MOLD-A4', lineaCodigo: 'MOLD-A4', lineaNombre: 'Moldeadora A4', riesgo: 71, causaProbable: 'PN-04-15 Falla de equipo · Descargador' },
-  { lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2', riesgo: 64, causaProbable: 'PN-02-02 Falla operacional · Túnel de frío' },
-  { lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1', riesgo: 46, causaProbable: 'PN-04-02 Insumo / MP · Dosificadora' },
-  { lineaId: 'LIN-MOLD-A2', lineaCodigo: 'MOLD-A2', lineaNombre: 'Moldeadora A2', riesgo: 38, causaProbable: 'PN-04-16 Falla operativa · Pinzas' },
+  { lineaId: 'LIN-LLEN-M2', lineaCodigo: 'LLEN-M2', lineaNombre: 'Llenadora M2', riesgo: 78, causaProbable: 'PN-02-01 Falla mantto' },
+  { lineaId: 'LIN-MOLD-A4', lineaCodigo: 'MOLD-A4', lineaNombre: 'Moldeadora A4', riesgo: 71, causaProbable: 'PN-04-15 Falla de equipo' },
+  { lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2', riesgo: 64, causaProbable: 'PN-02-02 Falla operacional' },
+  { lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1', riesgo: 46, causaProbable: 'PN-04-02 Insumo / MP' },
+  { lineaId: 'LIN-MOLD-A2', lineaCodigo: 'MOLD-A2', lineaNombre: 'Moldeadora A2', riesgo: 38, causaProbable: 'PN-04-16 Falla operativa' },
 ];
 
 export const RECURRENCIAS: Recurrencia[] = [
@@ -48,7 +48,6 @@ export const VARIABLES_ENTRADA: VariableEntrada[] = [
   { id: 'VAR-01', nombre: 'Línea', importancia: 92 },
   { id: 'VAR-02', nombre: 'Turno', importancia: 84 },
   { id: 'VAR-03', nombre: 'Producto', importancia: 71 },
-  { id: 'VAR-04', nombre: 'Máquina', importancia: 88 },
   { id: 'VAR-05', nombre: 'Causa', importancia: 79 },
   { id: 'VAR-06', nombre: 'Tiempo de operación', importancia: 66 },
   { id: 'VAR-07', nombre: 'Velocidad', importancia: 74 },

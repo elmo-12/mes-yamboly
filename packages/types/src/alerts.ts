@@ -44,8 +44,6 @@ export interface Alerta {
   lineaId: string;
   lineaCodigo: string;
   lineaNombre: string;
-  maquinaId?: string;
-  maquinaNombre?: string;
   /** Texto de la predicción: `Parada PM-01 en L2 en 40 min`. */
   prediccion: string;
   /** Probabilidad 0–100. */

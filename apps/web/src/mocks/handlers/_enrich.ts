@@ -35,7 +35,6 @@ export function enriquecerParada(parada: Parada): ParadaListItem {
   return {
     ...parada,
     lineaCodigo: lineaPorId.get(parada.lineaId)?.codigo ?? '—',
-    maquinaNombre: store.maquinas.find((m) => m.id === parada.maquinaId)?.nombre ?? '—',
     causaCodigo: causa?.codigo ?? '—',
     causaNombre: causa?.nombre ?? '—',
     tipoCausaCodigo: tipo?.codigo ?? '—',

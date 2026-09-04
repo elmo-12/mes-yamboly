@@ -29,7 +29,6 @@ function validarAlta(body: Record<string, unknown>): Detalles {
   if (!/^\d{8}$/.test(texto(body.dni))) detalles.dni = 'El DNI debe tener 8 dígitos';
   if (!ROLES.includes(texto(body.rol) as Role)) detalles.rol = 'Selecciona un rol';
   if (texto(body.cargo).trim().length < 2) detalles.cargo = 'El cargo es obligatorio';
-  if (texto(body.sedeId).trim().length < 1) detalles.sedeId = 'Selecciona una sede';
   if (texto(body.password).length < 8) {
     detalles.password = 'La contraseña debe tener al menos 8 caracteres';
   }
@@ -55,7 +54,7 @@ function duplicado(email: string | undefined, dni: string | undefined, excluirId
 /** Espejo de `apps/api/src/modules/users/users.controller.ts`. */
 export const usersHandlers = [
   /**
-   * Directorio de personas. Lo consumen Configuración → Sedes y usuarios y los
+   * Directorio de personas. Lo consumen Configuración → Usuarios y los
    * selectores de captura: sin restricción de rol, igual que la API.
    */
   http.get(`${API}/usuarios`, async ({ request }) => {
@@ -63,7 +62,6 @@ export const usersHandlers = [
     if (simulado) return simulado;
     const url = new URL(request.url);
     const roles = listaQuery(url, 'rol');
-    const sedeId = url.searchParams.get('sedeId');
     const lineaId = url.searchParams.get('lineaId');
     const activo = url.searchParams.get('activo');
 
@@ -71,7 +69,6 @@ export const usersHandlers = [
       .sort((a, b) => a.id.localeCompare(b.id))
       .map(toUser);
     if (roles.length > 0) data = data.filter((u) => roles.includes(u.rol));
-    if (sedeId) data = data.filter((u) => u.sedeId === sedeId);
     // Sin línea = transversal (jefe, supervisores, calidad): aparece en toda línea.
     if (lineaId) data = data.filter((u) => !u.lineaId || u.lineaId === lineaId);
     if (activo !== null) data = data.filter((u) => u.activo === (activo === 'true'));
@@ -100,7 +97,6 @@ export const usersHandlers = [
       dni,
       rol: texto(body.rol) as Role,
       cargo: texto(body.cargo),
-      sedeId: texto(body.sedeId),
       lineaId: (body.lineaId as string | null | undefined) ?? null,
       iniciales: derivarIniciales(nombre),
       activo: true,

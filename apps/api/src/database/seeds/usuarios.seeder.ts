@@ -1,5 +1,6 @@
 import { hashSync } from 'bcryptjs';
 import type { DataSource } from 'typeorm';
+import { SEDE_UNICA_ID } from '@mes/types';
 import { User } from '../entities';
 import { usuarios } from './data';
 import type { Seeder } from './seeder.interface';
@@ -14,6 +15,8 @@ export const usuariosSeeder: Seeder = {
       ...user,
       lineaId: lineaId ?? null,
       avatarUrl: avatarUrl ?? null,
+      /* Columna interna heredada: la app opera una única sede. */
+      sedeId: SEDE_UNICA_ID,
       passwordHash: hashSync(password, BCRYPT_ROUNDS),
     }));
     await dataSource.getRepository(User).save(filas);

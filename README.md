@@ -71,9 +71,9 @@ pnpm --filter @mes/api seed
 Encuesta pública: `/encuesta/tsp-2026-01` … `tsp-2026-22`.
 
 ## Datos maestros reales
-Los catálogos de planta (sedes, líneas, sabores, productos, velocidades estándar, causas de parada y de merma) ya no son datos de ejemplo: son el **maestro real de Yamboly**, extraído de un dump de Postgres (formato custom `pg_dump`, sistema Strapi v5) del sistema anterior a la migración.
+Los catálogos de planta (líneas, sabores, productos, velocidades estándar, causas de parada y de merma) ya no son datos de ejemplo: son el **maestro real de Yamboly**, extraído de un dump de Postgres (formato custom `pg_dump`, sistema Strapi v5) del sistema anterior a la migración.
 
-- **Origen:** `apps/api/src/database/seeds/data/real/*.json` (9 sedes, 9 líneas, 41 sabores, 201 productos, 333 velocidades estándar, 83 causas de parada, 56 causas de merma, 2 turnos). Las máquinas (33 equipos de línea) están curadas a mano en `apps/api/src/database/seeds/data/catalogs.ts`, ya que el dump no traía una tabla de equipos.
+- **Origen:** `apps/api/src/database/seeds/data/real/*.json` (9 líneas, 41 sabores, 201 productos, 333 velocidades estándar, 83 causas de parada, 56 causas de merma, 2 turnos).
 - **Regenerar los JSON desde el dump** (solo si cambia el dump o el mapeo de columnas):
   ```bash
   node apps/api/scripts/extraer-maestros.mjs
@@ -81,7 +81,8 @@ Los catálogos de planta (sedes, líneas, sabores, productos, velocidades están
   Requiere el binario `pg_restore` de **libpq** disponible en la ruta configurada en el script (p. ej. `/opt/homebrew/opt/libpq/bin/pg_restore` en macOS/Homebrew). No restaura ninguna base de datos: lee el dump en modo texto (`pg_restore -a -t <tabla> -f -`) y escribe los JSON commiteados; es una tarea de un solo uso, los JSON **no se regeneran en runtime**.
 - **Convenciones del dominio:**
   - **Línea = máquina física** de planta (Llenadora M2, Extrusora 2, Moldeadora A3…), no una familia de producto. Sustituye al antiguo esquema `L1…L5`.
-  - **Máquina = equipo dentro de una línea** (envolvedora, codificadora, dosificadora, túnel de frío, tapadora, faja transportadora…), 2–4 por línea; obligatoria al registrar una parada.
+  - **No existe el nivel máquina/equipo:** la línea es la máquina, y la parada se registra hasta la línea.
+  - **Una única sede (Lima):** no hay catálogo de sedes ni filtros por sede en la API pública.
   - **La velocidad estándar vive en el par producto × línea** (`VelocidadEstandar`, tabla `producto_linea`), no en el producto: un mismo producto puede tener velocidades distintas en cada línea donde se fabrica. Se congela en la orden al iniciarla.
   - **Turnos:** `D` (Día, 06:00–18:00) y `N` (Noche, 18:00–06:00); reemplazan al esquema anterior de 3 turnos.
 - Contrato completo de cada endpoint, conteos y convención de ids: `docs/api-contracts.md` (sección "Datos maestros reales").
@@ -111,16 +112,16 @@ Rutas: `/login`, `/` (Home por rol), `/tiempo-real` (+ captura rápida: parada, 
 |---|---|---|
 | Causas de parada | Árbol Tipo → General → Específica (+ `codigoLegado`) | `CausasParadaTab` / `CausaParadaDetalle` |
 | Causas de merma | Árbol Tipo de producción → Clasificación → Causa | `CausasMermaTab` / `CausaMermaDetalle` |
-| Máquinas | Equipos de línea (código, nombre, tipo, línea, estado) | `MaquinasTab` / `MaquinaDrawer` |
+| Líneas | Líneas de planta = máquinas físicas (código, nombre, nombre corto, proceso, capacidad, estado) | `LineasTab` / `LineaDrawer` / `DesactivarLineaModal` |
 | Productos y velocidades | Matriz producto × línea (`VelocidadEstandar`, u/h → u/min) | `ProductosVelocidadesTab` / `ProductoDrawer` / `VelocidadEstandarModal` |
 | Umbrales de alerta | Umbrales del motor de reglas/IA | `UmbralesTab` |
-| Sedes y usuarios | Sedes (alta/edición) + directorio de usuarios (alta, edición, activar/desactivar, restablecer contraseña) | `SedesUsuariosTab` / `SedeDrawer` / `UsuarioDrawer` / `RestablecerPasswordModal` |
+| Usuarios | Directorio de personas (alta, edición, activar/desactivar, restablecer contraseña) | `UsuariosTab` / `UsuarioDrawer` / `RestablecerPasswordModal` |
 
 ## Backend
 12 módulos (auth, users, catalogs, orders, downtimes, scrap, speeds, realtime, reports, alerts, analytics, evidence) bajo `/api/v1`, respuestas `{ data, meta }` para colecciones y errores `{ statusCode, code, message, details }`. Contrato completo en `docs/api-contracts.md`; Swagger en `/docs`.
 
 ## Mocks
-`apps/web/src/mocks/{data,handlers,store.ts}`: mismos datos que los seeds del backend (maestro real: 9 líneas, 9 sedes, 41 sabores, 201 productos, 333 velocidades, 33 máquinas, causas de parada y de merma en árbol, turnos `D`/`N`, alertas, modelo v3.2, instrumentos TRI/TCI/TSP/CFS/EP). Errores simulables con `?__error=500` en cualquier llamada.
+`apps/web/src/mocks/{data,handlers,store.ts}`: mismos datos que los seeds del backend (maestro real: 9 líneas, 41 sabores, 201 productos, 333 velocidades, causas de parada y de merma en árbol, turnos `D`/`N`, alertas, modelo v3.2, instrumentos TRI/TCI/TSP/CFS/EP). Errores simulables con `?__error=500` en cualquier llamada.
 
 ## Decisiones de arquitectura
 - **Design System en código antes que las vistas** (`@mes/ui`), tokens 1:1 con las variables de Figma; reglas MDS codificadas (la página es el contenedor, cards solo funcionales, sombras solo en flotantes, un Primary por pantalla, Danger con confirmación).

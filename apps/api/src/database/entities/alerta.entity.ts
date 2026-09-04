@@ -25,12 +25,6 @@ export class Alerta {
   @Column('text')
   lineaNombre!: string;
 
-  @Column('text', { nullable: true })
-  maquinaId?: string | null;
-
-  @Column('text', { nullable: true })
-  maquinaNombre?: string | null;
-
   @Column('text')
   prediccion!: string;
 

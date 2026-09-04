@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Badge, Button, Icon, Modal, ModalContent, Tag, TimerChip, toast } from '@mes/ui';
-import { useMaquinas, useCausasParada } from '@/features/catalogs/hooks';
+import { useCausasParada } from '@/features/catalogs/hooks';
 import { useConfirmarDeteccion, useDescartarDeteccion } from '@/features/downtimes/hooks';
 import { etiquetaCausa, tiposDeParada } from '../causas';
 import type { ContextoLinea } from '../tipos';
@@ -25,7 +25,6 @@ export function IoTSugeridaModal({ contexto, abierto, onOpenChange }: IoTSugerid
   const [causaId, setCausaId] = React.useState('');
   const tri = useTriTimer(abierto);
   const { data: arbol } = useCausasParada(contexto.lineaId);
-  const { data: maquinas } = useMaquinas(contexto.lineaId);
   const confirmar = useConfirmarDeteccion();
   const descartar = useDescartarDeteccion();
 
@@ -46,7 +45,6 @@ export function IoTSugeridaModal({ contexto, abierto, onOpenChange }: IoTSugerid
         id: deteccionId,
         input: {
           causaId,
-          maquinaId: maquinas?.data[0]?.id ?? '',
           accionTomada: 'Parada confirmada desde la detección del sensor IoT',
           tiempoRegistroSeg: segundos,
         },
@@ -118,7 +116,7 @@ export function IoTSugeridaModal({ contexto, abierto, onOpenChange }: IoTSugerid
             ))}
           </div>
           <p className="text-body-sm text-text-disabled">
-            {[deteccionId ? `Evento ${deteccionId}` : '', maquinas?.data[0]?.nombre, `turno ${contexto.turnoLabel}`]
+            {[deteccionId ? `Evento ${deteccionId}` : '', contexto.etiqueta, `turno ${contexto.turnoLabel}`]
               .filter(Boolean)
               .join(' · ')}
           </p>

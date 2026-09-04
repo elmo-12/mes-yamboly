@@ -53,7 +53,7 @@ export function OrdenEvidenciasTab({ paradas, cargando }: OrdenEvidenciasTabProp
                 {`Parada ${hora(p.inicio)} · ${p.causaCodigo}`}
               </span>
             </div>
-            <Badge color="informational">{p.maquinaNombre}</Badge>
+            <Badge color="informational">{p.lineaCodigo}</Badge>
           </li>
         ))}
       </ul>

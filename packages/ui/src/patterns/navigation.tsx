@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Bell, ChevronDown, ChevronRight, CircleHelp, Menu, Search } from 'lucide-react';
+import { Bell, ChevronRight, CircleHelp, Menu, Search } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Avatar } from '../primitives/avatar';
 import { Badge } from '../primitives/badge';
@@ -194,8 +194,6 @@ export interface TopbarProps {
   /** Sustituye la campana (p. ej. por el disparador de un Popover). */
   notificationsSlot?: React.ReactNode;
   onHelpClick?: () => void;
-  /** Sede activa, p. ej. "Lima". */
-  site?: string;
   siteSlot?: React.ReactNode;
   user?: { name: string };
   /** Sustituye el avatar (p. ej. por el disparador de un DropdownMenu). */
@@ -219,7 +217,6 @@ export function Topbar({
   onNotificationsClick,
   notificationsSlot,
   onHelpClick,
-  site,
   siteSlot,
   user,
   userSlot,
@@ -267,13 +264,7 @@ export function Topbar({
 
       <div className="min-w-0 flex-1">{breadcrumb}</div>
 
-      {siteSlot ??
-        (site && (
-          <span className="hidden shrink-0 items-center gap-1.5 rounded-sm px-2 py-1.5 text-body text-text-secondary lg:flex">
-            Sede: <span className="font-medium text-text-primary">{site}</span>
-            <ChevronDown className="size-icon-sm text-text-secondary" aria-hidden />
-          </span>
-        ))}
+      {siteSlot}
 
       {notificationsSlot ?? (
         <button

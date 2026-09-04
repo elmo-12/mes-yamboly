@@ -1,13 +1,13 @@
 import type { DeteccionIoT, Parada } from '@mes/types';
-import { causasEspecificas, maquinas, tipoDeCausa } from './catalogs';
+import { causasEspecificas, tipoDeCausa } from './catalogs';
 import { maquinistaPorLinea } from './users';
 import { ordenes } from './orders';
 import { HOY, iso, minutosEntreIso, pad4, rng, sumarMinutos } from './seed';
 
 /**
  * ~190 paradas deterministas sobre el árbol de causas **real** (se registra
- * siempre una hoja `nivel: 'especifica'` y su raíz en `tipoCausaId`) y sobre
- * las máquinas-equipo de cada línea.
+ * siempre una hoja `nivel: 'especifica'` y su raíz en `tipoCausaId`). La
+ * parada se registra hasta el nivel de línea: no existe nivel máquina.
  *
  * Las 4 de la OF-2026-0815 reproducen la spec 05.D (42 min en total, 3 afectan
  * OEE) y la de la Moldeadora A3 sigue abierta (spec 03.A).
@@ -85,17 +85,12 @@ const DURACION_POR_TIPO: Record<string, [number, number]> = {
   'CPA-PS-05': [15, 45],
 };
 
-function maquinasDeLinea(lineaId: string) {
-  return maquinas.filter((m) => m.lineaId === lineaId);
-}
-
 /** Paradas de la OF-2026-0815 (spec 05.D: 42 min, 4 paradas, 3 afectan OEE). */
 export const PARADAS_REFERENCIA: Parada[] = [
   {
     id: 'PAR-0815-01',
     ordenId: 'ORD-0815',
     lineaId: 'LIN-LLEN-A1',
-    maquinaId: 'MAQ-08',
     causaId: 'CPA-PP-01-10',
     tipoCausaId: 'CPA-PP-01',
     inicio: iso(HOY, '07:42'),
@@ -112,7 +107,6 @@ export const PARADAS_REFERENCIA: Parada[] = [
     id: 'PAR-0815-02',
     ordenId: 'ORD-0815',
     lineaId: 'LIN-LLEN-A1',
-    maquinaId: 'MAQ-08',
     causaId: 'CPA-PN-04-01',
     tipoCausaId: 'CPA-PN-04',
     inicio: iso(HOY, '09:24'),
@@ -128,7 +122,6 @@ export const PARADAS_REFERENCIA: Parada[] = [
     id: 'PAR-0815-03',
     ordenId: 'ORD-0815',
     lineaId: 'LIN-LLEN-A1',
-    maquinaId: 'MAQ-10',
     causaId: 'CPA-PN-02-01',
     tipoCausaId: 'CPA-PN-02',
     inicio: iso(HOY, '11:18'),
@@ -147,7 +140,6 @@ export const PARADAS_REFERENCIA: Parada[] = [
     id: 'PAR-0815-04',
     ordenId: 'ORD-0815',
     lineaId: 'LIN-LLEN-A1',
-    maquinaId: 'MAQ-10',
     causaId: 'CPA-PN-04-14',
     tipoCausaId: 'CPA-PN-04',
     inicio: iso(HOY, '12:40'),
@@ -166,7 +158,6 @@ export const PARADA_ABIERTA: Parada = {
   id: 'PAR-0812-01',
   ordenId: 'ORD-0812',
   lineaId: 'LIN-MOLD-A3',
-  maquinaId: 'MAQ-28',
   causaId: 'CPA-PN-02-02',
   tipoCausaId: 'CPA-PN-02',
   inicio: iso(HOY, '13:47'),
@@ -187,7 +178,6 @@ function generarParadas(): Parada[] {
   );
 
   for (const orden of conParadas) {
-    const maquinasLinea = maquinasDeLinea(orden.lineaId);
     const causasLinea = causasEspecificas.filter(
       (c) => c.lineasAplicables.length === 0 || c.lineasAplicables.includes(orden.lineaId)
     );
@@ -196,7 +186,6 @@ function generarParadas(): Parada[] {
     for (let i = 0; i < orden.paradasCount; i += 1) {
       const causa = causasLinea[r.int(0, causasLinea.length - 1)]!;
       const tipo = tipoDeCausa(causa.id);
-      const maquina = maquinasLinea[r.int(0, Math.max(0, maquinasLinea.length - 1))] ?? maquinas[0]!;
       const [minimo, maximo] = DURACION_POR_TIPO[tipo?.id ?? ''] ?? [10, 30];
       const duracionMin = r.int(minimo, maximo);
       const inicio = cursor;
@@ -205,7 +194,6 @@ function generarParadas(): Parada[] {
         id: `PAR-${orden.id.slice(4)}-${pad4(i + 1).slice(2)}`,
         ordenId: orden.id,
         lineaId: orden.lineaId,
-        maquinaId: maquina.id,
         causaId: causa.id,
         tipoCausaId: tipo?.id ?? causa.id,
         inicio,
@@ -250,7 +238,6 @@ export const detecciones: DeteccionIoT[] = [
     id: 'IOT-EXTR2-01',
     lineaId: 'LIN-EXTR-2',
     lineaCodigo: 'EXTR-2',
-    maquinaId: 'MAQ-01',
     detectadaEn: iso(HOY, '14:02'),
     minutos: 3,
     estado: 'sugerida',
@@ -260,7 +247,6 @@ export const detecciones: DeteccionIoT[] = [
     id: 'IOT-0815-01',
     lineaId: 'LIN-LLEN-A1',
     lineaCodigo: 'LLEN-A1',
-    maquinaId: 'MAQ-10',
     detectadaEn: iso(HOY, '11:18'),
     minutos: 9,
     estado: 'confirmada',
@@ -271,7 +257,6 @@ export const detecciones: DeteccionIoT[] = [
     id: 'IOT-MOLDA3-01',
     lineaId: 'LIN-MOLD-A3',
     lineaCodigo: 'MOLD-A3',
-    maquinaId: 'MAQ-28',
     detectadaEn: iso(HOY, '13:47'),
     minutos: 18,
     estado: 'confirmada',
@@ -282,7 +267,6 @@ export const detecciones: DeteccionIoT[] = [
     id: 'IOT-LLENM2-01',
     lineaId: 'LIN-LLEN-M2',
     lineaCodigo: 'LLEN-M2',
-    maquinaId: 'MAQ-19',
     detectadaEn: iso(HOY, '10:26'),
     minutos: 4,
     estado: 'descartada',

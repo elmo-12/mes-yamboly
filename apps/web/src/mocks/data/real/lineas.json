@@ -6,7 +6,6 @@
     "nombreCorto": "EXTR 2",
     "tipoProceso": "extrusora",
     "idLegado": 2,
-    "sedeId": "SED-LIMA",
     "estado": "activo"
   },
   {
@@ -16,7 +15,6 @@
     "nombreCorto": "EXTR 3",
     "tipoProceso": "extrusora",
     "idLegado": 8,
-    "sedeId": "SED-LIMA",
     "estado": "activo"
   },
   {
@@ -26,7 +24,6 @@
     "nombreCorto": "LLEN A1",
     "tipoProceso": "llenadora",
     "idLegado": 9,
-    "sedeId": "SED-LIMA",
     "estado": "activo"
   },
   {
@@ -36,7 +33,6 @@
     "nombreCorto": "LLEN A2",
     "tipoProceso": "llenadora",
     "idLegado": 5,
-    "sedeId": "SED-LIMA",
     "estado": "activo"
   },
   {
@@ -46,7 +42,6 @@
     "nombreCorto": "LLEN M1",
     "tipoProceso": "llenadora",
     "idLegado": 6,
-    "sedeId": "SED-LIMA",
     "estado": "activo"
   },
   {
@@ -56,7 +51,6 @@
     "nombreCorto": "LLEN M2",
     "tipoProceso": "llenadora",
     "idLegado": 1,
-    "sedeId": "SED-LIMA",
     "estado": "activo"
   },
   {
@@ -66,7 +60,6 @@
     "nombreCorto": "MOLD A2",
     "tipoProceso": "moldeadora",
     "idLegado": 4,
-    "sedeId": "SED-LIMA",
     "estado": "activo"
   },
   {
@@ -76,7 +69,6 @@
     "nombreCorto": "MOLD A3",
     "tipoProceso": "moldeadora",
     "idLegado": 10,
-    "sedeId": "SED-LIMA",
     "estado": "activo"
   },
   {
@@ -86,7 +78,6 @@
     "nombreCorto": "MOLD A4",
     "tipoProceso": "moldeadora",
     "idLegado": 3,
-    "sedeId": "SED-LIMA",
     "estado": "activo"
   }
 ]

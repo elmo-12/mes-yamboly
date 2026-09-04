@@ -307,7 +307,7 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       const modelo = await get('/analitica/modelo').expect(200);
       expect(modelo.body.fasesCrispDm).toHaveLength(6);
       expect(modelo.body.metricas).toMatchObject({ registros: 2140, features: 14, auc: 0.86, f1: 0.79 });
-      expect(modelo.body.variablesEntrada).toHaveLength(9);
+      expect(modelo.body.variablesEntrada).toHaveLength(8);
 
       const datos = await get('/analitica/estado-datos').expect(200);
       expect(datos.body).toMatchObject({ eventos: 2140, requeridos: 2000, suficiente: true });

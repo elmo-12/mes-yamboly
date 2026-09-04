@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsOptional } from 'class-validator';
 import {
   ESTADOS_CATALOGO,
   TIPOS_PROCESO_LINEA,
@@ -15,11 +15,6 @@ export class SaborQueryDto {
 }
 
 export class LineaQueryDto {
-  @ApiPropertyOptional({ example: 'SED-LIMA' })
-  @IsOptional()
-  @IsString()
-  sedeId?: string;
-
   @ApiPropertyOptional({ enum: TIPOS_PROCESO_LINEA })
   @IsOptional()
   @IsIn(TIPOS_PROCESO_LINEA)

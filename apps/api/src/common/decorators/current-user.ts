@@ -16,7 +16,6 @@ export interface AuthUser {
   rol: Role;
   iniciales: string;
   lineaId?: string | null;
-  sedeId: string;
 }
 
 /** `@CurrentUser() user: AuthUser` — inyecta el usuario autenticado. */

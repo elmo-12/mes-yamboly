@@ -7,17 +7,18 @@ import type {
   CausaParada,
   CausaParadaNodo,
   EstadoCatalogo,
-  Maquina,
+  Linea,
+  LineaListItem,
   Producto,
-  Sede,
   TipoMermaCodigo,
   TipoProcesoLinea,
   VelocidadEstandar,
   VelocidadEstandarListItem,
 } from '@mes/types';
-import { lineaPorId, lineas, turnos } from '../data';
+import { TIPOS_PROCESO_LINEA } from '@mes/types';
+import { lineaPorId, turnos } from '../data';
 import { getStore } from '../store';
-import { API, errores, listaQuery, normalizar, preludio } from './_utils';
+import { API, errores, normalizar, preludio } from './_utils';
 
 /** Texto de los campos sin resolver, igual que `GUION` en `catalogs.service.ts`. */
 const GUION = '—';
@@ -25,6 +26,41 @@ const GUION = '—';
 /** `velocidadUnidMin = velocidadUnidHora / 60` redondeado a 1 decimal. */
 function unidadesPorMinuto(velocidadUnidHora: number): number {
   return Math.round((velocidadUnidHora / 60) * 10) / 10;
+}
+
+/** Ventana del contador `paradas30d` de cada línea (espejo de `CatalogsService`). */
+const DIAS_VENTANA_PARADAS = 30;
+
+/**
+ * Resuelve los contadores del mantenedor de líneas: pares producto × línea
+ * activos y paradas de los últimos 30 días. Con datos congelados la referencia
+ * es la parada más reciente del conjunto, no el reloj del navegador.
+ */
+function enriquecerLineas(filas: Linea[]): LineaListItem[] {
+  const store = getStore();
+  const conVelocidad = new Map<string, number>();
+  for (const par of store.velocidadesEstandar) {
+    if (par.estado !== 'activo') continue;
+    conVelocidad.set(par.lineaId, (conVelocidad.get(par.lineaId) ?? 0) + 1);
+  }
+  const paradas30d = new Map<string, number>();
+  if (store.paradas.length > 0) {
+    const ultima = store.paradas.reduce(
+      (max, p) => (p.inicio > max ? p.inicio : max),
+      store.paradas[0]!.inicio
+    );
+    const desde = new Date(ultima);
+    desde.setDate(desde.getDate() - DIAS_VENTANA_PARADAS);
+    const limite = desde.toISOString().slice(0, 19);
+    for (const p of store.paradas) {
+      if (p.inicio >= limite) paradas30d.set(p.lineaId, (paradas30d.get(p.lineaId) ?? 0) + 1);
+    }
+  }
+  return filas.map((l) => ({
+    ...l,
+    productosConVelocidad: conVelocidad.get(l.id) ?? 0,
+    paradas30d: paradas30d.get(l.id) ?? 0,
+  }));
 }
 
 /** Reconstruye un árbol de causas (parada o merma) a partir de `parentId`. */
@@ -92,79 +128,6 @@ function exigirRango(
 }
 
 /* ------------------------------------------------------------------ */
-/* Sedes                                                               */
-/* ------------------------------------------------------------------ */
-
-const sedesHandlers = [
-  http.get(`${API}/sedes`, async ({ request }) => {
-    const simulado = await preludio(request);
-    if (simulado) return simulado;
-    const data = [...getStore().sedes].sort((a, b) => a.id.localeCompare(b.id));
-    return HttpResponse.json({ data });
-  }),
-
-  http.post(`${API}/sedes`, async ({ request }) => {
-    const simulado = await preludio(request);
-    if (simulado) return simulado;
-    const store = getStore();
-    const body = (await request.json()) as Record<string, unknown>;
-
-    const detalles: Detalles = {};
-    exigirPatron(
-      detalles,
-      'codigo',
-      body.codigo,
-      /^[A-Z]{3,4}$/,
-      'Formato esperado AREQ (3 o 4 letras mayúsculas)'
-    );
-    exigirTexto(detalles, 'nombre', body.nombre, 3, 'El nombre es obligatorio');
-    exigirTexto(detalles, 'ciudad', body.ciudad, 3, 'La ciudad es obligatoria');
-    if (Object.keys(detalles).length > 0) return errores.validacion(detalles);
-
-    const codigo = texto(body.codigo);
-    if (store.sedes.some((s) => s.codigo === codigo)) {
-      return errores.conflicto('Ya existe una sede con ese código', { codigo });
-    }
-    /* Misma convención que el maestro real: `SED-AREQUIPA`, `SED-LIMA`. */
-    const nombre = texto(body.nombre);
-    const slug = normalizar(nombre)
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-    const id = `SED-${slug || codigo}`;
-    if (store.sedes.some((s) => s.id === id)) {
-      return errores.conflicto('Ya existe una sede con ese nombre', { nombre });
-    }
-
-    const sede: Sede = {
-      id,
-      codigo,
-      nombre,
-      ciudad: texto(body.ciudad),
-      activa: body.activa === undefined ? true : Boolean(body.activa),
-    };
-    store.sedes.push(sede);
-    return HttpResponse.json(sede, { status: 201 });
-  }),
-
-  http.patch(`${API}/sedes/:id`, async ({ request, params }) => {
-    const simulado = await preludio(request);
-    if (simulado) return simulado;
-    const store = getStore();
-    const sede = store.sedes.find((s) => s.id === params.id);
-    if (!sede) return errores.noEncontrado('Sede');
-    const body = (await request.json()) as Partial<Sede>;
-    if (body.codigo && body.codigo !== sede.codigo) {
-      if (store.sedes.some((s) => s.codigo === body.codigo)) {
-        return errores.conflicto('Ya existe una sede con ese código', { codigo: body.codigo });
-      }
-    }
-    Object.assign(sede, body);
-    return HttpResponse.json(sede);
-  }),
-];
-
-/* ------------------------------------------------------------------ */
 /* Sabores, líneas y turnos                                            */
 /* ------------------------------------------------------------------ */
 
@@ -188,15 +151,91 @@ const maestrosHandlers = [
     const simulado = await preludio(request);
     if (simulado) return simulado;
     const url = new URL(request.url);
-    const sedeId = url.searchParams.get('sedeId');
     const tipoProceso = url.searchParams.get('tipoProceso');
     const estado = url.searchParams.get('estado');
-    const data = [...lineas]
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .filter((l) => (sedeId ? l.sedeId === sedeId : true))
-      .filter((l) => (tipoProceso ? l.tipoProceso === tipoProceso : true))
-      .filter((l) => (estado ? l.estado === estado : true));
+    const data = enriquecerLineas(
+      [...getStore().lineas]
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .filter((l) => (tipoProceso ? l.tipoProceso === tipoProceso : true))
+        .filter((l) => (estado ? l.estado === estado : true))
+    );
     return HttpResponse.json({ data });
+  }),
+
+  http.post(`${API}/lineas`, async ({ request }) => {
+    const simulado = await preludio(request);
+    if (simulado) return simulado;
+    const store = getStore();
+    const body = (await request.json()) as Record<string, unknown>;
+
+    const detalles: Detalles = {};
+    exigirPatron(
+      detalles,
+      'codigo',
+      body.codigo,
+      /^[A-Z]{3,4}-[A-Z]?\d{1,2}$/,
+      'Formato esperado LLEN-M2, EXTR-2 o MOLD-A3'
+    );
+    exigirTexto(detalles, 'nombre', body.nombre, 3, 'El nombre es obligatorio');
+    exigirTexto(detalles, 'nombreCorto', body.nombreCorto, 2, 'El nombre corto es obligatorio');
+    if (!TIPOS_PROCESO_LINEA.includes(body.tipoProceso as TipoProcesoLinea)) {
+      detalles.tipoProceso = 'Selecciona el tipo de proceso';
+    }
+    if (Object.keys(detalles).length > 0) return errores.validacion(detalles);
+
+    const codigo = texto(body.codigo);
+    if (store.lineas.some((l) => l.codigo === codigo)) {
+      return errores.conflicto('Ya existe una línea con ese código', { codigo });
+    }
+    const nueva: Linea = {
+      id: `LIN-${codigo}`,
+      codigo,
+      nombre: texto(body.nombre),
+      nombreCorto: texto(body.nombreCorto),
+      tipoProceso: body.tipoProceso as TipoProcesoLinea,
+      estado: (body.estado as EstadoCatalogo | undefined) ?? 'activo',
+      capacidadUnidadesMin: Number(body.capacidadUnidadesMin ?? 0),
+    };
+    store.lineas.push(nueva);
+    return HttpResponse.json(nueva, { status: 201 });
+  }),
+
+  http.patch(`${API}/lineas/:id`, async ({ request, params }) => {
+    const simulado = await preludio(request);
+    if (simulado) return simulado;
+    const store = getStore();
+    const linea = store.lineas.find((l) => l.id === params.id);
+    if (!linea) return errores.noEncontrado('Línea');
+    const body = (await request.json()) as Partial<Linea>;
+    if (body.codigo && body.codigo !== linea.codigo) {
+      if (store.lineas.some((l) => l.codigo === body.codigo)) {
+        return errores.conflicto('Ya existe una línea con ese código', { codigo: body.codigo });
+      }
+    }
+    Object.assign(linea, body);
+    return HttpResponse.json(linea);
+  }),
+
+  /** Baja lógica: la línea pasa a `inactivo` y conserva órdenes y paradas. */
+  http.delete(`${API}/lineas/:id`, async ({ request, params }) => {
+    const simulado = await preludio(request);
+    if (simulado) return simulado;
+    const store = getStore();
+    const linea = store.lineas.find((l) => l.id === params.id);
+    if (!linea) return errores.noEncontrado('Línea');
+    const conservados =
+      store.ordenes.filter((o) => o.lineaId === linea.id).length +
+      store.paradas.filter((p) => p.lineaId === linea.id).length;
+    linea.estado = 'inactivo';
+    const respuesta: BajaLogicaResponse = {
+      id: linea.id,
+      codigo: linea.codigo,
+      estado: 'inactivo',
+      conservados,
+      etiquetaConservados: 'órdenes y paradas',
+      mensaje: `Hay ${conservados} órdenes y paradas registradas en esta línea; se conservarán con el código ${linea.codigo}.`,
+    };
+    return HttpResponse.json(respuesta);
   }),
 ];
 
@@ -480,96 +519,6 @@ const velocidadesHandlers = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* Máquinas (equipos de la línea)                                      */
-/* ------------------------------------------------------------------ */
-
-const maquinasHandlers = [
-  http.get(`${API}/maquinas`, async ({ request }) => {
-    const simulado = await preludio(request);
-    if (simulado) return simulado;
-    const url = new URL(request.url);
-    const lineaId = url.searchParams.get('lineaId');
-    const estados = listaQuery(url, 'estado');
-    let data = [...getStore().maquinas].sort((a, b) => a.id.localeCompare(b.id));
-    if (lineaId) data = data.filter((m) => m.lineaId === lineaId);
-    if (estados.length > 0) data = data.filter((m) => estados.includes(m.estado));
-    return HttpResponse.json({ data });
-  }),
-
-  http.post(`${API}/maquinas`, async ({ request }) => {
-    const simulado = await preludio(request);
-    if (simulado) return simulado;
-    const store = getStore();
-    const body = (await request.json()) as Record<string, unknown>;
-
-    const detalles: Detalles = {};
-    exigirPatron(
-      detalles,
-      'codigo',
-      body.codigo,
-      /^MQ-[A-Z0-9]{2,6}-\d{2}$/,
-      'Formato esperado MQ-LLENM2-01'
-    );
-    exigirTexto(detalles, 'nombre', body.nombre, 3, 'El nombre es obligatorio');
-    exigirTexto(detalles, 'tipo', body.tipo, 3, 'El tipo es obligatorio');
-    exigirTexto(detalles, 'lineaId', body.lineaId, 1, 'Selecciona una línea');
-    if (Object.keys(detalles).length > 0) return errores.validacion(detalles);
-
-    const codigo = texto(body.codigo);
-    if (store.maquinas.some((m) => m.codigo === codigo)) {
-      return errores.conflicto('Ya existe una máquina con ese código', { codigo });
-    }
-    const nueva: Maquina = {
-      id: `MAQ-${String(store.maquinas.length + 1).padStart(2, '0')}`,
-      codigo,
-      nombre: texto(body.nombre),
-      tipo: texto(body.tipo),
-      lineaId: texto(body.lineaId),
-      estado: (body.estado as Maquina['estado'] | undefined) ?? 'operativa',
-      paradas30d: 0,
-    };
-    store.maquinas.push(nueva);
-    return HttpResponse.json(nueva, { status: 201 });
-  }),
-
-  http.patch(`${API}/maquinas/:id`, async ({ request, params }) => {
-    const simulado = await preludio(request);
-    if (simulado) return simulado;
-    const store = getStore();
-    const maquina = store.maquinas.find((m) => m.id === params.id);
-    if (!maquina) return errores.noEncontrado('Máquina');
-    const body = (await request.json()) as Partial<Maquina>;
-    if (body.codigo && body.codigo !== maquina.codigo) {
-      if (store.maquinas.some((m) => m.codigo === body.codigo)) {
-        return errores.conflicto('Ya existe una máquina con ese código', { codigo: body.codigo });
-      }
-    }
-    Object.assign(maquina, body);
-    return HttpResponse.json(maquina);
-  }),
-
-  /** Baja lógica: la máquina pasa a `baja` y conserva sus paradas históricas. */
-  http.delete(`${API}/maquinas/:id`, async ({ request, params }) => {
-    const simulado = await preludio(request);
-    if (simulado) return simulado;
-    const store = getStore();
-    const maquina = store.maquinas.find((m) => m.id === params.id);
-    if (!maquina) return errores.noEncontrado('Máquina');
-    const conservados = store.paradas.filter((p) => p.maquinaId === maquina.id).length;
-    maquina.estado = 'baja';
-    const respuesta: BajaLogicaResponse = {
-      id: maquina.id,
-      codigo: maquina.codigo,
-      estado: 'baja',
-      conservados,
-      etiquetaConservados: 'paradas',
-      mensaje: `Hay ${conservados} paradas registradas en esta máquina; se conservarán con el código ${maquina.codigo}.`,
-    };
-    return HttpResponse.json(respuesta);
-  }),
-];
-
-/* ------------------------------------------------------------------ */
 /* Causas de parada (árbol Tipo → General → Específica)                */
 /* ------------------------------------------------------------------ */
 
@@ -767,11 +716,9 @@ const causasMermaHandlers = [
 
 /** Espejo de `apps/api/src/modules/catalogs/catalogs.controller.ts`. */
 export const catalogsHandlers = [
-  ...sedesHandlers,
   ...maestrosHandlers,
   ...productosHandlers,
   ...velocidadesHandlers,
-  ...maquinasHandlers,
   ...causasParadaHandlers,
   ...causasMermaHandlers,
 ];

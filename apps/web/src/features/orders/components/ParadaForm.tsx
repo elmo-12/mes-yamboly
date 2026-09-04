@@ -5,7 +5,7 @@ import { Controller, type UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
 import { Input, Select, Switch, Textarea } from '@mes/ui';
 import type { CausaParadaNodo, ParadaListItem } from '@mes/types';
-import { useMaquinas, useUsuarios } from '@/features/catalogs/hooks';
+import { useUsuarios } from '@/features/catalogs/hooks';
 import { especificasDeTipo } from '@/features/catalogs/causas';
 import { hora } from '../format';
 
@@ -16,7 +16,6 @@ import { hora } from '../format';
  */
 export const paradaFormSchema = z
   .object({
-    maquinaId: z.string().min(1, 'Selecciona una máquina'),
     horaInicio: z.string().regex(/^\d{2}:\d{2}$/, 'Formato HH:mm'),
     horaFin: z
       .string()
@@ -42,7 +41,6 @@ export type ParadaFormValues = z.infer<typeof paradaFormSchema>;
 /** Valores iniciales a partir de una parada existente (drawer de edición). */
 export function valoresDeParada(parada: ParadaListItem): ParadaFormValues {
   return {
-    maquinaId: parada.maquinaId,
     horaInicio: hora(parada.inicio),
     horaFin: parada.fin ? hora(parada.fin) : '',
     tipoCausaId: parada.tipoCausaId,
@@ -70,13 +68,12 @@ export function duracionMin(inicio: string, fin: string): number | null {
 
 export interface ParadaFormProps {
   form: UseFormReturn<ParadaFormValues>;
-  lineaId: string;
   causas?: readonly CausaParadaNodo[];
   formId: string;
   onSubmit: (valores: ParadaFormValues) => void | Promise<void>;
 }
 
-export function ParadaForm({ form, lineaId, causas = [], formId, onSubmit }: ParadaFormProps) {
+export function ParadaForm({ form, causas = [], formId, onSubmit }: ParadaFormProps) {
   const {
     register,
     control,
@@ -86,7 +83,6 @@ export function ParadaForm({ form, lineaId, causas = [], formId, onSubmit }: Par
     formState: { errors },
   } = form;
 
-  const { data: maquinas } = useMaquinas(lineaId || undefined);
   const { data: usuarios } = useUsuarios();
 
   const tipoCausaId = watch('tipoCausaId');
@@ -118,10 +114,6 @@ export function ParadaForm({ form, lineaId, causas = [], formId, onSubmit }: Par
 
   const minutos = duracionMin(horaInicio, horaFin);
 
-  const opcionesMaquina = (maquinas?.data ?? [])
-    .filter((m) => m.estado !== 'baja')
-    .map((m) => ({ value: m.id, label: `${m.codigo} · ${m.nombre}` }));
-
   const opcionesResponsable = (usuarios?.data ?? [])
     .filter((u) => u.activo)
     .map((u) => ({ value: u.id, label: `${u.nombre} · ${u.cargo}` }));
@@ -133,22 +125,6 @@ export function ParadaForm({ form, lineaId, causas = [], formId, onSubmit }: Par
       className="flex flex-col gap-4"
       noValidate
     >
-      <Controller
-        control={control}
-        name="maquinaId"
-        render={({ field }) => (
-          <Select
-            label="Máquina"
-            placeholder="Selecciona una máquina"
-            options={opcionesMaquina}
-            value={field.value}
-            onValueChange={field.onChange}
-            destructive={Boolean(errors.maquinaId)}
-            hint={errors.maquinaId?.message}
-          />
-        )}
-      />
-
       <div className="grid grid-cols-2 gap-4">
         <Input
           label="Hora inicio"

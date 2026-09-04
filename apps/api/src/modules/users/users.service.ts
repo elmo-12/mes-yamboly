@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
 import { Not, Repository } from 'typeorm';
+import { SEDE_UNICA_ID } from '@mes/types';
 import type { Colaborador, User as UserDto } from '@mes/types';
 import {
   BusinessRuleException,
@@ -39,7 +40,6 @@ export class UsersService {
     const filas = await this.usuarios.find({ order: { id: 'ASC' } });
     return filas
       .filter((u) => (roles.length > 0 ? roles.includes(u.rol) : true))
-      .filter((u) => (query.sedeId ? u.sedeId === query.sedeId : true))
       // Sin línea = transversal (jefe, supervisores, calidad): aparece en toda línea.
       .filter((u) => (query.lineaId ? !u.lineaId || u.lineaId === query.lineaId : true))
       .filter((u) => (query.activo === undefined ? true : u.activo === query.activo))
@@ -61,7 +61,8 @@ export class UsersService {
       dni: dto.dni,
       rol: dto.rol,
       cargo: dto.cargo,
-      sedeId: dto.sedeId,
+      /* Columna interna heredada: la app opera una única sede. */
+      sedeId: SEDE_UNICA_ID,
       lineaId: dto.lineaId ?? null,
       iniciales: derivarIniciales(dto.nombre),
       avatarUrl: null,

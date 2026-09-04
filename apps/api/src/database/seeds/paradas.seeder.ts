@@ -19,7 +19,6 @@ export const paradasSeeder: Seeder = {
     await dataSource.getRepository(DeteccionIoT).save(
       detecciones.map((d) => ({
         ...d,
-        maquinaId: d.maquinaId ?? null,
         paradaId: d.paradaId ?? null,
       })),
     );

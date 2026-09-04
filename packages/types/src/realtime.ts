@@ -73,7 +73,6 @@ export interface TiempoRealResumen {
   turnoLabel: string;
   /** `06:00–14:00` */
   turnoRango: string;
-  sedeId: string;
   lineas: LineaEstado[];
 }
 

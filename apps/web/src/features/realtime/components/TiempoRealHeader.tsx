@@ -10,7 +10,6 @@ export interface TiempoRealHeaderProps {
   actualizadoEn?: string;
   turnoLabel?: string;
   turnoRango?: string;
-  lineas: number;
   /** Regla MDS: el Primary de la pantalla base se deshabilita con overlay abierto. */
   overlayAbierto: boolean;
   onIniciarOrden: () => void;
@@ -36,20 +35,15 @@ export function TiempoRealHeader({
   actualizadoEn,
   turnoLabel,
   turnoRango,
-  lineas,
   overlayAbierto,
   onIniciarOrden,
 }: TiempoRealHeaderProps) {
   const segundos = useSegundosDesde(actualizadoEn);
   const frescura =
     segundos === null ? 'Conectando con la planta…' : `Actualizado hace ${formatNumber(segundos)} s`;
-  /* En móvil solo cabe la frescura; el resto del subtítulo aparece desde `sm`. */
-  const detalle = [
-    turnoLabel ? `Turno ${turnoLabel} ${turnoRango ?? ''}`.trim() : null,
-    lineas > 0 ? `${formatNumber(lineas)} puestos monitoreados` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  /* En móvil solo cabe la frescura; el turno aparece desde `sm`. El recuento de
+     líneas por estado va en la fila de filtros, no aquí. */
+  const detalle = turnoLabel ? `Turno ${turnoLabel} ${turnoRango ?? ''}`.trim() : '';
 
   return (
     <AppPageHeader

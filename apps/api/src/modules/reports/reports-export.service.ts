@@ -190,13 +190,13 @@ export class ReportsExportService {
           nombre: 'Paradas',
           columnas: [
             { header: 'Id', width: 14 }, { header: 'Orden', width: 14 }, { header: 'Línea', width: 10 },
-            { header: 'Máquina', width: 12 }, { header: 'Causa', width: 16 }, { header: 'Inicio', width: 20 },
+            { header: 'Causa', width: 16 }, { header: 'Inicio', width: 20 },
             { header: 'Fin', width: 20 }, { header: 'Duración min', width: 13 },
             { header: 'Afecta OEE', width: 12 }, { header: 'Acción tomada', width: 46 },
             { header: 'TRI seg', width: 9 },
           ],
           filas: datos.map((p) => [
-            p.id, p.ordenId, p.lineaId, p.maquinaId, p.causaId, p.inicio, p.fin,
+            p.id, p.ordenId, p.lineaId, p.causaId, p.inicio, p.fin,
             p.duracionMin, p.afectaOee, p.accionTomada, p.tiempoRegistroSeg,
           ]),
         };

@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * Respuesta única de toda baja lógica de catálogo (`DELETE /productos/:id`,
- * `/velocidades-estandar/:id`, `/causas-merma/:id`, `/maquinas/:id`,
+ * `/velocidades-estandar/:id`, `/causas-merma/:id`, `/lineas/:id`,
  * `/causas-parada/:id`). Nunca hay borrado físico cuando existe histórico.
  */
 export class BajaLogicaResponseDto {

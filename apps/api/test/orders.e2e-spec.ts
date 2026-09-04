@@ -109,7 +109,7 @@ describe('ordenes (e2e)', () => {
     expect(body.data[0]).toMatchObject({
       causaCodigo: 'PP-01-10',
       causaNombre: 'Cambio De Sabor',
-      maquinaNombre: 'Llenadora LLEN A1',
+      lineaCodigo: 'LLEN-A1',
     });
   });
 

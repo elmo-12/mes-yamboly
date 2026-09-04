@@ -39,11 +39,6 @@ export class UsuarioBaseDto {
   @MinLength(2, { message: 'El cargo es obligatorio' })
   cargo!: string;
 
-  @ApiProperty({ example: 'SED-LIMA' })
-  @IsString()
-  @MinLength(1, { message: 'Selecciona una sede' })
-  sedeId!: string;
-
   @ApiPropertyOptional({ example: 'LIN-LLEN-M2', nullable: true })
   @IsOptional()
   @IsString()
@@ -88,11 +83,6 @@ export class UsuarioQueryDto {
   @ApiPropertyOptional({ description: 'Repetible o separado por comas' })
   @IsOptional()
   rol?: string | string[];
-
-  @ApiPropertyOptional({ example: 'SED-LIMA' })
-  @IsOptional()
-  @IsString()
-  sedeId?: string;
 
   @ApiPropertyOptional({ example: 'LIN-LLEN-M2' })
   @IsOptional()

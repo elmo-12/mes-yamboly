@@ -132,7 +132,7 @@ export function TciTab({ tci }: { tci: EvidenciaTCI }) {
 
       <NotaAnexo
         titulo="Reglas de validación aplicadas por el MES (RF15)"
-        detalle="Completo: todos los campos obligatorios del formulario están informados. · Preciso: los valores están dentro de rango y son coherentes con la orden de fabricación. · Trazable: el registro conserva usuario, máquina, línea, turno y marca temporal de creación y de última edición."
+        detalle="Completo: todos los campos obligatorios del formulario están informados. · Preciso: los valores están dentro de rango y son coherentes con la orden de fabricación. · Trazable: el registro conserva usuario, línea, turno y marca temporal de creación y de última edición."
       />
     </div>
   );

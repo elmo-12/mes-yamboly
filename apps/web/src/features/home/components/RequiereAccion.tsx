@@ -23,10 +23,9 @@ export interface RequiereAccionProps {
 /** Título + mensaje de la alerta a partir del contrato de `/alertas/recientes`. */
 function textos(alerta: Alerta): { titulo: string; mensaje: string } {
   const factor = alerta.factores[0]?.texto;
-  const maquina = alerta.maquinaNombre ? ` en ${alerta.maquinaNombre}` : '';
   return {
     titulo: `${alerta.lineaCodigo} ${alerta.lineaNombre} · ${alerta.prediccion}`,
-    mensaje: `Probabilidad ${formatPct(alerta.probabilidad, 0)}${factor ? ` · ${factor}` : maquina}`,
+    mensaje: `Probabilidad ${formatPct(alerta.probabilidad, 0)}${factor ? ` · ${factor}` : ''}`,
   };
 }
 

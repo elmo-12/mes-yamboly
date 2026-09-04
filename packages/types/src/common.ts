@@ -127,29 +127,15 @@ export const TIPO_PROCESO_LABEL: Record<TipoProcesoLinea, string> = {
 };
 
 /* ------------------------------------------------------------------ */
-/* Sedes                                                               */
+/* Sede única                                                          */
 /* ------------------------------------------------------------------ */
 
-export interface Sede {
-  id: string;
-  /** Código corto de 3–4 letras mayúsculas: `LIMA`, `AREQ`, `CHIC`, `TARA`. */
-  codigo: string;
-  /** `Arequipa`, `Lima`, … */
-  nombre: string;
-  ciudad: string;
-  activa: boolean;
-}
-
-/** Alta/edición de sede (`POST /sedes`, `PATCH /sedes/:id`). */
-export const sedeSchema = z.object({
-  codigo: z
-    .string()
-    .regex(/^[A-Z]{3,4}$/, 'Formato esperado AREQ (3 o 4 letras mayúsculas)'),
-  nombre: z.string().min(3, 'El nombre es obligatorio'),
-  ciudad: z.string().min(3, 'La ciudad es obligatoria'),
-  activa: z.boolean().default(true),
-});
-export type SedeInput = z.infer<typeof sedeSchema>;
+/**
+ * La aplicación opera una sola sede (Lima). No hay catálogo de sedes ni
+ * filtros por sede en la API pública; la constante existe únicamente como
+ * valor interno de las columnas heredadas `user.sedeId` y `linea.sedeId`.
+ */
+export const SEDE_UNICA_ID = 'SED-LIMA';
 
 /** Estado genérico de un registro de catálogo. */
 export const ESTADOS_CATALOGO = ['activo', 'inactivo'] as const;
@@ -161,10 +147,9 @@ export type EstadoCatalogo = (typeof ESTADOS_CATALOGO)[number];
 
 /**
  * Respuesta única de toda baja lógica (`DELETE /causas-parada/:id`,
- * `/causas-merma/:id`, `/maquinas/:id`, `/productos/:id`, `/velocidades-estandar/:id`, …).
+ * `/causas-merma/:id`, `/lineas/:id`, `/productos/:id`, `/velocidades-estandar/:id`, …).
  * Nunca hay borrado físico cuando existe histórico: el registro pasa a
- * `inactivo` (catálogos) o `baja` (máquinas) y se informa cuántos registros
- * históricos conservan el código.
+ * `inactivo` y se informa cuántos registros históricos conservan el código.
  *
  * @example
  * { id: 'CPA-PN-02-01', codigo: 'PN-02-01', estado: 'inactivo',

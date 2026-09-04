@@ -6,11 +6,10 @@ import type {
   CausaMermaInput,
   CausaParadaInput,
   CrearUsuarioInput,
-  MaquinaInput,
+  LineaInput,
   ProductoInput,
   RestablecerPasswordInput,
   Role,
-  SedeInput,
   UpdateProductoInput,
   UpdateVelocidadEstandarInput,
   VelocidadEstandarInput,
@@ -21,7 +20,6 @@ import {
   type CausaMermaFiltros,
   type CausaParadaFiltros,
   type LineaFiltros,
-  type MaquinaFiltros,
   type ProductoFiltros,
   type SaborFiltros,
   type UsuarioFiltros,
@@ -56,7 +54,7 @@ function invalidar(queryClient: QueryClient, ...claves: readonly (readonly unkno
 }
 
 /* ------------------------------------------------------------------ */
-/* Turnos y sedes                                                      */
+/* Turnos                                                              */
 /* ------------------------------------------------------------------ */
 
 export function useTurnos() {
@@ -64,33 +62,6 @@ export function useTurnos() {
     queryKey: queryKeys.catalogs.turnos(),
     queryFn: catalogsApi.turnos,
     staleTime: CATALOGO_STALE,
-  });
-}
-
-export function useSedes() {
-  return useQuery({
-    queryKey: queryKeys.catalogs.sedes(),
-    queryFn: catalogsApi.sedes,
-    staleTime: CATALOGO_STALE,
-  });
-}
-
-export function useCrearSede() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: SedeInput) => catalogsApi.crearSede(input),
-    onSuccess: () => invalidar(queryClient, queryKeys.catalogs.sedes()),
-  });
-}
-
-export function useActualizarSede() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Partial<SedeInput> }) =>
-      catalogsApi.actualizarSede(id, input),
-    /* El nombre de la sede aparece en la ficha de cada usuario. */
-    onSuccess: () =>
-      invalidar(queryClient, queryKeys.catalogs.sedes(), queryKeys.catalogs.usuarios()),
   });
 }
 
@@ -107,11 +78,40 @@ export function useSabores(filtros: SaborFiltros = {}) {
 }
 
 export function useLineas(filtros?: string | LineaFiltros) {
-  const f = normalizar<LineaFiltros>(filtros, 'sedeId');
+  const f = normalizar<LineaFiltros>(filtros, 'tipoProceso');
   return useQuery({
     queryKey: queryKeys.catalogs.lineasList(clave(f)),
     queryFn: () => catalogsApi.lineas(f),
     staleTime: CATALOGO_STALE,
+  });
+}
+
+/**
+ * Mantenedor de líneas (Configuración → Líneas). La línea **es** la máquina
+ * física: no existe un nivel de equipo por debajo.
+ */
+export function useCrearLinea() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: LineaInput) => catalogsApi.crearLinea(input),
+    onSuccess: () => invalidar(queryClient, queryKeys.catalogs.lineas()),
+  });
+}
+
+export function useActualizarLinea() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Partial<LineaInput> }) =>
+      catalogsApi.actualizarLinea(id, input),
+    onSuccess: () => invalidar(queryClient, queryKeys.catalogs.lineas()),
+  });
+}
+
+export function useBajaLinea() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => catalogsApi.bajaLinea(id),
+    onSuccess: () => invalidar(queryClient, queryKeys.catalogs.lineas()),
   });
 }
 
@@ -218,44 +218,6 @@ export function useBajaVelocidadEstandar() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Máquinas (equipos de la línea)                                      */
-/* ------------------------------------------------------------------ */
-
-export function useMaquinas(filtros?: string | MaquinaFiltros) {
-  const f = normalizar<MaquinaFiltros>(filtros, 'lineaId');
-  return useQuery({
-    queryKey: queryKeys.catalogs.maquinasList(clave(f)),
-    queryFn: () => catalogsApi.maquinas(f),
-    staleTime: CATALOGO_STALE,
-  });
-}
-
-export function useCrearMaquina() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: MaquinaInput) => catalogsApi.crearMaquina(input),
-    onSuccess: () => invalidar(queryClient, queryKeys.catalogs.maquinas()),
-  });
-}
-
-export function useActualizarMaquina() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Partial<MaquinaInput> }) =>
-      catalogsApi.actualizarMaquina(id, input),
-    onSuccess: () => invalidar(queryClient, queryKeys.catalogs.maquinas()),
-  });
-}
-
-export function useBajaMaquina() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => catalogsApi.bajaMaquina(id),
-    onSuccess: () => invalidar(queryClient, queryKeys.catalogs.maquinas()),
-  });
-}
-
-/* ------------------------------------------------------------------ */
 /* Causas de parada                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -340,7 +302,7 @@ export function useBajaCausaMerma() {
 /* ------------------------------------------------------------------ */
 
 export function useUsuarios(filtros?: string | UsuarioFiltros) {
-  const f = normalizar<UsuarioFiltros>(filtros, 'sedeId');
+  const f = normalizar<UsuarioFiltros>(filtros, 'lineaId');
   return useQuery({
     queryKey: queryKeys.catalogs.usuariosList(clave(f)),
     queryFn: () => catalogsApi.usuarios(f),

@@ -18,7 +18,7 @@ export interface RestablecerPasswordModalProps {
 }
 
 /**
- * `Configuración / Sedes y usuarios` — modal para asignar una nueva
+ * `Configuración / Usuarios` — modal para asignar una nueva
  * contraseña desde Sistemas (Figma 2154:119, tamaño por defecto 560), sin
  * pasar por el flujo de "olvidé mi contraseña" del login.
  */

@@ -109,7 +109,6 @@ export function OrdenParadasTab({
                 <TH className="w-[80px] px-2">Duración</TH>
                 <TH className="w-[118px] px-2">Tipo</TH>
                 <TH className="w-[150px]">Causa</TH>
-                <TH className="w-[120px]">Máquina</TH>
                 <TH className="w-[150px]">Acción tomada</TH>
                 <TH className="w-[110px]">Responsable</TH>
                 <TH className="w-[84px] px-2">Evidencia</TH>
@@ -147,12 +146,6 @@ export function OrdenParadasTab({
                     className="max-w-[150px] truncate"
                     title={`${p.causaCodigo} ${p.causaNombre}`}
                   >{`${p.causaCodigo} ${p.causaNombre}`}</TCell>
-                  <TCell
-                    className="max-w-[120px] truncate text-neutral-text"
-                    title={p.maquinaNombre}
-                  >
-                    {p.maquinaNombre}
-                  </TCell>
                   <TCell
                     className="max-w-[150px] truncate text-neutral-text"
                     title={p.accionTomada}

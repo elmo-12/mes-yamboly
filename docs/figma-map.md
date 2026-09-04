@@ -10,6 +10,13 @@ La rama `feat/maestros-reales` migró los catálogos de ejemplo a los maestros r
 - **Productos y velocidades**, y **Sedes y usuarios**, con CRUD real en Configuración.
 - Rutas **`/pasteurizacion`** y **`/personal`** retiradas de la navegación (ver "Mapa de navegación" abajo, que conserva la lectura original de Figma).
 
+Ajustes del 4-sep-2026 (tarde, sobre lo anterior): el producto decidió retirar el nivel máquina/equipo y el catálogo de sedes.
+- **Sin paso Máquina** en el wizard de parada — el frame `Parada / P2 Detalle` **2156:8367** (fila 12 más abajo) traía un Dropdown "Máquina" que ya no existe: la parada se registra hasta línea.
+- **Pestaña Máquinas → Líneas** — el frame `Configuración / Máquinas` **2165:11984** (fila 54) pasa a ser el mantenedor de Líneas (alta/edición/baja), no de equipos por línea.
+- **Sin sedes** — no hay catálogo de sedes ni selector de sede en ninguna pantalla (topbar, tiempo real, Configuración); Yamboly opera una única sede (Lima).
+- **Tarjetas de tiempo real ampliadas** — el frame `Tiempo real / Líneas / Default / 1440` **2156:3936** (fila 6) se implementó con `LineCard` ampliada (2 columnas en ≥1280 px, métricas 2×2, progreso etiquetado, mensaje contextual) y sin filtro de línea ni selector de sede.
+- **Velocidades en modal** — "Ver velocidades" abre un `VelocidadesModal` en vez del panel embebido descrito en la matriz de Productos y velocidades.
+
 **Origen** de cada fila: `F` = leído de Figma en esta sesión (`get_design_context` / `get_metadata`) · `S` = solo desde spec textual (`docs/figma-specs-modulos.md`) · `F*` = leído parcialmente (metadata de estructura, sin código).
 
 Convenciones comunes a **todas** las pantallas del shell: `MES/Sidebar` (260) + `MES/Topbar` (1180×64) + `Content` (1180, padding 28/32/40/32, gap 24, útil **1116**) + `MES/Page header` (breadcrumb + H2 + subtítulo + acciones con **un solo Primary**).

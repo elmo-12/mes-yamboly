@@ -8,7 +8,6 @@ export interface Parada {
   id: string;
   ordenId: string;
   lineaId: string;
-  maquinaId: string;
   /** Causa específica (`PM-01-03`). */
   causaId: string;
   /** Causa raíz / tipo (`PM-01`). */
@@ -35,7 +34,6 @@ export interface Parada {
 /** Fila con textos resueltos para tablas. */
 export interface ParadaListItem extends Parada {
   lineaCodigo: string;
-  maquinaNombre: string;
   causaCodigo: string;
   causaNombre: string;
   tipoCausaCodigo: string;
@@ -56,7 +54,6 @@ export interface ParadaListQuery extends PaginationQuery {
 export const createParadaSchema = z.object({
   ordenId: z.string().min(1, 'Orden requerida'),
   lineaId: z.string().min(1, 'Selecciona una línea'),
-  maquinaId: z.string().min(1, 'Selecciona una máquina'),
   tipoCausaId: z.string().min(1, 'Selecciona el tipo de parada'),
   causaId: z.string().min(1, 'Selecciona la causa específica'),
   inicio: z.string().min(1, 'La hora de inicio es obligatoria'),
@@ -100,7 +97,6 @@ export interface DeteccionIoT {
   id: string;
   lineaId: string;
   lineaCodigo: string;
-  maquinaId?: string;
   /** ISO-8601 con hora — `14:02` en la spec 03.A/04.K. */
   detectadaEn: string;
   /** Minutos sin movimiento detectados por el sensor. */
@@ -113,7 +109,6 @@ export interface DeteccionIoT {
 
 export const confirmarDeteccionSchema = z.object({
   causaId: z.string().min(1, 'Selecciona una causa'),
-  maquinaId: z.string().min(1, 'Selecciona una máquina'),
   accionTomada: z.string().min(10, 'Describe la acción tomada').max(300),
   tiempoRegistroSeg: z.coerce.number().min(0).default(0),
 });

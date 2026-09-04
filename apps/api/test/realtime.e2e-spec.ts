@@ -52,10 +52,10 @@ describe('tiempo real y catálogos (e2e)', () => {
   /**
    * BUGs reales de la API detectados y corregidos durante esta oleada (ver
    * informe):
-   * 1. `RealtimeController`/`RealtimeService` usaban `sedeId ?? 'SED-01'`
-   *    como sede por defecto, pero la única sede real del seed es
-   *    `SED-LIMA`; sin `?sedeId=` explícito `/tiempo-real/lineas` y
-   *    `/tiempo-real/tv` devolvían `lineas`/`filas` vacíos.
+   * 1. `RealtimeController`/`RealtimeService` filtraban por sede; la
+   *    aplicación opera una única sede (Lima) y el filtro se retiró del
+   *    contrato: `/tiempo-real/lineas` y `/tiempo-real/tv` devuelven siempre
+   *    las 9 líneas.
    * 2. Las líneas nunca llegaban a `parada`/`produciendo`/`alerta` porque
    *    `RealtimeService.contexto()` comparaba `orden.fecha` con `hoyIso()`
    *    (reloj real) mientras el seed fija `HOY = '2026-08-28'`
@@ -70,7 +70,8 @@ describe('tiempo real y catálogos (e2e)', () => {
       .expect(200);
 
     expect(body.lineas).toHaveLength(9);
-    expect(body.sedeId).toBe('SED-LIMA');
+    /* La sede desapareció del contrato: solo hay una (Lima). */
+    expect(body).not.toHaveProperty('sedeId');
     const porCodigo = Object.fromEntries(
       body.lineas.map((l: { lineaCodigo: string; estado: string }) => [l.lineaCodigo, l.estado]),
     );

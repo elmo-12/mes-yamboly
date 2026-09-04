@@ -44,10 +44,9 @@ export function horaDeIso(valor: string): string {
   return (parte ?? valor).slice(0, 5);
 }
 
-/** `LLEN-M2 Llenadora M2 · Envolvedora` para la columna LÍNEA / MÁQUINA. */
-export function lineaMaquina(alerta: Alerta): string {
-  const linea = `${alerta.lineaCodigo} ${alerta.lineaNombre}`;
-  return alerta.maquinaNombre ? `${linea} · ${alerta.maquinaNombre}` : linea;
+/** `LLEN-M2 Llenadora M2` para la columna LÍNEA (no hay nivel máquina). */
+export function etiquetaLinea(alerta: Alerta): string {
+  return `${alerta.lineaCodigo} ${alerta.lineaNombre}`;
 }
 
 /** La ventana ya se cerró: habilita el bloque "Resultado real" del drawer. */

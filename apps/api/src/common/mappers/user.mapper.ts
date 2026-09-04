@@ -10,7 +10,6 @@ export function toUserDto(user: User): UserDto {
     dni: user.dni,
     rol: user.rol,
     cargo: user.cargo,
-    sedeId: user.sedeId,
     lineaId: user.lineaId ?? undefined,
     iniciales: user.iniciales,
     avatarUrl: user.avatarUrl ?? undefined,

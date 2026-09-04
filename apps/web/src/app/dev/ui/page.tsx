@@ -95,14 +95,13 @@ import {
   Topbar,
   toast,
 } from '@mes/ui';
-import { useMaquinas, useProductos, useUsuarios } from '@/features/catalogs/hooks';
+import { useLineas, useProductos, useUsuarios } from '@/features/catalogs/hooks';
 import { DesactivarUsuarioModal } from '@/features/settings/components/DesactivarUsuarioModal';
-import { EliminarMaquinaModal } from '@/features/settings/components/EliminarMaquinaModal';
+import { DesactivarLineaModal } from '@/features/settings/components/DesactivarLineaModal';
 import { EliminarProductoModal } from '@/features/settings/components/EliminarProductoModal';
-import { MaquinaDrawer } from '@/features/settings/components/MaquinaDrawer';
+import { LineaDrawer } from '@/features/settings/components/LineaDrawer';
 import { ProductoDrawer } from '@/features/settings/components/ProductoDrawer';
 import { RestablecerPasswordModal } from '@/features/settings/components/RestablecerPasswordModal';
-import { SedeDrawer } from '@/features/settings/components/SedeDrawer';
 import { UsuarioDrawer } from '@/features/settings/components/UsuarioDrawer';
 import { VelocidadEstandarModal } from '@/features/settings/components/VelocidadEstandarModal';
 
@@ -237,27 +236,25 @@ const HEATMAP = [
 function MantenedoresQA() {
   const productos = useProductos();
   const usuarios = useUsuarios();
-  const maquinas = useMaquinas();
+  const lineas = useLineas();
 
   const primerProducto = productos.data?.data[0];
   const primerUsuario = usuarios.data?.data[0];
-  const primeraMaquina = maquinas.data?.data[0];
+  const primeraLinea = lineas.data?.data[0];
 
   const [productoAlta, setProductoAlta] = React.useState(false);
   const [productoEdicion, setProductoEdicion] = React.useState(false);
   const [velocidadAlta, setVelocidadAlta] = React.useState(false);
   const [eliminarProducto, setEliminarProducto] = React.useState(false);
 
-  const [sedeAlta, setSedeAlta] = React.useState(false);
-
   const [usuarioAlta, setUsuarioAlta] = React.useState(false);
   const [usuarioEdicion, setUsuarioEdicion] = React.useState(false);
   const [restablecerPassword, setRestablecerPassword] = React.useState(false);
   const [desactivarUsuario, setDesactivarUsuario] = React.useState(false);
 
-  const [maquinaAlta, setMaquinaAlta] = React.useState(false);
-  const [maquinaEdicion, setMaquinaEdicion] = React.useState(false);
-  const [eliminarMaquina, setEliminarMaquina] = React.useState(false);
+  const [lineaAlta, setLineaAlta] = React.useState(false);
+  const [lineaEdicion, setLineaEdicion] = React.useState(false);
+  const [desactivarLinea, setDesactivarLinea] = React.useState(false);
 
   return (
     <>
@@ -274,10 +271,6 @@ function MantenedoresQA() {
         </Button>
       </Row>
 
-      <Row label="Sede (SedeDrawer)">
-        <Button variant="secondary" onClick={() => setSedeAlta(true)}>Nueva sede</Button>
-      </Row>
-
       <Row label="Usuario (UsuarioDrawer · RestablecerPasswordModal · DesactivarUsuarioModal)">
         <Button variant="secondary" onClick={() => setUsuarioAlta(true)}>Nuevo usuario</Button>
         <Button variant="secondary" disabled={!primerUsuario} onClick={() => setUsuarioEdicion(true)}>
@@ -291,13 +284,13 @@ function MantenedoresQA() {
         </Button>
       </Row>
 
-      <Row label="Máquina (MaquinaDrawer · EliminarMaquinaModal)">
-        <Button variant="secondary" onClick={() => setMaquinaAlta(true)}>Nueva máquina</Button>
-        <Button variant="secondary" disabled={!primeraMaquina} onClick={() => setMaquinaEdicion(true)}>
-          Editar {primeraMaquina?.codigo ?? 'máquina'}
+      <Row label="Línea (LineaDrawer · DesactivarLineaModal)">
+        <Button variant="secondary" onClick={() => setLineaAlta(true)}>Nueva línea</Button>
+        <Button variant="secondary" disabled={!primeraLinea} onClick={() => setLineaEdicion(true)}>
+          Editar {primeraLinea?.codigo ?? 'línea'}
         </Button>
-        <Button variant="danger" disabled={!primeraMaquina} onClick={() => setEliminarMaquina(true)}>
-          Eliminar {primeraMaquina?.codigo ?? 'máquina'}
+        <Button variant="danger" disabled={!primeraLinea} onClick={() => setDesactivarLinea(true)}>
+          Desactivar {primeraLinea?.codigo ?? 'línea'}
         </Button>
       </Row>
 
@@ -314,8 +307,6 @@ function MantenedoresQA() {
           />
         </>
       )}
-
-      <SedeDrawer open={sedeAlta} onOpenChange={setSedeAlta} />
 
       <UsuarioDrawer open={usuarioAlta} onOpenChange={setUsuarioAlta} />
       {primerUsuario && (
@@ -335,15 +326,15 @@ function MantenedoresQA() {
         </>
       )}
 
-      <MaquinaDrawer open={maquinaAlta} onOpenChange={setMaquinaAlta} />
-      {primeraMaquina && (
+      <LineaDrawer open={lineaAlta} onOpenChange={setLineaAlta} />
+      {primeraLinea && (
         <>
-          <MaquinaDrawer open={maquinaEdicion} onOpenChange={setMaquinaEdicion} maquina={primeraMaquina} />
-          <EliminarMaquinaModal
-            open={eliminarMaquina}
-            onOpenChange={setEliminarMaquina}
-            maquina={primeraMaquina}
-            onEliminada={() => void maquinas.refetch()}
+          <LineaDrawer open={lineaEdicion} onOpenChange={setLineaEdicion} linea={primeraLinea} />
+          <DesactivarLineaModal
+            open={desactivarLinea}
+            onOpenChange={setDesactivarLinea}
+            linea={primeraLinea}
+            onDesactivada={() => void lineas.refetch()}
           />
         </>
       )}
@@ -388,7 +379,6 @@ export default function DevUiPage() {
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar
             notificationsCount={3}
-            site="Lima"
             user={{ name: 'Carlos Mendoza' }}
             breadcrumb={
               <Breadcrumb items={[{ label: 'Inicio', href: '/' }, { label: 'Dev' }, { label: 'UI kit' }]} />
@@ -529,19 +519,19 @@ export default function DevUiPage() {
                   hint="Correo o contraseña incorrectos"
                 />
                 <Input label="Sitio" prefix="https://" placeholder="mes.yamboly.lat" />
-                <Input label="Deshabilitado" defaultValue="PT-01 Pasteurizador" disabled />
+                <Input label="Deshabilitado" defaultValue="EXTR-2 Extrusora 2" disabled />
               </div>
               <div className="grid grid-cols-3 gap-6">
                 <Select
-                  label="Máquina"
-                  placeholder="Selecciona máquina"
-                  defaultValue="env-l2"
+                  label="Línea"
+                  placeholder="Selecciona línea"
+                  defaultValue="LIN-LLEN-M2"
                   options={[
-                    { value: 'llen-l1', label: 'Llenadora Tetra Hoyer L1' },
-                    { value: 'tunel-l1', label: 'Túnel de frío L1' },
-                    { value: 'env-l2', label: 'Envolvedora L2' },
-                    { value: 'cod-l3', label: 'Codificadora Domino L3' },
-                    { value: 'pt-01', label: 'Pasteurizador PT-01', disabled: true },
+                    { value: 'LIN-LLEN-M2', label: 'Llenadora M2' },
+                    { value: 'LIN-LLEN-M1', label: 'Llenadora M1' },
+                    { value: 'LIN-EXTR-2', label: 'Extrusora 2' },
+                    { value: 'LIN-MOLD-A2', label: 'Moldeadora A2' },
+                    { value: 'LIN-MOLD-A4', label: 'Moldeadora A4', disabled: true },
                   ]}
                 />
                 <Select
@@ -645,7 +635,7 @@ export default function DevUiPage() {
                 <AlertCard
                   variant="warning"
                   title="L2 Conos · Riesgo de parada en 40 min"
-                  description="Probabilidad 78 % · Envolvedora L2 con 3 paradas PM-01 en 7 días"
+                  description="Probabilidad 78 % · L2 Conos con 3 paradas PM-01 en 7 días"
                   badge={<Badge color="warning">Advertencia</Badge>}
                   actionLabel="Ver alerta"
                 />
@@ -744,7 +734,7 @@ export default function DevUiPage() {
                   order="OF-2026-0815 · Cono Vainilla 120 ml"
                   state="alerta"
                   badgeLabel="Riesgo de parada 78 %"
-                  message="Vibración anómala en llenadora Tetra Hoyer · posible PM-01"
+                  message="Vibración anómala en L2 Conos · posible PM-01"
                   metrics={[
                     { label: 'Producido', value: '4 015 u', note: '78 % del objetivo' },
                     { label: 'Velocidad', value: '104 u/min', note: 'objetivo 120' },
@@ -766,6 +756,34 @@ export default function DevUiPage() {
                   segments={[{ tone: 'ok' }, { tone: 'micro' }, { tone: 'ok' }, { tone: 'unknown' }, { tone: 'idle' }]}
                 />
               </div>
+
+              <Row label="layout=&quot;expanded&quot; · tablero de Tiempo real (code · meta · progress · messageTone)">
+                <div className="w-full">
+                  <LineCard
+                    layout="expanded"
+                    code="L2"
+                    line="Conos"
+                    order="OF-2026-0815 · Cono Vainilla 120 ml"
+                    meta="Turno Mañana · Maquinista Jorge Quispe"
+                    state="alerta"
+                    badgeLabel="Riesgo de parada 78 %"
+                    message="Vibración anómala en llenadora · posible PM-01"
+                    messageTone="warning"
+                    metrics={[
+                      { label: 'Producido', value: '4 015 u', note: '78 % del objetivo' },
+                      { label: 'Velocidad', value: '104 u/min', note: 'objetivo 120,0 · −13 %' },
+                      { label: 'Última parada', value: '14 min', note: 'PM-01 · 11:20' },
+                      { label: 'Tiempo en estado', value: '6 min', note: 'desde la última alerta' },
+                    ]}
+                    progress={{
+                      value: 78,
+                      label: 'Avance del objetivo del turno',
+                      valueLabel: '78 % · 4 015 / 5 150 u',
+                      tone: 'warning',
+                    }}
+                  />
+                </div>
+              </Row>
             </Block>
 
             <Divider />
@@ -1117,7 +1135,7 @@ export default function DevUiPage() {
             <Block
               id="mantenedores-4a"
               title="Mantenedores (4a)"
-              description="Drawers y modales de productos, velocidades, sedes, usuarios y máquinas — sobre el primer registro real de cada catálogo"
+              description="Drawers y modales de productos, velocidades, usuarios y líneas — sobre el primer registro real de cada catálogo"
             >
               <MantenedoresQA />
             </Block>

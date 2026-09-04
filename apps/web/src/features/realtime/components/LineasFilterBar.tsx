@@ -1,104 +1,76 @@
 'use client';
 
-import { FilterBar, SelectInline, type FilterGroup } from '@mes/ui';
-import type { EstadoLinea, LineaEstado, Sede } from '@mes/types';
+import { Tag } from '@mes/ui';
+import type { EstadoLinea, LineaEstado } from '@mes/types';
+import { formatNumber } from '@mes/shared';
 
 export interface FiltrosLineas {
-  linea: string[];
   estado: string[];
 }
 
-export const FILTROS_VACIOS: FiltrosLineas = { linea: [], estado: [] };
+export const FILTROS_VACIOS: FiltrosLineas = { estado: [] };
 
-/** Tag "Todas" del grupo LÍNEA: seleccionado cuando no hay ninguna línea filtrada. */
-const TODAS = '__todas__';
-
-const ESTADOS: { value: EstadoLinea; label: string }[] = [
-  { value: 'produciendo', label: 'Produciendo' },
-  { value: 'parada', label: 'Parada' },
-  { value: 'sin_orden', label: 'Sin orden' },
-  { value: 'alerta', label: 'Alerta IA' },
-  { value: 'sugerida', label: 'Sugerida' },
+const ESTADOS: { value: EstadoLinea; label: string; resumen: string }[] = [
+  { value: 'produciendo', label: 'Produciendo', resumen: 'produciendo' },
+  { value: 'parada', label: 'Parada', resumen: 'parada' },
+  { value: 'sin_orden', label: 'Sin orden', resumen: 'sin orden' },
+  { value: 'alerta', label: 'Alerta IA', resumen: 'alerta' },
+  { value: 'sugerida', label: 'Sugerida', resumen: 'sugerida' },
 ];
 
 export interface LineasFilterBarProps {
   lineas: readonly LineaEstado[];
-  sedes: readonly Sede[];
-  sedeId: string;
-  onSedeChange: (sedeId: string) => void;
   value: FiltrosLineas;
   onChange: (value: FiltrosLineas) => void;
 }
 
 /**
- * Filter bar de `Tiempo real` (Figma 2156:5364): fila 1 grupo LÍNEA + selector
- * inline y "Limpiar filtros" a la derecha; fila 2 grupo ESTADO. Filtra en
+ * Fila compacta de Tiempo real: resumen del tablero ("9 líneas · 3 produciendo
+ * · …") y los Tags de Estado. No hay filtro por línea (solo 9 puestos, caben
+ * todos) ni selector de sede (Yamboly opera una única planta). Filtra en
  * cliente sobre la respuesta de `/tiempo-real/lineas`.
  */
-export function LineasFilterBar({
-  lineas,
-  sedes,
-  sedeId,
-  onSedeChange,
-  value,
-  onChange,
-}: LineasFilterBarProps) {
-  const grupoLinea: FilterGroup = {
-    id: 'linea',
-    label: 'Línea',
-    options: [
-      { value: TODAS, label: 'Todas' },
-      ...lineas.map((l) => ({ value: l.lineaId, label: `${l.lineaCodigo} ${l.lineaNombre}` })),
-    ],
+export function LineasFilterBar({ lineas, value, onChange }: LineasFilterBarProps) {
+  const conteo = (estado: EstadoLinea) => lineas.filter((l) => l.estado === estado).length;
+
+  const resumen = [
+    `${formatNumber(lineas.length)} ${lineas.length === 1 ? 'línea' : 'líneas'}`,
+    ...ESTADOS.filter((e) => conteo(e.value) > 0).map(
+      (e) => `${formatNumber(conteo(e.value))} ${e.resumen}`,
+    ),
+  ].join(' · ');
+
+  const alternar = (estado: EstadoLinea) => {
+    const activo = value.estado.includes(estado);
+    onChange({
+      estado: activo ? value.estado.filter((e) => e !== estado) : [...value.estado, estado],
+    });
   };
-  const grupoEstado: FilterGroup = {
-    id: 'estado',
-    label: 'Estado',
-    options: ESTADOS,
-  };
-  const hayFiltros = value.linea.length > 0 || value.estado.length > 0;
 
   return (
-    <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <FilterBar
-          groups={[grupoLinea]}
-          value={{ linea: value.linea.length > 0 ? value.linea : [TODAS] }}
-          onChange={(next) => {
-            const lista = next.linea ?? [];
-            /* "Todas" está activo cuando no hay ninguna línea filtrada: si se
-               toca una línea se conserva solo esa; si se toca "Todas" se limpia. */
-            const teniaTodas = value.linea.length === 0;
-            const sinTodas = lista.filter((v) => v !== TODAS);
-            onChange({
-              ...value,
-              linea: teniaTodas ? sinTodas : lista.includes(TODAS) ? [] : lista,
-            });
-          }}
-        />
-        <div className="flex items-center gap-4">
-          <SelectInline
-            label="Sede"
-            options={sedes.map((s) => ({ value: s.id, label: s.nombre, disabled: !s.activa }))}
-            value={sedeId}
-            onValueChange={onSedeChange}
-          />
-          {hayFiltros && (
-            <button
-              type="button"
-              className="text-body-sm font-medium text-primary hover:underline"
-              onClick={() => onChange(FILTROS_VACIOS)}
-            >
-              Limpiar filtros
-            </button>
-          )}
-        </div>
+    <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-3">
+      <p className="text-body-sm text-text-secondary">{resumen}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        {ESTADOS.map((e) => (
+          <Tag
+            key={e.value}
+            size="md"
+            selected={value.estado.includes(e.value)}
+            onClick={() => alternar(e.value)}
+          >
+            {e.label}
+          </Tag>
+        ))}
       </div>
-      <FilterBar
-        groups={[grupoEstado]}
-        value={{ estado: value.estado }}
-        onChange={(next) => onChange({ ...value, estado: next.estado ?? [] })}
-      />
+      {value.estado.length > 0 && (
+        <button
+          type="button"
+          className="text-body-sm font-medium text-primary hover:underline"
+          onClick={() => onChange(FILTROS_VACIOS)}
+        >
+          Limpiar filtros
+        </button>
+      )}
     </div>
   );
 }
@@ -108,9 +80,5 @@ export function filtrarLineas(
   lineas: readonly LineaEstado[],
   filtros: FiltrosLineas,
 ): LineaEstado[] {
-  return lineas.filter(
-    (l) =>
-      (filtros.linea.length === 0 || filtros.linea.includes(l.lineaId)) &&
-      (filtros.estado.length === 0 || filtros.estado.includes(l.estado)),
-  );
+  return lineas.filter((l) => filtros.estado.length === 0 || filtros.estado.includes(l.estado));
 }

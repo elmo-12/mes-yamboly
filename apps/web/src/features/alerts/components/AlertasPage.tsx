@@ -52,7 +52,7 @@ import {
   SEVERIDAD_BADGE,
   esperaConfirmacion,
   formatVentana,
-  lineaMaquina,
+  etiquetaLinea,
   toneProbabilidad,
 } from './alerta-format';
 
@@ -284,8 +284,8 @@ export function AlertasPage() {
           >
             <Input
               leadingIcon={<Icon name="search" />}
-              placeholder="Buscar alerta o máquina"
-              aria-label="Buscar alerta o máquina"
+              placeholder="Buscar alerta o línea"
+              aria-label="Buscar alerta o línea"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
             />
@@ -355,7 +355,7 @@ export function AlertasPage() {
               <tr>
                 <TH className="w-25">Severidad</TH>
                 <TH className="w-[150px]">Tipo</TH>
-                <TH className="w-[150px]">Línea / Máquina</TH>
+                <TH className="w-[150px]">Línea</TH>
                 <TH className="w-60">Predicción</TH>
                 <TH className="w-32">Probabilidad</TH>
                 <TH className="w-28">Ventana</TH>
@@ -424,8 +424,8 @@ function FilaAlerta({ alerta, onAbrir }: { alerta: Alerta; onAbrir: () => void }
         {TIPO_ALERTA_LABEL[alerta.tipo]}
       </TCell>
       <TCell className="text-[12.5px] font-medium">
-        <span className="block max-w-[126px] truncate" title={lineaMaquina(alerta)}>
-          {lineaMaquina(alerta)}
+        <span className="block max-w-[126px] truncate" title={etiquetaLinea(alerta)}>
+          {etiquetaLinea(alerta)}
         </span>
       </TCell>
       <TCell className="text-body">
