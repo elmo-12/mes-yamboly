@@ -87,23 +87,44 @@ export const ROLE_LABEL: Record<Role, string> = {
 /* Turnos                                                              */
 /* ------------------------------------------------------------------ */
 
-export const TURNOS = ['M', 'T', 'N'] as const;
+/**
+ * Turnos reales de planta Yamboly: `D` Día 06:00–18:00 y `N` Noche 18:00–06:00.
+ * Sustituyen al esquema anterior de 3 turnos (`M`/`T`/`N`).
+ */
+export const TURNOS = ['D', 'N'] as const;
 export type Turno = (typeof TURNOS)[number];
 
 export const TURNO_LABEL: Record<Turno, string> = {
-  M: 'Mañana',
-  T: 'Tarde',
+  D: 'Día',
   N: 'Noche',
 };
 
 export interface TurnoInfo {
   codigo: Turno;
   label: string;
-  /** `HH:mm` */
+  /** `HH:mm` — `06:00` (D) · `18:00` (N) */
   inicio: string;
-  /** `HH:mm` */
+  /** `HH:mm` — `18:00` (D) · `06:00` (N, cruza medianoche) */
   fin: string;
 }
+
+/* ------------------------------------------------------------------ */
+/* Tipos de proceso de línea                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Las 9 líneas reales son máquinas físicas de tres familias de proceso:
+ * 4 llenadoras (`LLEN-M2`, `LLEN-M1`, `LLEN-A1`, `LLEN-A2`),
+ * 2 extrusoras (`EXTR-2`, `EXTR-3`) y 3 moldeadoras (`MOLD-A2`, `MOLD-A3`, `MOLD-A4`).
+ */
+export const TIPOS_PROCESO_LINEA = ['llenadora', 'extrusora', 'moldeadora'] as const;
+export type TipoProcesoLinea = (typeof TIPOS_PROCESO_LINEA)[number];
+
+export const TIPO_PROCESO_LABEL: Record<TipoProcesoLinea, string> = {
+  llenadora: 'Llenadora',
+  extrusora: 'Extrusora',
+  moldeadora: 'Moldeadora',
+};
 
 /* ------------------------------------------------------------------ */
 /* Sedes                                                               */
@@ -111,14 +132,66 @@ export interface TurnoInfo {
 
 export interface Sede {
   id: string;
+  /** Código corto de 3–4 letras mayúsculas: `LIMA`, `AREQ`, `CHIC`, `TARA`. */
+  codigo: string;
+  /** `Arequipa`, `Lima`, … */
   nombre: string;
   ciudad: string;
   activa: boolean;
 }
 
+/** Alta/edición de sede (`POST /sedes`, `PATCH /sedes/:id`). */
+export const sedeSchema = z.object({
+  codigo: z
+    .string()
+    .regex(/^[A-Z]{3,4}$/, 'Formato esperado AREQ (3 o 4 letras mayúsculas)'),
+  nombre: z.string().min(3, 'El nombre es obligatorio'),
+  ciudad: z.string().min(3, 'La ciudad es obligatoria'),
+  activa: z.boolean().default(true),
+});
+export type SedeInput = z.infer<typeof sedeSchema>;
+
 /** Estado genérico de un registro de catálogo. */
 export const ESTADOS_CATALOGO = ['activo', 'inactivo'] as const;
 export type EstadoCatalogo = (typeof ESTADOS_CATALOGO)[number];
+
+/* ------------------------------------------------------------------ */
+/* Baja lógica                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Respuesta única de toda baja lógica (`DELETE /causas-parada/:id`,
+ * `/causas-merma/:id`, `/maquinas/:id`, `/productos/:id`, `/velocidades-estandar/:id`, …).
+ * Nunca hay borrado físico cuando existe histórico: el registro pasa a
+ * `inactivo` (catálogos) o `baja` (máquinas) y se informa cuántos registros
+ * históricos conservan el código.
+ *
+ * @example
+ * { id: 'CPA-PN-02-01', codigo: 'PN-02-01', estado: 'inactivo',
+ *   conservados: 14, etiquetaConservados: 'paradas históricas',
+ *   mensaje: 'Hay 14 paradas históricas con esta causa; se conservarán con el código.' }
+ */
+export interface BajaLogicaResponse {
+  id: string;
+  codigo: string;
+  estado: 'inactivo' | 'baja';
+  /** Nº de registros históricos que conservan el código. */
+  conservados: number;
+  /** Texto en plural para el modal Danger: `paradas históricas`, `mermas históricas`, … */
+  etiquetaConservados: string;
+  mensaje: string;
+}
+
+/**
+ * Forma histórica de la baja de causas de parada.
+ * @deprecated Usa {@link BajaLogicaResponse}. La API sigue enviando
+ * `paradasConservadas` junto a `conservados` durante la migración; el campo
+ * se retirará cuando web y e2e consuman el genérico.
+ */
+export interface BajaCausaParadaResponse extends BajaLogicaResponse {
+  /** @deprecated Alias de `conservados`. */
+  paradasConservadas: number;
+}
 
 /** Semántica de tendencia usada en los KPI (`+2,1 pp vs ayer`). */
 export interface Delta {

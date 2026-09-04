@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TURNOS } from './common';
 import type { PaginationQuery, Periodo, Turno } from './common';
 
 export const ESTADOS_ORDEN = ['en_curso', 'cerrada', 'por_validar', 'validada', 'incompleta'] as const;
@@ -42,7 +43,17 @@ export interface OrdenFabricacion {
   producido: number;
   /** Conteo de la codificadora, para el control cruzado de calidad. */
   conteoCodificadora: number;
+  /**
+   * Velocidad estándar **en unidades por minuto**, congelada al iniciar la orden
+   * a partir del par producto × línea vigente (`VelocidadEstandar.velocidadUnidMin`,
+   * = `velocidadUnidHora / 60` con 1 decimal). No cambia si luego se edita el par.
+   */
   velocidadEstandar: number;
+  /**
+   * Par producto × línea del que se copió `velocidadEstandar` (`VE-0002`);
+   * `null` en órdenes anteriores a la migración de maestros.
+   */
+  velocidadEstandarId?: string | null;
   estado: EstadoOrden;
   maquinistaId: string;
   supervisorId: string;
@@ -100,7 +111,7 @@ export const createOrdenSchema = z.object({
   codigo: z.string().regex(/^OF-\d{4}-\d{4}$/, 'Formato esperado OF-2026-0815'),
   lote: z.string().min(3, 'El lote es obligatorio'),
   vencimiento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida'),
-  turno: z.enum(['M', 'T', 'N'] as const),
+  turno: z.enum(TURNOS, { errorMap: () => ({ message: 'Selecciona el turno' }) }),
   planificado: z.coerce.number().int().positive('Debe ser mayor que 0'),
   maquinistaId: z.string().min(1, 'Selecciona un maquinista'),
   supervisorId: z.string().min(1, 'Selecciona un supervisor'),

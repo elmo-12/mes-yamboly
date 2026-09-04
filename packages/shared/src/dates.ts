@@ -1,9 +1,9 @@
 import type { DateRange, Periodo, Turno, TurnoInfo } from '@mes/types';
 
+/** Turnos reales de planta: `D` Día 06:00–18:00 · `N` Noche 18:00–06:00. */
 export const TURNOS_DEF: TurnoInfo[] = [
-  { codigo: 'M', label: 'Mañana', inicio: '06:00', fin: '14:00' },
-  { codigo: 'T', label: 'Tarde', inicio: '14:00', fin: '22:00' },
-  { codigo: 'N', label: 'Noche', inicio: '22:00', fin: '06:00' },
+  { codigo: 'D', label: 'Día', inicio: '06:00', fin: '18:00' },
+  { codigo: 'N', label: 'Noche', inicio: '18:00', fin: '06:00' },
 ];
 
 function toDate(value: Date | string | number): Date {
@@ -23,11 +23,9 @@ export function toIsoDate(value: Date | string | number): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-/** Turno correspondiente a una hora del día (06–14 M, 14–22 T, resto N). */
+/** Turno correspondiente a una hora del día (06–18 `D`, resto `N`). */
 export function turnoPorHora(hora: number): Turno {
-  if (hora >= 6 && hora < 14) return 'M';
-  if (hora >= 14 && hora < 22) return 'T';
-  return 'N';
+  return hora >= 6 && hora < 18 ? 'D' : 'N';
 }
 
 /** Turno correspondiente a una fecha/hora concreta. */
@@ -39,7 +37,7 @@ export function turnoInfo(turno: Turno): TurnoInfo {
   return TURNOS_DEF.find((t) => t.codigo === turno) ?? TURNOS_DEF[0];
 }
 
-/** `06:00–14:00` */
+/** `06:00–18:00` (D) · `18:00–06:00` (N) */
 export function turnoRango(turno: Turno): string {
   const info = turnoInfo(turno);
   return `${info.inicio}–${info.fin}`;
