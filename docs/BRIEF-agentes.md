@@ -15,7 +15,7 @@ Comandos: `pnpm dev` (web :3000, api :4000), `pnpm typecheck`, `pnpm build`. NO 
 - Vistas: nunca importan mocks ni hacen fetch directo. Flujo: componente → hook (`useQuery`/`useMutation` de `features/<f>/hooks`) → `features/<f>/api.ts` → `services/api/client.ts` (el adapter mock/api se resuelve por `NEXT_PUBLIC_DATA_SOURCE`).
 - Cada vista con estados: loading (skeleton), empty, no-results, error, success/toast, validación de formularios (react-hook-form + zod), confirmación, forbidden.
 - Archivos pequeños y por responsabilidad (una página = composición de secciones). Sin código muerto ni imports sin usar. `pnpm typecheck` en verde al terminar tu bloque.
-- Convención de rutas (apps/web/src/app): `(auth)/login`, `(app)/` = shell con sidebar: `page.tsx` Home, `tiempo-real`, `ordenes`, `ordenes/[id]`, `reportes`, `alertas`, `analitica`, `evidencia`, `configuracion`, `pasteurizacion`, `personal`, `perfil`; fuera del shell: `tv`, `encuesta/[token]`.
+- Convención de rutas (apps/web/src/app): `(auth)/login`, `(app)/` = shell con sidebar: `page.tsx` Home, `tiempo-real`, `ordenes`, `ordenes/[id]`, `reportes`, `alertas`, `analitica`, `evidencia`, `configuracion`, `perfil`; fuera del shell: `tv`, `encuesta/[token]`.
 - Endpoints (prefijo `/api/v1`): ver `docs/api-contracts.md` (lo genera A3). Colecciones `{ data, meta:{page,pageSize,total,totalPages} }`; errores `{ statusCode, code, message, details? }`.
 
 ## Informe final del agente

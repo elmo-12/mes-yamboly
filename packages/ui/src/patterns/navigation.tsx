@@ -65,7 +65,9 @@ export function Sidebar({
         <span className="grid size-7 shrink-0 place-items-center rounded-sm bg-primary text-body-sm font-semibold text-primary-foreground">
           Y
         </span>
-        {!collapsed && <span className="text-body-md font-semibold text-text-primary">{brand}</span>}
+        {!collapsed && (
+          <span className="text-body-md font-semibold text-text-primary">{brand}</span>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -107,7 +109,9 @@ export function Sidebar({
       </div>
 
       <div className="flex flex-col gap-0.5 pt-2">
-        {footerActions && !collapsed && <div className="flex flex-col gap-0.5">{footerActions}</div>}
+        {footerActions && !collapsed && (
+          <div className="flex flex-col gap-0.5">{footerActions}</div>
+        )}
         {user && (
           <div
             className={cn(
@@ -129,8 +133,10 @@ export function Sidebar({
   );
 }
 
-export interface SidebarFooterActionProps
-  extends Omit<React.HTMLAttributes<HTMLElement>, 'children'> {
+export interface SidebarFooterActionProps extends Omit<
+  React.HTMLAttributes<HTMLElement>,
+  'children'
+> {
   icon: React.ReactNode;
   children?: React.ReactNode;
   /** Si se indica, el ítem se renderiza como enlace en vez de botón. */
@@ -370,7 +376,12 @@ export function PageHeader({
   return (
     /* `flex-wrap` en el contenedor y en las acciones: por debajo de ~420 px la
        botonera baja de línea en vez de desbordar el ancho de la página. */
-    <div className={cn('flex w-full flex-wrap items-center justify-between gap-x-6 gap-y-4', className)}>
+    <div
+      className={cn(
+        'flex w-full flex-wrap items-center justify-between gap-x-6 gap-y-4',
+        className,
+      )}
+    >
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {breadcrumb && breadcrumb.length > 0 && (
           <Breadcrumb items={breadcrumb} linkComponent={linkComponent} />
@@ -392,14 +403,11 @@ export function PageHeader({
  * Frame `Content` del shell (Figma): ancho 1180, padding 28/32/40/32, gap 24,
  * ancho útil 1116. Todas las pantallas MES cuelgan de aquí.
  */
-export function PageContent({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+export function PageContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        'flex w-full max-w-app flex-1 flex-col gap-6 bg-background-main px-8 pt-7 pb-10',
+        'flex w-full flex-1 flex-col gap-6 bg-background-main px-8 pt-7 pb-10',
         className,
       )}
       {...props}

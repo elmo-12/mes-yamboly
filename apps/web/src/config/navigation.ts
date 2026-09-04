@@ -28,7 +28,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { href: '/', label: 'Inicio', icon: 'home-01' },
       { href: '/tiempo-real', label: 'Tiempo real', icon: 'activity' },
       { href: '/alertas', label: 'Alertas', icon: 'bell-01', countKey: 'alertas' },
-      { href: '/pasteurizacion', label: 'Pasteurización', icon: 'ice-cream' },
     ],
   },
   {
@@ -47,7 +46,6 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'Administración',
     items: [
-      { href: '/personal', label: 'Personal', icon: 'user-group' },
       {
         href: '/configuracion',
         label: 'Configuración',

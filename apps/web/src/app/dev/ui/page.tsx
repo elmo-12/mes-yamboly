@@ -21,10 +21,8 @@ import {
   Search,
   Settings,
   SlidersHorizontal,
-  Thermometer,
   Trash2,
   User,
-  Users,
 } from 'lucide-react';
 import {
   AlertCard,
@@ -137,7 +135,6 @@ const SIDEBAR_GROUPS = [
       { href: '/', label: 'Inicio', icon: <House /> },
       { href: '/tiempo-real', label: 'Tiempo real', icon: <Activity /> },
       { href: '/alertas', label: 'Alertas', icon: <Bell />, count: 3 },
-      { href: '/pasteurizacion', label: 'Pasteurización', icon: <Thermometer /> },
     ],
   },
   {
@@ -151,7 +148,6 @@ const SIDEBAR_GROUPS = [
   {
     label: 'Administración',
     items: [
-      { href: '/personal', label: 'Personal', icon: <Users /> },
       { href: '/configuracion', label: 'Configuración', icon: <Settings /> },
       { href: '/evidencia', label: 'Evidencia de tesis', icon: <ClipboardList /> },
     ],

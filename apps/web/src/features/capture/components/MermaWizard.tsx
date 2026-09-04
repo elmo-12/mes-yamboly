@@ -314,7 +314,7 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
                 render={({ field }) => (
                   <Checkbox
                     label="Enviar a pasteurización"
-                    supporting="El producto en proceso retorna al Pasteurizador PT-01 para reproceso"
+                    supporting="El balde queda disponible para reproceso en el almacén de mermas (módulo de pasteurización del sistema actual)"
                     checked={field.value ?? false}
                     onCheckedChange={(v) => field.onChange(v === true)}
                   />
