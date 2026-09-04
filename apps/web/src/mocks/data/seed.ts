@@ -9,7 +9,7 @@ export const SEED = 20260828;
 /** Fecha "hoy" congelada del prototipo: viernes 28 ago 2026. */
 export const HOY = '2026-08-28';
 
-/** Marca de tiempo de referencia para "ahora" (14:05 del turno Tarde). */
+/** Marca de tiempo de referencia para "ahora" (14:05 del turno Día 06:00–18:00). */
 export const AHORA_ISO = '2026-08-28T14:05:00';
 
 export function mulberry32(seed: number): () => number {

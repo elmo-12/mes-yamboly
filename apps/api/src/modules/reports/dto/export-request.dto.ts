@@ -24,7 +24,7 @@ export class ExportRequestDto {
   @Matches(FECHA, { message: 'hasta debe tener formato YYYY-MM-DD' })
   hasta!: string;
 
-  @ApiPropertyOptional({ example: 'LIN-02' })
+  @ApiPropertyOptional({ example: 'LIN-LLEN-M2' })
   @IsOptional()
   @IsString()
   lineaId?: string;

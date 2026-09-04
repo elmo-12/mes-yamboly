@@ -20,16 +20,19 @@ export function TvLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh w-full flex-col gap-6 bg-tv-background p-10 text-tv-text">
+    <div className="flex min-h-dvh w-full flex-col gap-4 bg-tv-background p-8 text-tv-text">
       <header className="flex items-center gap-6">
-        <div className="flex min-w-0 flex-col gap-1.5">
+        <div className="flex min-w-0 flex-col gap-1">
           <h1 className="text-display text-tv-text">{titulo}</h1>
           {subtitulo && <p className="text-tv-lead text-tv-text-muted">{subtitulo}</p>}
         </div>
         <div className="flex-1" />
         <Reloj nota={notaReloj} />
       </header>
-      <main className="flex min-h-0 flex-1 flex-col gap-6">{children}</main>
+      {/* Las 9 líneas de planta reparten el alto disponible en `main`: cuanto
+          menos "chrome" (padding, gaps) fuera de la lista, más alto le queda a
+          cada fila para seguir siendo legible a 1440/1920 sin scroll. */}
+      <main className="flex min-h-0 flex-1 flex-col gap-4">{children}</main>
     </div>
   );
 }

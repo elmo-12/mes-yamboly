@@ -1,21 +1,53 @@
 import type { AlertaListQuery, OrdenListQuery, ReporteQuery } from '@mes/types';
 
+/**
+ * Filtros serializables de una consulta de catálogo (`{ lineaId, estado, … }`).
+ * Forman parte de la clave, así que cada combinación cachea por separado.
+ */
+export type CatalogoFiltros = Readonly<
+  Record<string, string | number | boolean | readonly string[] | undefined>
+>;
+
 /** Fábrica de claves de TanStack Query por dominio. */
 export const queryKeys = {
   auth: {
     all: ['auth'] as const,
     me: () => [...queryKeys.auth.all, 'me'] as const,
   },
+  /**
+   * Catálogos maestros. Cada entidad expone una **raíz** sin argumentos
+   * (`sedes()`, `productos()`, …) que sirve para invalidar todas sus consultas,
+   * y una variante `…List(filtros)` con los filtros de la llamada. TanStack
+   * empareja por prefijo, así que invalidar la raíz alcanza a todas las listas.
+   */
   catalogs: {
     all: ['catalogs'] as const,
     sedes: () => [...queryKeys.catalogs.all, 'sedes'] as const,
     turnos: () => [...queryKeys.catalogs.all, 'turnos'] as const,
-    lineas: (sedeId?: string) => [...queryKeys.catalogs.all, 'lineas', sedeId ?? 'todas'] as const,
-    productos: (lineaId?: string) => [...queryKeys.catalogs.all, 'productos', lineaId ?? 'todas'] as const,
-    maquinas: (lineaId?: string) => [...queryKeys.catalogs.all, 'maquinas', lineaId ?? 'todas'] as const,
-    causasParada: (lineaId?: string) => [...queryKeys.catalogs.all, 'causas-parada', lineaId ?? 'todas'] as const,
+    sabores: () => [...queryKeys.catalogs.all, 'sabores'] as const,
+    saboresList: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.sabores(), filtros] as const,
+    lineas: () => [...queryKeys.catalogs.all, 'lineas'] as const,
+    lineasList: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.lineas(), filtros] as const,
+    productos: () => [...queryKeys.catalogs.all, 'productos'] as const,
+    productosList: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.productos(), filtros] as const,
+    velocidades: () => [...queryKeys.catalogs.all, 'velocidades-estandar'] as const,
+    velocidadesList: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.velocidades(), filtros] as const,
+    maquinas: () => [...queryKeys.catalogs.all, 'maquinas'] as const,
+    maquinasList: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.maquinas(), filtros] as const,
+    causasParada: () => [...queryKeys.catalogs.all, 'causas-parada'] as const,
+    causasParadaArbol: (filtros: CatalogoFiltros = {}) =>
+      [...queryKeys.catalogs.causasParada(), 'arbol', filtros] as const,
+    causasParadaPlano: (filtros: CatalogoFiltros = {}) =>
+      [...queryKeys.catalogs.causasParada(), 'plano', filtros] as const,
     causasMerma: () => [...queryKeys.catalogs.all, 'causas-merma'] as const,
-    usuarios: (sedeId?: string) => [...queryKeys.catalogs.all, 'usuarios', sedeId ?? 'todas'] as const,
+    causasMermaArbol: (filtros: CatalogoFiltros = {}) =>
+      [...queryKeys.catalogs.causasMerma(), 'arbol', filtros] as const,
+    causasMermaPlano: (filtros: CatalogoFiltros = {}) =>
+      [...queryKeys.catalogs.causasMerma(), 'plano', filtros] as const,
+    usuarios: () => [...queryKeys.catalogs.all, 'usuarios'] as const,
+    usuariosList: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.usuarios(), filtros] as const,
+    personas: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.usuarios(), 'personas', filtros] as const,
+    colaboradores: () => [...queryKeys.catalogs.all, 'colaboradores'] as const,
   },
   orders: {
     all: ['orders'] as const,

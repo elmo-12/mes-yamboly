@@ -35,7 +35,7 @@ function Bloque({
 
 export default function DevApiPage() {
   const tiempoReal = useTiempoReal();
-  const ordenes = useOrdenes({ page: 1, pageSize: 5, lineaId: 'LIN-02', periodo: 'mes' });
+  const ordenes = useOrdenes({ page: 1, pageSize: 5, lineaId: 'LIN-LLEN-M2', periodo: 'mes' });
   const alertas = useAlertasResumen();
   const evidencia = useEvidenciaResumen();
   const analitica = useAnaliticaResumen();
@@ -56,7 +56,7 @@ export default function DevApiPage() {
       </Bloque>
 
       <Bloque
-        titulo="2 · Órdenes paginadas con filtro (GET /ordenes?lineaId=LIN-02&periodo=mes)"
+        titulo="2 · Órdenes paginadas con filtro (GET /ordenes?lineaId=LIN-LLEN-M2&periodo=mes)"
         cargando={ordenes.isPending}
         error={ordenes.error}
       >

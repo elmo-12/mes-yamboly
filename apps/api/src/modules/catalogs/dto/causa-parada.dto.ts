@@ -17,10 +17,10 @@ const BOOLEANO = ({ value }: { value: unknown }): unknown =>
   value === 'true' ? true : value === 'false' ? false : value;
 
 export class CreateCausaParadaDto {
-  @ApiProperty({ example: 'PM-01-06', description: 'PM-01, PM-01-A o PM-01-03' })
+  @ApiProperty({ example: 'PN-02-04', description: 'PN-02, PN-02-A o PN-02-01' })
   @IsString()
   @Matches(/^P[A-Z]-\d{2}(-[A-Z0-9]{1,2})?$/, {
-    message: 'Formato esperado PM-01, PM-01-A o PM-01-03',
+    message: 'Formato esperado PP-01, PP-01-A o PP-01-01',
   })
   codigo!: string;
 
@@ -33,7 +33,7 @@ export class CreateCausaParadaDto {
   @IsIn(NIVELES_CAUSA)
   nivel!: NivelCausa;
 
-  @ApiPropertyOptional({ example: 'CPA-PM-01-A', nullable: true })
+  @ApiPropertyOptional({ example: 'CPA-PN-02-A', nullable: true })
   @IsOptional()
   @IsString()
   parentId?: string | null;
@@ -78,6 +78,15 @@ export class CreateCausaParadaDto {
   @IsOptional()
   @IsIn(['activo', 'inactivo'])
   estado?: 'activo' | 'inactivo';
+
+  @ApiPropertyOptional({
+    example: 'RUT04',
+    nullable: true,
+    description: 'Código del sistema original (`PNP`, `RUT04`, `FAL02`, `IMP10`)',
+  })
+  @IsOptional()
+  @IsString()
+  codigoLegado?: string | null;
 }
 
 export class UpdateCausaParadaDto extends PartialType(CreateCausaParadaDto) {}
@@ -93,17 +102,10 @@ export class CausaParadaQueryDto {
   @IsIn(NIVELES_CAUSA)
   nivel?: NivelCausa;
 
-  @ApiPropertyOptional({ example: 'LIN-02' })
+  @ApiPropertyOptional({ example: 'LIN-LLEN-M2' })
   @IsOptional()
   @IsString()
   lineaId?: string;
 }
 
-export class BajaCausaResponseDto {
-  @ApiProperty({ example: 'CPA-PM-01-03' }) id!: string;
-  @ApiProperty({ example: 'PM-01-03' }) codigo!: string;
-  @ApiProperty({ example: 'inactivo' }) estado!: 'inactivo';
-  @ApiProperty({ example: 14, description: 'Paradas históricas que conservan el código' })
-  paradasConservadas!: number;
-  @ApiProperty() mensaje!: string;
-}
+export { BajaCausaParadaResponseDto as BajaCausaResponseDto } from './baja.dto';

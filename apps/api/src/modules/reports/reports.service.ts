@@ -20,7 +20,7 @@ import type {
   TendenciaOeePunto,
   Turno,
 } from '@mes/types';
-import { TURNO_LABEL } from '@mes/types';
+import { TURNO_LABEL, TURNOS } from '@mes/types';
 import {
   IndicadorDiario,
   IndicadorKpi,
@@ -256,7 +256,7 @@ export class ReportsService {
 
     const filasCausa = await this.mermasCausa.find({ order: { orden: 'ASC' } });
     const heatmap: HeatmapCelda[] = filasCausa.flatMap((c) =>
-      (['M', 'T', 'N'] as Turno[]).map((turno, i) => ({
+      TURNOS.map((turno, i) => ({
         fila: c.causaCodigo,
         filaLabel: `${c.causaCodigo} ${c.causaNombre}`,
         columna: turno,

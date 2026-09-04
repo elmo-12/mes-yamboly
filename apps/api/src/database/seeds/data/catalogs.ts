@@ -1,156 +1,312 @@
 import type {
   CausaMerma,
   CausaParada,
+  EstadoCatalogo,
   Linea,
   Maquina,
+  NivelCausa,
+  NivelCausaMerma,
   Producto,
+  Sabor,
   Sede,
+  TipoMermaCodigo,
+  TipoProcesoLinea,
   TurnoDef,
+  VelocidadEstandar,
 } from '@mes/types';
+import causasMermaJson from './real/causas-merma.json';
+import causasParadaJson from './real/causas-parada.json';
+import lineasJson from './real/lineas.json';
+import productosJson from './real/productos.json';
+import saboresJson from './real/sabores.json';
+import sedesJson from './real/sedes.json';
+import velocidadesJson from './real/velocidades-estandar.json';
 
-export const sedes: Sede[] = [
-  { id: 'SED-01', nombre: 'Planta Lima', ciudad: 'Lima', activa: true },
-  { id: 'SED-02', nombre: 'Planta Chincha', ciudad: 'Chincha', activa: false },
-];
+/**
+ * Catálogos maestros **reales** de Yamboly, extraídos del dump del sistema
+ * original a `./real/*.json` (ver `docs/` y el commit de extracción). Este
+ * módulo solo los tipa y deriva los índices: nunca inventa registros.
+ *
+ * Volúmenes: 9 sedes · 9 líneas · 41 sabores · 201 productos ·
+ * 334 pares producto × línea · 33 máquinas · 83 causas de parada ·
+ * 56 causas de merma · 2 turnos.
+ *
+ * Los campos `idLegado` del dump no se persisten: solo sirvieron para el
+ * cruce durante la extracción.
+ */
 
-export const SEDE_PRINCIPAL = 'SED-01';
+/** Nº de líneas reales; `lineasAplicables` con las 9 equivale a «todas» (`[]`). */
+const TOTAL_LINEAS = lineasJson.length;
 
-export const lineas: Linea[] = [
-  { id: 'LIN-01', codigo: 'L1', nombre: 'Paletas', sedeId: SEDE_PRINCIPAL, estado: 'activo', capacidadUnidadesMin: 95 },
-  { id: 'LIN-02', codigo: 'L2', nombre: 'Conos', sedeId: SEDE_PRINCIPAL, estado: 'activo', capacidadUnidadesMin: 120 },
-  { id: 'LIN-03', codigo: 'L3', nombre: 'Vasos', sedeId: SEDE_PRINCIPAL, estado: 'activo', capacidadUnidadesMin: 110 },
-  { id: 'LIN-04', codigo: 'L4', nombre: 'Sándwich', sedeId: SEDE_PRINCIPAL, estado: 'activo', capacidadUnidadesMin: 80 },
-  { id: 'LIN-05', codigo: 'L5', nombre: 'Bombones', sedeId: SEDE_PRINCIPAL, estado: 'activo', capacidadUnidadesMin: 140 },
-  { id: 'LIN-PT', codigo: 'PT-01', nombre: 'Pasteurizador', sedeId: SEDE_PRINCIPAL, estado: 'activo', capacidadUnidadesMin: 60 },
-];
-
-export const productos: Producto[] = [
-  { id: 'PRD-001', codigo: 'PAL-CHO-70', nombre: 'Paleta Chocolate', sabor: 'Chocolate', presentacion: '70 g', lineaId: 'LIN-01', velocidadEstandar: 95, estado: 'activo' },
-  { id: 'PRD-002', codigo: 'PAL-FRE-70', nombre: 'Paleta Fresa', sabor: 'Fresa', presentacion: '70 g', lineaId: 'LIN-01', velocidadEstandar: 95, estado: 'activo' },
-  { id: 'PRD-003', codigo: 'CON-VAI-120', nombre: 'Cono Vainilla 120 ml', sabor: 'Vainilla', presentacion: '120 ml', lineaId: 'LIN-02', velocidadEstandar: 120, estado: 'activo' },
-  { id: 'PRD-004', codigo: 'CON-CHO-120', nombre: 'Cono Chocolate 120 ml', sabor: 'Chocolate', presentacion: '120 ml', lineaId: 'LIN-02', velocidadEstandar: 118, estado: 'activo' },
-  { id: 'PRD-005', codigo: 'VAS-LUC-160', nombre: 'Vaso Lúcuma', sabor: 'Lúcuma', presentacion: '160 ml', lineaId: 'LIN-03', velocidadEstandar: 110, estado: 'activo' },
-  { id: 'PRD-006', codigo: 'VAS-VAI-160', nombre: 'Vaso Vainilla', sabor: 'Vainilla', presentacion: '160 ml', lineaId: 'LIN-03', velocidadEstandar: 110, estado: 'activo' },
-  { id: 'PRD-007', codigo: 'SAN-CLA-90', nombre: 'Sándwich Clásico', sabor: 'Vainilla', presentacion: '90 g', lineaId: 'LIN-04', velocidadEstandar: 80, estado: 'activo' },
-  { id: 'PRD-008', codigo: 'SAN-CHO-90', nombre: 'Sándwich Chocolate', sabor: 'Chocolate', presentacion: '90 g', lineaId: 'LIN-04', velocidadEstandar: 78, estado: 'activo' },
-  { id: 'PRD-009', codigo: 'BOM-FRE-25', nombre: 'Bombón Fresa', sabor: 'Fresa', presentacion: '25 g', lineaId: 'LIN-05', velocidadEstandar: 140, estado: 'activo' },
-  { id: 'PRD-010', codigo: 'BOM-CHO-25', nombre: 'Bombón Chocolate', sabor: 'Chocolate', presentacion: '25 g', lineaId: 'LIN-05', velocidadEstandar: 140, estado: 'activo' },
-  { id: 'PRD-011', codigo: 'MEZ-BAS-PT', nombre: 'Mezcla base pasteurizada', sabor: 'Base', presentacion: '1 000 L', lineaId: 'LIN-PT', velocidadEstandar: 60, estado: 'activo' },
-];
-
-export const maquinas: Maquina[] = [
-  { id: 'MAQ-01', codigo: 'MQ-L1-01', nombre: 'Moldeadora de paletas', tipo: 'Moldeadora', lineaId: 'LIN-01', estado: 'operativa', paradas30d: 6 },
-  { id: 'MAQ-02', codigo: 'MQ-L1-02', nombre: 'Túnel de frío L1', tipo: 'Túnel de frío', lineaId: 'LIN-01', estado: 'operativa', paradas30d: 3 },
-  { id: 'MAQ-03', codigo: 'MQ-L2-01', nombre: 'Dosificadora de conos', tipo: 'Dosificadora', lineaId: 'LIN-02', estado: 'operativa', paradas30d: 5 },
-  { id: 'MAQ-04', codigo: 'MQ-L2-02', nombre: 'Envolvedora L2', tipo: 'Envolvedora', lineaId: 'LIN-02', estado: 'operativa', paradas30d: 11 },
-  { id: 'MAQ-05', codigo: 'MQ-L2-03', nombre: 'Tolva de cobertura L2', tipo: 'Tolva', lineaId: 'LIN-02', estado: 'operativa', paradas30d: 4 },
-  { id: 'MAQ-06', codigo: 'MQ-L3-01', nombre: 'Llenadora de vasos', tipo: 'Llenadora', lineaId: 'LIN-03', estado: 'operativa', paradas30d: 7 },
-  { id: 'MAQ-07', codigo: 'MQ-L3-02', nombre: 'Selladora L3', tipo: 'Selladora', lineaId: 'LIN-03', estado: 'mantenimiento', paradas30d: 9 },
-  { id: 'MAQ-08', codigo: 'MQ-L4-01', nombre: 'Formadora de galleta', tipo: 'Formadora', lineaId: 'LIN-04', estado: 'operativa', paradas30d: 8 },
-  { id: 'MAQ-09', codigo: 'MQ-L4-02', nombre: 'Ensambladora de sándwich', tipo: 'Ensambladora', lineaId: 'LIN-04', estado: 'operativa', paradas30d: 10 },
-  { id: 'MAQ-10', codigo: 'MQ-L5-01', nombre: 'Bañadora de bombones', tipo: 'Bañadora', lineaId: 'LIN-05', estado: 'operativa', paradas30d: 5 },
-  { id: 'MAQ-11', codigo: 'MQ-L5-02', nombre: 'Encajadora L5', tipo: 'Encajadora', lineaId: 'LIN-05', estado: 'operativa', paradas30d: 2 },
-  { id: 'MAQ-12', codigo: 'MQ-PT-01', nombre: 'Pasteurizador PT-01', tipo: 'Pasteurizador', lineaId: 'LIN-PT', estado: 'operativa', paradas30d: 3 },
-];
-
-const TODAS_LINEAS = ['LIN-01', 'LIN-02', 'LIN-03', 'LIN-04', 'LIN-05'];
-
-type CausaSemilla = Omit<CausaParada, 'id' | 'paradasHistoricas'> & { paradasHistoricas?: number };
-
-function causa(c: CausaSemilla): CausaParada {
-  return { id: `CPA-${c.codigo}`, paradasHistoricas: c.paradasHistoricas ?? 0, ...c };
+function normalizarLineas(ids: string[]): string[] {
+  return ids.length === TOTAL_LINEAS ? [] : [...ids];
 }
 
-/** Árbol Tipo → General → Específica. 7 tipos, 15 generales, 24 específicas. */
-export const causasParada: CausaParada[] = [
-  /* PM-01 Falla mecánica ------------------------------------------- */
-  causa({ codigo: 'PM-01', nombre: 'Falla mecánica', nivel: 'tipo', parentId: null, clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: true, tiempoEstandarMin: 20, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 142 }),
-  causa({ codigo: 'PM-01-A', nombre: 'Transmisión', nivel: 'general', parentId: 'CPA-PM-01', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: true, tiempoEstandarMin: 18, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 41 }),
-  causa({ codigo: 'PM-01-01', nombre: 'Rotura de faja', nivel: 'especifica', parentId: 'CPA-PM-01-A', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: true, tiempoEstandarMin: 22, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 27 }),
-  causa({ codigo: 'PM-01-03', nombre: 'Rotura de cadena', nivel: 'especifica', parentId: 'CPA-PM-01-A', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: true, tiempoEstandarMin: 25, lineasAplicables: ['LIN-02', 'LIN-04', 'LIN-05'], estado: 'activo', paradasHistoricas: 14 }),
-  causa({ codigo: 'PM-01-B', nombre: 'Formado y envoltura', nivel: 'general', parentId: 'CPA-PM-01', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: false, tiempoEstandarMin: 15, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 55 }),
-  causa({ codigo: 'PM-01-02', nombre: 'Atasco en envolvedora', nivel: 'especifica', parentId: 'CPA-PM-01-B', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: false, tiempoEstandarMin: 12, lineasAplicables: ['LIN-01', 'LIN-02', 'LIN-05'], estado: 'activo', paradasHistoricas: 33 }),
-  causa({ codigo: 'PM-01-04', nombre: 'Desalineación de moldes', nivel: 'especifica', parentId: 'CPA-PM-01-B', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 16, lineasAplicables: ['LIN-01', 'LIN-04'], estado: 'activo', paradasHistoricas: 22 }),
-  causa({ codigo: 'PM-01-C', nombre: 'Dosificación', nivel: 'general', parentId: 'CPA-PM-01', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 14, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 19 }),
-  causa({ codigo: 'PM-01-05', nombre: 'Obstrucción de boquilla', nivel: 'especifica', parentId: 'CPA-PM-01-C', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 10, lineasAplicables: ['LIN-02', 'LIN-03'], estado: 'activo', paradasHistoricas: 19 }),
+function unDecimal(valor: number): number {
+  return Math.round(valor * 10) / 10;
+}
 
-  /* PE-02 Falla eléctrica ------------------------------------------ */
-  causa({ codigo: 'PE-02', nombre: 'Falla eléctrica', nivel: 'tipo', parentId: null, clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: true, tiempoEstandarMin: 25, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 37 }),
-  causa({ codigo: 'PE-02-A', nombre: 'Suministro', nivel: 'general', parentId: 'CPA-PE-02', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: true, tiempoEstandarMin: 30, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 16 }),
-  causa({ codigo: 'PE-02-01', nombre: 'Corte de energía', nivel: 'especifica', parentId: 'CPA-PE-02-A', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: false, tiempoEstandarMin: 35, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 9 }),
-  causa({ codigo: 'PE-02-02', nombre: 'Caída de tensión', nivel: 'especifica', parentId: 'CPA-PE-02-A', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 18, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 7 }),
-  causa({ codigo: 'PE-02-B', nombre: 'Control', nivel: 'general', parentId: 'CPA-PE-02', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: true, tiempoEstandarMin: 22, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 21 }),
-  causa({ codigo: 'PE-02-03', nombre: 'Falla de variador', nivel: 'especifica', parentId: 'CPA-PE-02-B', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: true, tiempoEstandarMin: 28, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 12 }),
-  causa({ codigo: 'PE-02-04', nombre: 'Sensor fuera de servicio', nivel: 'especifica', parentId: 'CPA-PE-02-B', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 15, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 9 }),
+/* ------------------------------------------------------------------ */
+/* Sedes                                                               */
+/* ------------------------------------------------------------------ */
 
-  /* PL-03 Limpieza CIP --------------------------------------------- */
-  causa({ codigo: 'PL-03', nombre: 'Limpieza CIP', nivel: 'tipo', parentId: null, clasificacion: 'programada', afectaOee: false, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 15, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 96 }),
-  causa({ codigo: 'PL-03-A', nombre: 'Limpieza programada', nivel: 'general', parentId: 'CPA-PL-03', clasificacion: 'programada', afectaOee: false, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 15, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 71 }),
-  causa({ codigo: 'PL-03-01', nombre: 'CIP de inicio de turno', nivel: 'especifica', parentId: 'CPA-PL-03-A', clasificacion: 'programada', afectaOee: false, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 20, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 38 }),
-  causa({ codigo: 'PL-03-02', nombre: 'CIP entre sabores', nivel: 'especifica', parentId: 'CPA-PL-03-A', clasificacion: 'programada', afectaOee: false, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 14, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 33 }),
-  causa({ codigo: 'PL-03-B', nombre: 'Sanitización', nivel: 'general', parentId: 'CPA-PL-03', clasificacion: 'programada', afectaOee: false, requiereEvidencia: true, requiereSolicitud: false, tiempoEstandarMin: 25, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 25 }),
-  causa({ codigo: 'PL-03-03', nombre: 'Sanitizado de tolvas', nivel: 'especifica', parentId: 'CPA-PL-03-B', clasificacion: 'programada', afectaOee: false, requiereEvidencia: true, requiereSolicitud: false, tiempoEstandarMin: 25, lineasAplicables: ['LIN-02', 'LIN-03', 'LIN-PT'], estado: 'activo', paradasHistoricas: 25 }),
+export const sedes: Sede[] = sedesJson.map((s) => ({
+  id: s.id,
+  codigo: s.codigo,
+  nombre: s.nombre,
+  ciudad: s.ciudad,
+  activa: s.activa,
+}));
 
-  /* PC-04 Cambio de producto --------------------------------------- */
-  causa({ codigo: 'PC-04', nombre: 'Cambio de producto', nivel: 'tipo', parentId: null, clasificacion: 'programada', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 30, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 88 }),
-  causa({ codigo: 'PC-04-A', nombre: 'Cambio de formato', nivel: 'general', parentId: 'CPA-PC-04', clasificacion: 'programada', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 35, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 52 }),
-  causa({ codigo: 'PC-04-01', nombre: 'Cambio de molde', nivel: 'especifica', parentId: 'CPA-PC-04-A', clasificacion: 'programada', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 40, lineasAplicables: ['LIN-01', 'LIN-04', 'LIN-05'], estado: 'activo', paradasHistoricas: 29 }),
-  causa({ codigo: 'PC-04-02', nombre: 'Cambio de bobina', nivel: 'especifica', parentId: 'CPA-PC-04-A', clasificacion: 'programada', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 12, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 23 }),
-  causa({ codigo: 'PC-04-B', nombre: 'Cambio de sabor', nivel: 'general', parentId: 'CPA-PC-04', clasificacion: 'programada', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 28, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 36 }),
-  causa({ codigo: 'PC-04-03', nombre: 'Purga de mezcla', nivel: 'especifica', parentId: 'CPA-PC-04-B', clasificacion: 'programada', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 28, lineasAplicables: ['LIN-02', 'LIN-03', 'LIN-PT'], estado: 'activo', paradasHistoricas: 36 }),
+/** Sede de planta: todas las líneas y los usuarios del seed cuelgan de aquí. */
+export const SEDE_PRINCIPAL = 'SED-LIMA';
 
-  /* PA-05 Falta de insumo ------------------------------------------ */
-  causa({ codigo: 'PA-05', nombre: 'Falta de insumo', nivel: 'tipo', parentId: null, clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: true, tiempoEstandarMin: 18, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 51 }),
-  causa({ codigo: 'PA-05-A', nombre: 'Materia prima', nivel: 'general', parentId: 'CPA-PA-05', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: true, tiempoEstandarMin: 22, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 24 }),
-  causa({ codigo: 'PA-05-01', nombre: 'Falta de mezcla base', nivel: 'especifica', parentId: 'CPA-PA-05-A', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: true, tiempoEstandarMin: 25, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 14 }),
-  causa({ codigo: 'PA-05-02', nombre: 'Falta de cobertura', nivel: 'especifica', parentId: 'CPA-PA-05-A', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 18, lineasAplicables: ['LIN-01', 'LIN-05'], estado: 'activo', paradasHistoricas: 10 }),
-  causa({ codigo: 'PA-05-B', nombre: 'Empaque', nivel: 'general', parentId: 'CPA-PA-05', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 14, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 27 }),
-  causa({ codigo: 'PA-05-03', nombre: 'Falta de bobina', nivel: 'especifica', parentId: 'CPA-PA-05-B', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 12, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 17 }),
-  causa({ codigo: 'PA-05-04', nombre: 'Falta de cajas', nivel: 'especifica', parentId: 'CPA-PA-05-B', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 16, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 10 }),
+/* ------------------------------------------------------------------ */
+/* Sabores                                                             */
+/* ------------------------------------------------------------------ */
 
-  /* PO-06 Ajuste operativo ----------------------------------------- */
-  causa({ codigo: 'PO-06', nombre: 'Ajuste operativo', nivel: 'tipo', parentId: null, clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 10, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 44 }),
-  causa({ codigo: 'PO-06-A', nombre: 'Calibración', nivel: 'general', parentId: 'CPA-PO-06', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 8, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 31 }),
-  causa({ codigo: 'PO-06-01', nombre: 'Ajuste de peso', nivel: 'especifica', parentId: 'CPA-PO-06-A', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 7, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 19 }),
-  causa({ codigo: 'PO-06-02', nombre: 'Ajuste de temperatura', nivel: 'especifica', parentId: 'CPA-PO-06-A', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 12, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 12 }),
-  causa({ codigo: 'PO-06-B', nombre: 'Calidad', nivel: 'general', parentId: 'CPA-PO-06', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: false, tiempoEstandarMin: 12, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 13 }),
-  causa({ codigo: 'PO-06-03', nombre: 'Ajuste de sellado', nivel: 'especifica', parentId: 'CPA-PO-06-B', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: true, requiereSolicitud: false, tiempoEstandarMin: 12, lineasAplicables: ['LIN-02', 'LIN-03', 'LIN-04'], estado: 'activo', paradasHistoricas: 13 }),
+export const sabores: Sabor[] = saboresJson.map((s) => ({
+  id: s.id,
+  codigo: s.codigo,
+  nombre: s.nombre,
+  estado: s.estado as EstadoCatalogo,
+}));
 
-  /* PS-07 Sin personal --------------------------------------------- */
-  causa({ codigo: 'PS-07', nombre: 'Sin personal', nivel: 'tipo', parentId: null, clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 20, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 18 }),
-  causa({ codigo: 'PS-07-A', nombre: 'Dotación', nivel: 'general', parentId: 'CPA-PS-07', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 20, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 18 }),
-  causa({ codigo: 'PS-07-01', nombre: 'Falta de operario', nivel: 'especifica', parentId: 'CPA-PS-07-A', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 25, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 11 }),
-  causa({ codigo: 'PS-07-02', nombre: 'Refrigerio no cubierto', nivel: 'especifica', parentId: 'CPA-PS-07-A', clasificacion: 'imprevista', afectaOee: true, requiereEvidencia: false, requiereSolicitud: false, tiempoEstandarMin: 15, lineasAplicables: TODAS_LINEAS, estado: 'activo', paradasHistoricas: 7 }),
+/** Nombres de sabor del maestro real (41), usados como texto en mermas. */
+export const SABORES: string[] = sabores.map((s) => s.nombre);
+
+/* ------------------------------------------------------------------ */
+/* Productos                                                           */
+/* ------------------------------------------------------------------ */
+
+export const productos: Producto[] = productosJson.map((p) => ({
+  id: p.id,
+  codigo: p.codigo,
+  descripcionLarga: p.descripcionLarga,
+  descripcionCorta: p.descripcionCorta,
+  nombre: p.nombre,
+  alias: p.alias,
+  marca: p.marca,
+  presentacion: p.presentacion,
+  unidadesPorCaja: p.unidadesPorCaja,
+  pesoKg: p.pesoKg,
+  saborId: p.saborId,
+  sabor: p.sabor,
+  estado: p.estado as EstadoCatalogo,
+}));
+
+const codigosProducto = new Set(productos.map((p) => p.codigo));
+
+/* ------------------------------------------------------------------ */
+/* Velocidad estándar (par producto × línea, tabla `producto_linea`)    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 333 pares activos. Del dump (340) se descartan:
+ * - los **6** cuyo producto ya no está en el maestro vigente (productos dados
+ *   de baja que conservaban su velocidad);
+ * - **1 duplicado** `1120116 × LIN-MOLD-A2` (`VE-0130`, 11 160 u/h) que rompe la
+ *   unicidad `(productoId, lineaId)` de `producto_linea`; se conserva `VE-0129`
+ *   (15 120 u/h), el primero del maestro.
+ */
+const paresVistos = new Set<string>();
+
+export const velocidadesEstandar: VelocidadEstandar[] = velocidadesJson
+  .filter((v) => {
+    if (!codigosProducto.has(v.productoCodigo)) return false;
+    const clave = `${v.productoCodigo}|${v.lineaId}`;
+    if (paresVistos.has(clave)) return false;
+    paresVistos.add(clave);
+    return true;
+  })
+  .map((v) => ({
+    id: v.id,
+    productoId: `PRD-${v.productoCodigo}`,
+    lineaId: v.lineaId,
+    velocidadUnidHora: v.velocidadUnidHora,
+    velocidadUnidMin: v.velocidadUnidMin,
+    mermaEstandarPct: v.mermaEstandarPct,
+    cipMin: v.cipMin as number | null,
+    arranqueMin: v.arranqueMin as number | null,
+    estado: v.estado as EstadoCatalogo,
+  }));
+
+/* ------------------------------------------------------------------ */
+/* Líneas (9 máquinas físicas reales)                                  */
+/* ------------------------------------------------------------------ */
+
+function capacidadDeLinea(lineaId: string): number {
+  const pares = velocidadesEstandar.filter((v) => v.lineaId === lineaId && v.estado === 'activo');
+  if (pares.length === 0) return 0;
+  return unDecimal(Math.max(...pares.map((v) => v.velocidadUnidMin)));
+}
+
+export const lineas: Linea[] = lineasJson.map((l) => ({
+  id: l.id,
+  codigo: l.codigo,
+  nombre: l.nombre,
+  nombreCorto: l.nombreCorto,
+  tipoProceso: l.tipoProceso as TipoProcesoLinea,
+  sedeId: l.sedeId,
+  estado: l.estado as EstadoCatalogo,
+  capacidadUnidadesMin: capacidadDeLinea(l.id),
+}));
+
+/* ------------------------------------------------------------------ */
+/* Máquinas = equipos de cada línea (2–4 por línea)                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Equipos físicos que componen cada línea. La familia de proceso define la
+ * dotación: llenadoras (dosificadora/llenadora, codificadora, tapadora o
+ * selladora, faja), extrusoras (extrusora, envolvedora, codificadora, túnel de
+ * frío) y moldeadoras (moldeadora, descargador o pinzas, envolvedora, túnel).
+ */
+export const maquinas: Maquina[] = [
+  /* Extrusora 2 */
+  { id: 'MAQ-01', codigo: 'MQ-EXTR2-01', nombre: 'Extrusora EXTR 2', tipo: 'Extrusora', lineaId: 'LIN-EXTR-2', estado: 'operativa', paradas30d: 12 },
+  { id: 'MAQ-02', codigo: 'MQ-EXTR2-02', nombre: 'Envolvedora EXTR 2', tipo: 'Envolvedora', lineaId: 'LIN-EXTR-2', estado: 'operativa', paradas30d: 9 },
+  { id: 'MAQ-03', codigo: 'MQ-EXTR2-03', nombre: 'Codificadora EXTR 2', tipo: 'Codificadora', lineaId: 'LIN-EXTR-2', estado: 'operativa', paradas30d: 5 },
+  { id: 'MAQ-04', codigo: 'MQ-EXTR2-04', nombre: 'Túnel de frío EXTR 2', tipo: 'Túnel de frío', lineaId: 'LIN-EXTR-2', estado: 'operativa', paradas30d: 3 },
+  /* Extrusora 3 */
+  { id: 'MAQ-05', codigo: 'MQ-EXTR3-01', nombre: 'Extrusora EXTR 3', tipo: 'Extrusora', lineaId: 'LIN-EXTR-3', estado: 'operativa', paradas30d: 10 },
+  { id: 'MAQ-06', codigo: 'MQ-EXTR3-02', nombre: 'Envolvedora EXTR 3', tipo: 'Envolvedora', lineaId: 'LIN-EXTR-3', estado: 'operativa', paradas30d: 7 },
+  { id: 'MAQ-07', codigo: 'MQ-EXTR3-03', nombre: 'Túnel de frío EXTR 3', tipo: 'Túnel de frío', lineaId: 'LIN-EXTR-3', estado: 'mantenimiento', paradas30d: 6 },
+  /* Llenadora A1 */
+  { id: 'MAQ-08', codigo: 'MQ-LLENA1-01', nombre: 'Llenadora LLEN A1', tipo: 'Llenadora', lineaId: 'LIN-LLEN-A1', estado: 'operativa', paradas30d: 8 },
+  { id: 'MAQ-09', codigo: 'MQ-LLENA1-02', nombre: 'Codificadora LLEN A1', tipo: 'Codificadora', lineaId: 'LIN-LLEN-A1', estado: 'operativa', paradas30d: 4 },
+  { id: 'MAQ-10', codigo: 'MQ-LLENA1-03', nombre: 'Tapadora LLEN A1', tipo: 'Tapadora', lineaId: 'LIN-LLEN-A1', estado: 'operativa', paradas30d: 6 },
+  { id: 'MAQ-11', codigo: 'MQ-LLENA1-04', nombre: 'Faja transportadora LLEN A1', tipo: 'Faja transportadora', lineaId: 'LIN-LLEN-A1', estado: 'operativa', paradas30d: 3 },
+  /* Llenadora A2 */
+  { id: 'MAQ-12', codigo: 'MQ-LLENA2-01', nombre: 'Llenadora LLEN A2', tipo: 'Llenadora', lineaId: 'LIN-LLEN-A2', estado: 'operativa', paradas30d: 7 },
+  { id: 'MAQ-13', codigo: 'MQ-LLENA2-02', nombre: 'Codificadora LLEN A2', tipo: 'Codificadora', lineaId: 'LIN-LLEN-A2', estado: 'operativa', paradas30d: 3 },
+  { id: 'MAQ-14', codigo: 'MQ-LLENA2-03', nombre: 'Selladora LLEN A2', tipo: 'Selladora', lineaId: 'LIN-LLEN-A2', estado: 'operativa', paradas30d: 5 },
+  /* Llenadora M1 */
+  { id: 'MAQ-15', codigo: 'MQ-LLENM1-01', nombre: 'Dosificadora LLEN M1', tipo: 'Dosificadora', lineaId: 'LIN-LLEN-M1', estado: 'operativa', paradas30d: 9 },
+  { id: 'MAQ-16', codigo: 'MQ-LLENM1-02', nombre: 'Codificadora LLEN M1', tipo: 'Codificadora', lineaId: 'LIN-LLEN-M1', estado: 'operativa', paradas30d: 4 },
+  { id: 'MAQ-17', codigo: 'MQ-LLENM1-03', nombre: 'Tapadora LLEN M1', tipo: 'Tapadora', lineaId: 'LIN-LLEN-M1', estado: 'operativa', paradas30d: 6 },
+  { id: 'MAQ-18', codigo: 'MQ-LLENM1-04', nombre: 'Faja transportadora LLEN M1', tipo: 'Faja transportadora', lineaId: 'LIN-LLEN-M1', estado: 'operativa', paradas30d: 2 },
+  /* Llenadora M2 */
+  { id: 'MAQ-19', codigo: 'MQ-LLENM2-01', nombre: 'Dosificadora LLEN M2', tipo: 'Dosificadora', lineaId: 'LIN-LLEN-M2', estado: 'operativa', paradas30d: 11 },
+  { id: 'MAQ-20', codigo: 'MQ-LLENM2-02', nombre: 'Codificadora LLEN M2', tipo: 'Codificadora', lineaId: 'LIN-LLEN-M2', estado: 'operativa', paradas30d: 5 },
+  { id: 'MAQ-21', codigo: 'MQ-LLENM2-03', nombre: 'Selladora LLEN M2', tipo: 'Selladora', lineaId: 'LIN-LLEN-M2', estado: 'operativa', paradas30d: 7 },
+  { id: 'MAQ-22', codigo: 'MQ-LLENM2-04', nombre: 'Faja transportadora LLEN M2', tipo: 'Faja transportadora', lineaId: 'LIN-LLEN-M2', estado: 'operativa', paradas30d: 3 },
+  /* Moldeadora A2 */
+  { id: 'MAQ-23', codigo: 'MQ-MOLDA2-01', nombre: 'Moldeadora MOLD A2', tipo: 'Moldeadora', lineaId: 'LIN-MOLD-A2', estado: 'operativa', paradas30d: 10 },
+  { id: 'MAQ-24', codigo: 'MQ-MOLDA2-02', nombre: 'Descargador MOLD A2', tipo: 'Descargador', lineaId: 'LIN-MOLD-A2', estado: 'operativa', paradas30d: 6 },
+  { id: 'MAQ-25', codigo: 'MQ-MOLDA2-03', nombre: 'Envolvedora MOLD A2', tipo: 'Envolvedora', lineaId: 'LIN-MOLD-A2', estado: 'operativa', paradas30d: 8 },
+  { id: 'MAQ-26', codigo: 'MQ-MOLDA2-04', nombre: 'Túnel de frío MOLD A2', tipo: 'Túnel de frío', lineaId: 'LIN-MOLD-A2', estado: 'operativa', paradas30d: 3 },
+  /* Moldeadora A3 */
+  { id: 'MAQ-27', codigo: 'MQ-MOLDA3-01', nombre: 'Moldeadora MOLD A3', tipo: 'Moldeadora', lineaId: 'LIN-MOLD-A3', estado: 'operativa', paradas30d: 12 },
+  { id: 'MAQ-28', codigo: 'MQ-MOLDA3-02', nombre: 'Pinzas extractoras MOLD A3', tipo: 'Pinzas', lineaId: 'LIN-MOLD-A3', estado: 'mantenimiento', paradas30d: 9 },
+  { id: 'MAQ-29', codigo: 'MQ-MOLDA3-03', nombre: 'Envolvedora MOLD A3', tipo: 'Envolvedora', lineaId: 'LIN-MOLD-A3', estado: 'operativa', paradas30d: 7 },
+  /* Moldeadora A4 */
+  { id: 'MAQ-30', codigo: 'MQ-MOLDA4-01', nombre: 'Moldeadora MOLD A4', tipo: 'Moldeadora', lineaId: 'LIN-MOLD-A4', estado: 'operativa', paradas30d: 9 },
+  { id: 'MAQ-31', codigo: 'MQ-MOLDA4-02', nombre: 'Descargador de pinzas MOLD A4', tipo: 'Descargador', lineaId: 'LIN-MOLD-A4', estado: 'operativa', paradas30d: 5 },
+  { id: 'MAQ-32', codigo: 'MQ-MOLDA4-03', nombre: 'Envolvedora MOLD A4', tipo: 'Envolvedora', lineaId: 'LIN-MOLD-A4', estado: 'operativa', paradas30d: 6 },
+  { id: 'MAQ-33', codigo: 'MQ-MOLDA4-04', nombre: 'Túnel de frío MOLD A4', tipo: 'Túnel de frío', lineaId: 'LIN-MOLD-A4', estado: 'operativa', paradas30d: 4 },
 ];
 
-export const causasMerma: CausaMerma[] = [
-  { id: 'CME-MR-01', codigo: 'MR-01', nombre: 'Sobrepeso', aplicaA: ['EP', 'PT'], requiereEvidencia: false, estado: 'activo' },
-  { id: 'CME-MR-02', codigo: 'MR-02', nombre: 'Rotura', aplicaA: ['EP', 'PT'], requiereEvidencia: true, estado: 'activo' },
-  { id: 'CME-MR-03', codigo: 'MR-03', nombre: 'Arranque', aplicaA: ['MP', 'EP'], requiereEvidencia: false, estado: 'activo' },
-  { id: 'CME-MR-04', codigo: 'MR-04', nombre: 'Contaminación', aplicaA: ['MP', 'EP', 'PT'], requiereEvidencia: true, estado: 'activo' },
-];
+/* ------------------------------------------------------------------ */
+/* Causas de parada (árbol Tipo → General → Específica, 5/26/52)       */
+/* ------------------------------------------------------------------ */
+
+export const causasParada: CausaParada[] = causasParadaJson.map((c) => ({
+  id: c.id,
+  codigo: c.codigo,
+  nombre: c.nombre,
+  nivel: c.nivel as NivelCausa,
+  parentId: c.parentId,
+  clasificacion: c.clasificacion as 'programada' | 'imprevista',
+  afectaOee: c.afectaOee,
+  requiereEvidencia: c.requiereEvidencia,
+  requiereSolicitud: c.requiereSolicitud,
+  tiempoEstandarMin: c.tiempoEstandarMin,
+  lineasAplicables: normalizarLineas(c.lineasAplicables),
+  estado: c.estado as EstadoCatalogo,
+  paradasHistoricas: c.paradasHistoricas,
+  codigoLegado: c.codigoLegado,
+}));
+
+/* ------------------------------------------------------------------ */
+/* Causas de merma (árbol Tipo → Clasificación → Causa, 5/11/40)       */
+/* ------------------------------------------------------------------ */
+
+export const causasMerma: CausaMerma[] = causasMermaJson.map((c) => ({
+  id: c.id,
+  codigo: c.codigo,
+  nombre: c.nombre,
+  nivel: c.nivel as NivelCausaMerma,
+  parentId: c.parentId,
+  aplicaA: c.aplicaA as TipoMermaCodigo[],
+  lineasAplicables: normalizarLineas(c.lineasAplicables),
+  requiereEvidencia: c.requiereEvidencia,
+  requiereComentario: c.requiereComentario,
+  requiereSolicitud: c.requiereSolicitud,
+  estado: c.estado as EstadoCatalogo,
+  mermasHistoricas: c.mermasHistoricas,
+}));
+
+/* ------------------------------------------------------------------ */
+/* Turnos reales: D 06:00–18:00 · N 18:00–06:00                        */
+/* ------------------------------------------------------------------ */
 
 export const turnos: TurnoDef[] = [
-  { id: 'TUR-M', codigo: 'M', label: 'Mañana', inicio: '06:00', fin: '14:00', activo: true },
-  { id: 'TUR-T', codigo: 'T', label: 'Tarde', inicio: '14:00', fin: '22:00', activo: true },
-  { id: 'TUR-N', codigo: 'N', label: 'Noche', inicio: '22:00', fin: '06:00', activo: true },
+  { id: 'TUR-D', codigo: 'D', label: 'Día', inicio: '06:00', fin: '18:00', activo: true },
+  { id: 'TUR-N', codigo: 'N', label: 'Noche', inicio: '18:00', fin: '06:00', activo: true },
 ];
 
-export const SABORES = ['Vainilla', 'Chocolate', 'Fresa', 'Lúcuma'] as const;
+/* ------------------------------------------------------------------ */
+/* Índices de acceso rápido usados por handlers y generadores          */
+/* ------------------------------------------------------------------ */
 
-/* Índices de acceso rápido usados por los handlers. */
+export const sedePorId = new Map(sedes.map((s) => [s.id, s]));
 export const lineaPorId = new Map(lineas.map((l) => [l.id, l]));
+export const saborPorId = new Map(sabores.map((s) => [s.id, s]));
 export const productoPorId = new Map(productos.map((p) => [p.id, p]));
 export const maquinaPorId = new Map(maquinas.map((m) => [m.id, m]));
 export const causaParadaPorId = new Map(causasParada.map((c) => [c.id, c]));
 export const causaMermaPorId = new Map(causasMerma.map((c) => [c.id, c]));
+export const velocidadEstandarPorId = new Map(velocidadesEstandar.map((v) => [v.id, v]));
+
+/** Pares producto × línea agrupados por línea, en el orden del maestro. */
+export const velocidadesPorLinea = new Map<string, VelocidadEstandar[]>(
+  lineas.map((l) => [l.id, velocidadesEstandar.filter((v) => v.lineaId === l.id)]),
+);
+
+/** Par activo de un producto en una línea; `undefined` si la línea no lo corre. */
+export function parProductoLinea(
+  productoId: string,
+  lineaId: string,
+): VelocidadEstandar | undefined {
+  return velocidadesEstandar.find(
+    (v) => v.productoId === productoId && v.lineaId === lineaId && v.estado === 'activo',
+  );
+}
 
 export const causasEspecificas = causasParada.filter((c) => c.nivel === 'especifica');
 export const tiposCausa = causasParada.filter((c) => c.nivel === 'tipo');
 
-/** Devuelve el tipo (raíz) al que pertenece una causa de cualquier nivel. */
+/** Devuelve el tipo (raíz) al que pertenece una causa de parada de cualquier nivel. */
 export function tipoDeCausa(causaId: string): CausaParada | undefined {
   let actual = causaParadaPorId.get(causaId);
   while (actual && actual.parentId) actual = causaParadaPorId.get(actual.parentId);
+  return actual;
+}
+
+/** Hojas del árbol de merma (`nivel: 'causa'`) — las únicas seleccionables. */
+export const causasMermaHoja = causasMerma.filter((c) => c.nivel === 'causa');
+export const tiposCausaMerma = causasMerma.filter((c) => c.nivel === 'tipo');
+
+/** Clasificación (nivel intermedio) de una hoja de merma. */
+export function clasificacionDeMerma(causaId: string): CausaMerma | undefined {
+  const hoja = causaMermaPorId.get(causaId);
+  return hoja?.parentId ? causaMermaPorId.get(hoja.parentId) : undefined;
+}
+
+/** Tipo (raíz) de una causa de merma de cualquier nivel. */
+export function tipoDeMerma(causaId: string): CausaMerma | undefined {
+  let actual = causaMermaPorId.get(causaId);
+  while (actual && actual.parentId) actual = causaMermaPorId.get(actual.parentId);
   return actual;
 }

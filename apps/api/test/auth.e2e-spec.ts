@@ -35,7 +35,7 @@ describe('auth (e2e)', () => {
       .send({ email: '46012784', password: 'Yamboly2026' })
       .expect(200);
 
-    expect(body.user).toMatchObject({ id: 'USR-02', rol: 'maquinista', lineaId: 'LIN-02' });
+    expect(body.user).toMatchObject({ id: 'USR-02', rol: 'maquinista', lineaId: 'LIN-EXTR-2' });
   });
 
   it('rechaza credenciales inválidas con 401 y el código UNAUTHORIZED', async () => {

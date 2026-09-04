@@ -44,7 +44,7 @@ export function horaDeIso(valor: string): string {
   return (parte ?? valor).slice(0, 5);
 }
 
-/** `L2 Conos · Envolvedora L2` para la columna LÍNEA / MÁQUINA. */
+/** `LLEN-M2 Llenadora M2 · Envolvedora` para la columna LÍNEA / MÁQUINA. */
 export function lineaMaquina(alerta: Alerta): string {
   const linea = `${alerta.lineaCodigo} ${alerta.lineaNombre}`;
   return alerta.maquinaNombre ? `${linea} · ${alerta.maquinaNombre}` : linea;

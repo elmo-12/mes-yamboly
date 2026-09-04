@@ -5,16 +5,34 @@ import {
   CausaParada,
   Linea,
   Maquina,
+  Merma,
+  OrdenFabricacion,
   Parada,
   Producto,
+  Sabor,
+  Sede,
   Turno,
+  VelocidadEstandar,
 } from '../../database/entities';
 import { CatalogsController } from './catalogs.controller';
 import { CatalogsService } from './catalogs.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Turno, Linea, Producto, Maquina, CausaParada, CausaMerma, Parada]),
+    TypeOrmModule.forFeature([
+      Turno,
+      Sede,
+      Linea,
+      Sabor,
+      Producto,
+      VelocidadEstandar,
+      Maquina,
+      CausaParada,
+      CausaMerma,
+      Parada,
+      Merma,
+      OrdenFabricacion,
+    ]),
   ],
   controllers: [CatalogsController],
   providers: [CatalogsService],

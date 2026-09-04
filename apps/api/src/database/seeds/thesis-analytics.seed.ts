@@ -24,7 +24,10 @@ export class ThesisAnalyticsSeeder implements Seeder {
     if (await repo.count()) return;
     /* `rng(707)` reproduce las probabilidades del histórico del mock. */
     const r = rng(707);
-    const lineas = ['L1', 'L2', 'L3', 'L4', 'L5'];
+    const lineas = [
+      'EXTR-2', 'EXTR-3', 'LLEN-A1', 'LLEN-A2', 'LLEN-M1',
+      'LLEN-M2', 'MOLD-A2', 'MOLD-A3', 'MOLD-A4',
+    ];
     const tipos = ['Parada prevista', 'Merma prevista', 'Velocidad baja', 'OEE bajo umbral'];
     const filas: Prediccion[] = [];
     for (let i = 0; i < 24; i += 1) {

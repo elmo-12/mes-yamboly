@@ -5,6 +5,10 @@ export class Sede {
   @PrimaryColumn('text')
   id!: string;
 
+  /** Código corto de 3–4 letras mayúsculas: `LIMA`, `AREQ`, `CHIC`, `TARA`. */
+  @Column('text', { unique: true, default: '' })
+  codigo!: string;
+
   @Column('text')
   nombre!: string;
 

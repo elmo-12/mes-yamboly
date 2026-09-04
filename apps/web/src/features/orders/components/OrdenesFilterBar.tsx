@@ -38,7 +38,7 @@ export function OrdenesFilterBar({
   hayFiltros,
 }: OrdenesFilterBarProps) {
   const { data: lineas } = useLineas();
-  const lineasProduccion = (lineas?.data ?? []).filter((l) => l.id !== 'LIN-PT');
+  const lineasProduccion = lineas?.data ?? [];
 
   const alternar = React.useCallback(
     <T extends string>(actual: readonly T[], valor: T): T[] =>

@@ -21,7 +21,7 @@ export class OrdenQueryDto extends PaginationDto {
   @Matches(FECHA, { message: 'hasta debe tener formato YYYY-MM-DD' })
   hasta?: string;
 
-  @ApiPropertyOptional({ description: 'Repetible o separado por comas', example: 'LIN-02' })
+  @ApiPropertyOptional({ description: 'Repetible o separado por comas', example: 'LIN-LLEN-M2' })
   @IsOptional()
   lineaId?: string | string[];
 

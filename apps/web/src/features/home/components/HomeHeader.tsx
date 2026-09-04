@@ -22,7 +22,7 @@ function primerNombre(nombre: string): string {
   return nombre.trim().split(' ')[0] ?? nombre;
 }
 
-/** `Turno Mañana · Viernes 28 ago 2026 · 5 líneas activas` */
+/** `Turno Día · Viernes 28 ago 2026 · 9 líneas activas` */
 function subtituloJefe(resumen: TiempoRealResumen | undefined): string | undefined {
   if (!resumen) return undefined;
   const activas = resumen.lineas.filter((l) => l.estado !== 'sin_orden').length;

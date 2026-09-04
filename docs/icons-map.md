@@ -16,11 +16,11 @@ Tamaños reales (no inventar otros): **18** en ítems del sidebar · **20** en t
 | `home-01` | `House` (alias `Home`) | Sidebar · Inicio | 18 |
 | `activity` | `Activity` | Sidebar · Tiempo real; chip "Sugerida" de Line card | 18 / 14 |
 | `bell-01` | `Bell` | Sidebar · Alertas; campana del topbar (con punto) | 18 / 20 |
-| `ice-cream` | `IceCreamCone` | Sidebar · Pasteurización; logo del login | 18 / 24 |
+| `ice-cream` | `IceCreamCone` | Logo del login (uso de Sidebar · Pasteurización retirado: la ruta ya no está en la navegación) | 24 |
 | `file` | `FileText` | Sidebar · Órdenes de fabricación | 18 |
 | `chart-alt2` | `ChartColumn` (alias `BarChart3`) | Sidebar · Reportes | 18 |
 | `insight` | `ChartLine` (alias `LineChart`) | Sidebar · Analítica IA; icon box de Insight card | 18 / 20 |
-| `user-group` | `Users` | Sidebar · Personal | 18 |
+| `user-group` | `Users` | Configuración · Sedes y usuarios (uso de Sidebar · Personal retirado: la ruta ya no está en la navegación) | 18 |
 | `settings-02` | `Settings` | Sidebar · Configuración | 18 |
 | `clipboard` | `ClipboardList` | Sidebar · Evidencia de tesis | 18 |
 | `search` / `search-lg` | `Search` | Search del topbar, search de tabla, Empty NoResults | 16 / 40 |
@@ -76,7 +76,7 @@ Tamaños reales (no inventar otros): **18** en ítems del sidebar · **20** en t
 | `cpu` | `Cpu` | Modelo/IA |
 | `flask` | `FlaskConical` | Calidad / laboratorio |
 | `light-bulb` | `Lightbulb` | Insight alternativo |
-| `temperature` | `Thermometer` | Pasteurización, túnel de frío |
+| `temperature` | `Thermometer` | Túnel de frío (uso en Pasteurización retirado: la ruta ya no está en la navegación) |
 | `forbidden` | `Ban` | Desactivar causa, estado forbidden |
 | `archive` | `Archive` | Órdenes archivadas |
 | `tag` | `Tag` | Lote / etiqueta |

@@ -14,7 +14,7 @@ import {
   cn,
   toast,
 } from '@mes/ui';
-import { calcDesvioVelocidad, formatNumber } from '@mes/shared';
+import { calcDesvioVelocidad, formatNumber, formatSpeed } from '@mes/shared';
 import { createVelocidadSchema } from '@mes/types';
 import { useCausasParada } from '@/features/catalogs/hooks';
 import { useCrearVelocidad } from '@/features/speeds/hooks';
@@ -61,6 +61,7 @@ export function VelocidadDrawer({ contexto, abierto, onOpenChange }: VelocidadDr
   }, [abierto]);
 
   const real = Number(texto.replace(',', '.')) || 0;
+  /* Estándar congelado en la orden en curso (u/min), nunca el del producto. */
   const estandar = contexto.velocidadEstandar;
   const desvio = calcDesvioVelocidad(real, estandar);
   const maximo = Math.max(real, estandar, 1);
@@ -160,20 +161,25 @@ export function VelocidadDrawer({ contexto, abierto, onOpenChange }: VelocidadDr
             <div className="flex flex-col gap-1.5">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-body text-neutral-text">Real</span>
-                <span className="text-body-md tabular text-text-primary">{real} u/min</span>
+                <span className="text-body-md tabular text-text-primary">{formatSpeed(real, 1)}</span>
               </div>
               <ProgressBar value={(real / maximo) * 100} tone="primary" label="Velocidad real" />
             </div>
             <div className="flex flex-col gap-1.5">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-body text-neutral-text">Estándar</span>
-                <span className="text-body-md tabular text-text-primary">{estandar} u/min</span>
+                <span className="text-body-md tabular text-text-primary">
+                  {formatSpeed(estandar, 1)}
+                </span>
               </div>
               <ProgressBar
                 value={(estandar / maximo) * 100}
                 tone="neutral"
                 label="Velocidad estándar"
               />
+              <p className="text-body-sm text-text-disabled">
+                {`Estándar de la orden en curso · ≈ ${formatNumber(estandar * 60)} u/h`}
+              </p>
             </div>
             <p
               className={cn(

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Button, Divider, EmptyState, Icon, SectionTitle, toast } from '@mes/ui';
 import type { LineaEstado } from '@mes/types';
+import { useSessionStore } from '@/features/auth/session-store';
 import { useSedes } from '@/features/catalogs/hooks';
 import { useDescartarDeteccion } from '@/features/downtimes/hooks';
 import {
@@ -34,7 +35,9 @@ type Overlay = Exclude<AccionLinea, 'descartar-iot'>;
  * (OE1 · KPI TRI).
  */
 export function TiempoRealPage() {
-  const [sedeId, setSedeId] = React.useState('SED-01');
+  /* Sede de trabajo: la del usuario en sesión y, si no la tuviera, Lima. */
+  const usuario = useSessionStore((s) => s.user);
+  const [sedeId, setSedeId] = React.useState(usuario?.sedeId ?? 'SED-LIMA');
   const [filtros, setFiltros] = React.useState<FiltrosLineas>(FILTROS_VACIOS);
   const [overlay, setOverlay] = React.useState<Overlay | null>(null);
   const [lineaSel, setLineaSel] = React.useState<LineaEstado | null>(null);

@@ -1,0 +1,248 @@
+[
+  {
+    "id": "SAB-2110119",
+    "codigo": "2110119",
+    "nombre": "Vainilla",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110120",
+    "codigo": "2110120",
+    "nombre": "Trisabor",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110121",
+    "codigo": "2110121",
+    "nombre": "Fresa/fusion Fresa",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110122",
+    "codigo": "2110122",
+    "nombre": "Fusion Naranja",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110123",
+    "codigo": "2110123",
+    "nombre": "Lucuma",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110124",
+    "codigo": "2110124",
+    "nombre": "Capuccino",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110125",
+    "codigo": "2110125",
+    "nombre": "Menta",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110126",
+    "codigo": "2110126",
+    "nombre": "Praia Fresa",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110127",
+    "codigo": "2110127",
+    "nombre": "Praia Chicha",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110128",
+    "codigo": "2110128",
+    "nombre": "Praia Limon",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110129",
+    "codigo": "2110129",
+    "nombre": "Praia Maracuya",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110130",
+    "codigo": "2110130",
+    "nombre": "Frozen Maracuya",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110131",
+    "codigo": "2110131",
+    "nombre": "Frozen Mango",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110132",
+    "codigo": "2110132",
+    "nombre": "Frozen Fresa",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110133",
+    "codigo": "2110133",
+    "nombre": "Crema Maracuya",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110134",
+    "codigo": "2110134",
+    "nombre": "Coco",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110135",
+    "codigo": "2110135",
+    "nombre": "Chicle",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110136",
+    "codigo": "2110136",
+    "nombre": "Ron Con Pasas",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110137",
+    "codigo": "2110137",
+    "nombre": "Vai-mora",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110138",
+    "codigo": "2110138",
+    "nombre": "Magneto Sauco",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110139",
+    "codigo": "2110139",
+    "nombre": "Magneto Maracuya",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110140",
+    "codigo": "2110140",
+    "nombre": "Trubulu Fresa Naranja",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110141",
+    "codigo": "2110141",
+    "nombre": "Combinado",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110160",
+    "codigo": "2110160",
+    "nombre": "Fresa",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110161",
+    "codigo": "2110161",
+    "nombre": "Mango",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110162",
+    "codigo": "2110162",
+    "nombre": "Chicha",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110163",
+    "codigo": "2110163",
+    "nombre": "Maracuya",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110164",
+    "codigo": "2110164",
+    "nombre": "Naranja",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110165",
+    "codigo": "2110165",
+    "nombre": "Chocolate",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110166",
+    "codigo": "2110166",
+    "nombre": "Mora",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110167",
+    "codigo": "2110167",
+    "nombre": "Cookies And Cream",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110168",
+    "codigo": "2110168",
+    "nombre": "Queso",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110169",
+    "codigo": "2110169",
+    "nombre": "Cafe",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110170",
+    "codigo": "2110170",
+    "nombre": "Nata",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110171",
+    "codigo": "2110171",
+    "nombre": "Ron",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110172",
+    "codigo": "2110172",
+    "nombre": "Chocolate Milk",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110173",
+    "codigo": "2110173",
+    "nombre": "Chocolate Dark",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110174",
+    "codigo": "2110174",
+    "nombre": "Malta",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110175",
+    "codigo": "2110175",
+    "nombre": "Frutos Rojos",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110176",
+    "codigo": "2110176",
+    "nombre": "Sauco",
+    "estado": "activo"
+  },
+  {
+    "id": "SAB-2110177",
+    "codigo": "2110177",
+    "nombre": "Marmoleado",
+    "estado": "activo"
+  }
+]

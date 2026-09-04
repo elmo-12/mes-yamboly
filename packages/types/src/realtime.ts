@@ -26,6 +26,12 @@ export interface AlertaLinea {
   /** Probabilidad 0–100. */
   riesgo: number;
   texto: string;
+  /**
+   * ISO-8601 local en que se generó la alerta. El timeline de la línea la
+   * ubica con esta marca (nunca con el reloj del servidor), de modo que el
+   * orden cronológico de los eventos no dependa de la hora de la consulta.
+   */
+  generadaEn: string;
 }
 
 export interface LineaEstado {
@@ -55,6 +61,14 @@ export interface LineaEstado {
 export interface TiempoRealResumen {
   /** ISO-8601 de la última actualización. */
   actualizadoEn: string;
+  /**
+   * `YYYY-MM-DD` que el módulo de tiempo real trata como "hoy" al elegir la
+   * orden vigente de cada línea. Con datos de demostración congelados en una
+   * fecha fija no coincide con el reloj del navegador, así que las vistas que
+   * acotan "lo del turno" (panel del maquinista) deben usar este valor y no
+   * `new Date()`.
+   */
+  diaOperativo: string;
   turno: Turno;
   turnoLabel: string;
   /** `06:00–14:00` */

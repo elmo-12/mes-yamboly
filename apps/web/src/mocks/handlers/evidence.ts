@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { EvidenciaResumen, KpiTesis, RegistroTRI } from '@mes/types';
-import { estadoCfs, estadoEp, estadoTci, estadoTri, estadoTsp } from '@mes/shared';
+import { estadoCfs, estadoEp, estadoTci, estadoTri, estadoTsp, formatNumber } from '@mes/shared';
 import {
   ITEMS_TSP,
   PERIODOS_TESIS,
@@ -36,43 +36,43 @@ function kpisTesis(): KpiTesis[] {
     {
       id: 'TRI',
       nombre: 'Tiempo de registro de información',
-      formula: 'TRI = ΣTR / n',
+      formula: 'ΣTR / n',
       valor: tri,
       unidad: 'min',
       meta: 'Reducción ≥ 40 % vs pretest',
       metaValor: 40,
       estado: estadoTri(reduccion),
       anexo: 'Anexo 02',
-      detalle: `${reduccion} % vs pretest (${pretest} min)`,
+      detalle: `${formatNumber(tri, 1)} min frente a ${formatNumber(pretest, 1)} min del pretest (${formatNumber(reduccion, 1)} %)`,
     },
     {
       id: 'TCI',
       nombre: 'Tasa de calidad de la información',
-      formula: 'TCI = RC / RT × 100',
+      formula: 'RC / RT × 100',
       valor: tci,
       unidad: '%',
       meta: '≥ 90 %',
       metaValor: 90,
       estado: estadoTci(tci),
       anexo: 'Anexo 03',
-      detalle: `${evidenciaTci.registrosCorrectos} de ${evidenciaTci.registrosTotales} registros correctos`,
+      detalle: `${evidenciaTci.registrosCorrectos} de ${evidenciaTci.registrosTotales} registros cumplen los 4 criterios`,
     },
     {
       id: 'TSP',
       nombre: 'Tasa de satisfacción del personal',
-      formula: 'TSP = PO / PT × 100',
+      formula: 'PO / PT × 100',
       valor: tsp.pctAcuerdo,
       unidad: '%',
       meta: '≥ 80 % de acuerdo',
       metaValor: 80,
       estado: estadoTsp(tsp.pctAcuerdo),
       anexo: 'Anexo 04',
-      detalle: `${tsp.respuestas} respuestas · promedio ${tsp.promedio} / 5`,
+      detalle: `${tsp.respuestas} encuestados · promedio ${formatNumber(tsp.promedio, 1)}`,
     },
     {
       id: 'CFS',
       nombre: 'Cumplimiento funcional del sistema',
-      formula: 'CFS = FV / FT × 100',
+      formula: 'FV / FT × 100',
       valor: cfs.porcentaje,
       unidad: '%',
       meta: '9 / 9 funcionalidades',
@@ -84,14 +84,14 @@ function kpisTesis(): KpiTesis[] {
     {
       id: 'EP',
       nombre: 'Exactitud de las predicciones',
-      formula: 'EP = PCC / PTG × 100',
+      formula: 'PCC / PTG × 100',
       valor: ep,
       unidad: '%',
       meta: '≥ 80 %',
       metaValor: 80,
       estado: estadoEp(ep),
       anexo: 'Anexo 06',
-      detalle: `${getStore().ep.correctas} de ${getStore().ep.totales} predicciones correctas`,
+      detalle: `${getStore().ep.correctas} de ${getStore().ep.totales} predicciones confirmadas`,
     },
   ];
 }

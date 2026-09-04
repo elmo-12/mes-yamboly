@@ -49,7 +49,7 @@ Sombras: solo `Shadow/Modal` en Modal y `Shadow/Drawer` en Drawer. Ninguna card 
   - Contador opcional a la derecha (Alertas): Badge `bg #FEF2F2`, texto `#B91C1C` 12/500, `padding 3px 10px`, `r999`.
 - **Spacer** `flex:1` antes del pie.
 - **Pie de usuario**: `padding 10`, `gap 10`, `r10`; avatar 28; nombre 12/600 `#111827`; rol 11/400 `#6B7280`.
-- Ítems reales (10, no 11 como dice la descripción del componente): OPERACIÓN → Inicio · Tiempo real · Alertas (3) · Pasteurización; CONTROL → Órdenes de fabricación · Reportes · Analítica IA; ADMINISTRACIÓN → Personal · Configuración · Evidencia de tesis.
+- Ítems reales en la app (8; el componente Figma original tenía 10, con Pasteurización y Personal — ambas rutas se retiraron de la navegación real): OPERACIÓN → Inicio · Tiempo real · Alertas (3); CONTROL → Órdenes de fabricación · Reportes · Analítica IA; ADMINISTRACIÓN → Configuración · Evidencia de tesis.
 - ⚠️ Inconsistencia detectada: en la instancia de Órdenes el ítem inactivo "Inicio" quedó en `#374151` en vez de `#6B7280`. En código usar siempre `#6B7280` para inactivo.
 
 ### 1.2 Topbar — `MES / Topbar` 2149:13 **[FIGMA]**

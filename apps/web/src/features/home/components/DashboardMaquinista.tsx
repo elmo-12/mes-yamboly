@@ -35,7 +35,7 @@ const ESTADO_LINE_CARD: Record<EstadoLinea, LineState> = {
  */
 export function DashboardMaquinista({ user }: { user: User }) {
   const router = useRouter();
-  const resumen = useResumenMaquinista(user.lineaId);
+  const resumen = useResumenMaquinista(user.lineaId ?? undefined);
   const linea = resumen.linea;
 
   if (resumen.isPending) return <HomeSkeleton variante="maquinista" />;

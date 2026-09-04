@@ -2,13 +2,13 @@ import type { LineaEstado, TiempoRealResumen } from '@mes/types';
 
 /**
  * Contexto operativo que los overlays de captura precargan (spec 04.A:
- * "L2 · Conos · OF-2026-0815 · Turno Mañana · Jorge Quispe").
+ * "LLEN-M2 · Llenadora M2 · OF-2026-0815 · Turno Día · Jorge Quispe").
  */
 export interface ContextoLinea {
   lineaId: string;
   lineaCodigo: string;
   lineaNombre: string;
-  /** `L2 · Conos` */
+  /** `LLEN-M2 · Llenadora M2` */
   etiqueta: string;
   ordenId?: string;
   ordenCodigo?: string;
@@ -16,6 +16,11 @@ export interface ContextoLinea {
   turnoLabel: string;
   turnoRango: string;
   velocidad: number;
+  /**
+   * Estándar **en u/min** congelado en la orden en curso al iniciarla (del par
+   * producto × línea). Nunca sale del producto: el mismo producto tiene
+   * velocidades distintas según la línea donde se fabrique.
+   */
   velocidadEstandar: number;
   producido: number;
   plan: number;

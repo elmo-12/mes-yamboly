@@ -26,16 +26,16 @@ export const PERIODOS_TESIS = {
 /* ------------------------------------------------------------------ */
 
 const EVENTOS_TRI = [
-  'Parada PL-03-02 · L2 Conos',
-  'Merma EP 3,2 kg · L2 Conos',
-  'Velocidad 118 u/min · L2 Conos',
-  'Parada PO-06-01 · L2 Conos',
-  'Parada PM-01-03 · L2 Conos',
-  'Merma PT 1,8 kg · L2 Conos',
-  'Parada PA-05-03 · L2 Conos',
-  'Inicio de orden OF-2026-0814 · L1 Paletas',
-  'Parada PM-01-04 · L4 Sándwich',
-  'Merma EP 2,4 kg · L3 Vasos',
+  'Parada PP-01-10 · LLEN-A1 Llenadora A1',
+  'Merma EP 3,2 kg · LLEN-A1 Llenadora A1',
+  'Velocidad 131 u/min · LLEN-A1 Llenadora A1',
+  'Parada PN-04-01 · LLEN-A1 Llenadora A1',
+  'Parada PN-02-01 · LLEN-A1 Llenadora A1',
+  'Merma PT 1,8 kg · LLEN-A1 Llenadora A1',
+  'Parada PN-04-14 · LLEN-A1 Llenadora A1',
+  'Inicio de orden OF-2026-0814 · LLEN-M2 Llenadora M2',
+  'Parada PN-02-02 · MOLD-A3 Moldeadora A3',
+  'Merma EP 2,4 kg · EXTR-2 Extrusora 2',
 ];
 
 const HORAS_POSTEST = ['07:42:18', '11:05:07', '09:10:33', '09:24:12', '11:18:41', '12:52:09', '12:40:55', '06:02:14', '13:47:26', '10:31:48'];
@@ -82,16 +82,16 @@ export const evidenciaTri: EvidenciaTRI = {
 /* ------------------------------------------------------------------ */
 
 const REGISTROS_TCI = [
-  'Parada 07:42 · PL-03-02 · L2',
-  'Merma EP 3,2 kg · MR-03 · L2',
-  'Velocidad 118 u/min · L2',
-  'Parada 09:24 · PO-06-01 · L2',
-  'Parada 11:18 · PM-01-03 · L2',
-  'Merma PT 1,8 kg · MR-01 · L2',
-  'Parada 12:40 · PA-05-03 · L2',
-  'Orden OF-2026-0814 · L1',
-  'Parada 13:47 · PM-01-04 · L4',
-  'Merma EP 2,4 kg · MR-03 · L3',
+  'Parada 07:42 · PP-01-10 · LLEN-A1',
+  'Merma EP 3,2 kg · MP-01-01 · LLEN-A1',
+  'Velocidad 131 u/min · LLEN-A1',
+  'Parada 09:24 · PN-04-01 · LLEN-A1',
+  'Parada 11:18 · PN-02-01 · LLEN-A1',
+  'Merma PT 1,8 kg · MP-02-01 · LLEN-A1',
+  'Parada 12:40 · PN-04-14 · LLEN-A1',
+  'Orden OF-2026-0814 · LLEN-M2',
+  'Parada 13:47 · PN-02-02 · MOLD-A3',
+  'Merma EP 2,4 kg · MP-01-01 · EXTR-2',
 ];
 
 const OBSERVACION_INCORRECTA = [
@@ -101,7 +101,7 @@ const OBSERVACION_INCORRECTA = [
 
 function generarTci(): EvaluacionTCI[] {
   const out: EvaluacionTCI[] = [];
-  const turnos: EvaluacionTCI['turno'][] = ['M', 'T', 'N'];
+  const turnos: EvaluacionTCI['turno'][] = ['D', 'N'];
   /** Índices (0-based) de los 2 registros que no cumplen los 4 criterios. */
   const fallos = new Set([11, 23]);
   for (let i = 0; i < 30; i += 1) {
@@ -109,8 +109,8 @@ function generarTci(): EvaluacionTCI[] {
     out.push({
       id: `TCI-${String(i + 1).padStart(2, '0')}`,
       n: i + 1,
-      fecha: fechaMenos(Math.floor(i / 3)),
-      turno: turnos[i % 3]!,
+      fecha: fechaMenos(Math.floor(i / 2)),
+      turno: turnos[i % 2]!,
       registro: REGISTROS_TCI[i % REGISTROS_TCI.length]!,
       completo: !falla || i === 23,
       preciso: !falla,
@@ -186,10 +186,10 @@ export const TOKEN_ENCUESTA = 'YMB-2026-TSP';
 export const verificacionesCfs: VerificacionCFS[] = [
   { id: 'CFS-1', n: 1, rf: 'RF1', funcionalidad: 'Captura de datos productivos', cumple: true, observacion: 'Registro en 3 toques con cronómetro TRI en cada modal', ruta: '/tiempo-real' },
   { id: 'CFS-2', n: 2, rf: 'RF2', funcionalidad: 'Registro de producción', cumple: true, observacion: 'Inicio y cierre de orden con conteo de codificadora', ruta: '/ordenes' },
-  { id: 'CFS-3', n: 3, rf: 'RF3', funcionalidad: 'Registro de paradas', cumple: true, observacion: 'Árbol de causas PM-01…PS-07 con acción tomada obligatoria', ruta: '/ordenes/ORD-0815' },
-  { id: 'CFS-4', n: 4, rf: 'RF4', funcionalidad: 'Registro de mermas', cumple: true, observacion: 'Tipos MP/EP/PT y causas MR-01…MR-04 con código de balde', ruta: '/ordenes/ORD-0815' },
+  { id: 'CFS-3', n: 3, rf: 'RF3', funcionalidad: 'Registro de paradas', cumple: true, observacion: 'Árbol de causas PP-01…PS-05 con acción tomada obligatoria', ruta: '/ordenes/ORD-0815' },
+  { id: 'CFS-4', n: 4, rf: 'RF4', funcionalidad: 'Registro de mermas', cumple: true, observacion: 'Tipos MP/EP/PT y árbol de causas MP-01…MP-05 con código de balde', ruta: '/ordenes/ORD-0815' },
   { id: 'CFS-5', n: 5, rf: 'RF5', funcionalidad: 'Repositorio centralizado', cumple: true, observacion: 'Órdenes con filtros, búsqueda, exportación y bitácora', ruta: '/ordenes' },
-  { id: 'CFS-6', n: 6, rf: 'RF6', funcionalidad: 'Dashboard en tiempo real', cumple: true, observacion: '6 líneas con estado, avance y Modo TV', ruta: '/tiempo-real' },
+  { id: 'CFS-6', n: 6, rf: 'RF6', funcionalidad: 'Dashboard en tiempo real', cumple: true, observacion: '9 líneas con estado, avance y Modo TV', ruta: '/tiempo-real' },
   { id: 'CFS-7', n: 7, rf: 'RF7', funcionalidad: 'Indicadores', cumple: true, observacion: 'OEE por línea, turno y periodo con comparativas', ruta: '/reportes' },
   { id: 'CFS-8', n: 8, rf: 'RF8', funcionalidad: 'Analítica con IA', cumple: true, observacion: 'Modelo v3.2 CRISP-DM con patrones y predicciones', ruta: '/analitica' },
   { id: 'CFS-9', n: 9, rf: 'RF9', funcionalidad: 'Alertas', cumple: true, observacion: 'Bandeja con umbrales configurables y confirmación de evento real', ruta: '/alertas' },
@@ -212,12 +212,12 @@ export const EP_CORRECTAS_BASE = 137;
 export const EP_TOTALES_BASE = 164;
 
 const TIPOS_EP = [
-  'Parada prevista · L2 Conos',
-  'Merma prevista · L3 Vasos',
-  'Velocidad baja · L1 Paletas',
-  'OEE bajo umbral · L4 Sándwich',
-  'Parada prevista · L4 Sándwich',
-  'Parada prevista · L5 Bombones',
+  'Parada prevista · LLEN-A1 Llenadora A1',
+  'Merma prevista · MOLD-A3 Moldeadora A3',
+  'Velocidad baja · LLEN-M2 Llenadora M2',
+  'OEE bajo umbral · LLEN-A2 Llenadora A2',
+  'Parada prevista · EXTR-2 Extrusora 2',
+  'Parada prevista · MOLD-A4 Moldeadora A4',
 ];
 
 function generarEp(): RegistroEP[] {

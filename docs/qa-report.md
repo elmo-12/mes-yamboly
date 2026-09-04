@@ -1,4 +1,111 @@
-# QA visual, funcional y responsive — MES Yamboly (Q1)
+# QA — MES Yamboly
+
+## QA fase 2 · maestros reales y mantenedores (4-sep-2026)
+
+Fecha: 2026-09-04 · Verificado en ambos modos (`NEXT_PUBLIC_DATA_SOURCE=mock` y `api`, backend NestJS en `:4000`) ·
+Referencia: `docs/figma-map.md`, `docs/design-system.md`, `docs/figma-specs-modulos.md`, `docs/api-contracts.md` y el
+archivo Figma `WOfwZEmPx1Hcw7ehaIsnpx`.
+
+**Método.** QA de integración de la fase "maestros reales": recorrido ruta por ruta en modo `mock` y en modo `api`
+contra el backend real (9 líneas, 9 sedes, 41 sabores, 201 productos, 333 velocidades producto×línea, 33 equipos,
+causas de parada 5/26/52, causas de merma 5/11/40, 2 turnos, 11 usuarios), comparando fidelidad contra los frames del
+MDS ya usados en la fase 1, comprobando paridad mock↔API dato a dato, midiendo responsive en 1440/1024/390 y
+revisando la consola del navegador. Los mismos veredictos de la fase 1 (**Alta fidelidad** / **Ajustado** /
+**Desviación justificada** / **Pendiente**) se reutilizan aquí.
+
+### Correcciones de esta fase
+
+| # | Corrección | Archivo(s) |
+|---|---|---|
+| 1 | Timeline y tiempos de tiempo real ya no usan el reloj de pared sino el **día operativo** (el turno Noche cruza medianoche) | `realtime.service.ts`, `AlertaLinea.generadaEn`, `TiempoRealResumen.diaOperativo` |
+| 2 | `GET /ordenes?periodo=hoy` pasó a usar el día operativo en vez del día de calendario (antes devolvía 0 órdenes «hoy», ahora 8) | API — filtro de periodo de órdenes |
+| 3 | `useResumenMaquinista` ahora lee `diaOperativo` en vez de la fecha de calendario, así el home del maquinista deja de aparecer vacío | `apps/web` — hook de resumen del maquinista |
+| 4 | Paridad mock↔API restablecida en el timeline (10 eventos idénticos en ambos modos) | seeds/mocks de tiempo real |
+| 5 | `UsuarioDrawer` filtra sólo sedes activas en el selector | `features/settings` — `UsuarioDrawer` |
+| 6 | Toaster ajustado a 3 s de duración | `packages/ui` — patrón `Toaster` |
+| 7 | KPIs de evidencia (TRI/TCI/TSP/CFS/EP) formateados en es-PE, en API y en mock por igual | `features/evidence` + API de evidencia |
+| 8 | Scroll automático a la matriz de velocidades al elegir un producto | `features/settings` — `ProductosVelocidadesTab` |
+
+### Veredictos por ruta
+
+| Ruta / área | Veredicto | Nota |
+|---|---|---|
+| `/login` | Alta fidelidad | |
+| Home jefe | Alta fidelidad | |
+| Tiempo real (9 LineCards, drawer) | Alta fidelidad | |
+| Modo TV (9 filas) | Alta fidelidad | |
+| Wizards iniciar orden / parada / merma | Alta fidelidad | |
+| Órdenes y detalle | Alta fidelidad | |
+| Reportes (2 turnos, XLSX real) | Alta fidelidad | |
+| Alertas | Alta fidelidad | |
+| Evidencia | Alta fidelidad | |
+| Encuesta pública | Alta fidelidad | |
+| Configuración › Causas de parada **2163:18282** | Alta fidelidad | |
+| Configuración › Causas de merma | Alta fidelidad | |
+| Configuración › Máquinas **2165:11984** | Alta fidelidad | |
+| Configuración › Productos y velocidades | Alta fidelidad | Matriz de 9 columnas (una por tipo de proceso de línea) |
+| Configuración › Sedes y usuarios | Alta fidelidad | |
+| Perfil | Alta fidelidad | |
+| Home maquinista | **Ajustado** | Corregido en esta fase (`useResumenMaquinista` con `diaOperativo`, ver correcciones #3) |
+| `/analitica` | **Desviación justificada** | Riesgo por línea muestra el top-5 en API frente a 9 líneas en mock |
+| Configuración › Umbrales **2165:13218** | **Desviación justificada** | Modelo reducido de 5 campos frente a los 8 ajustes + acciones de cabecera del frame Figma (decisión previa, no reabierta en esta fase) |
+| `/pasteurizacion`, `/personal` | n/a | 404 — rutas retiradas en esta fase (ver `docs/implementation-summary.md`) |
+| Configuración (rol maquinista) | n/a | `Forbidden`, comportamiento correcto |
+
+**Desviaciones justificadas de modelo (aplican a todas las rutas anteriores):** 9 líneas reales (no 5 + PT-01) ·
+2 turnos D/N (no M/T/N) · árbol de causas de merma de 3 niveles (tipo → clasificación → causa) frente a las 4 causas
+planas del frame Figma · el selector de producto en el wizard de captura sólo ofrece productos con par
+(producto, línea) vigente — el 422 por falta de par sólo es alcanzable pasando el modo `api`.
+
+Regla MDS «un `Button variant="primary"` por pantalla» se cumple en toda la fase (excepción documentada de siempre:
+cada `LineCard` trae su propio Primary).
+
+### KPIs observados (modo `api`)
+
+| KPI | Meta | Valor observado |
+|---|---|---|
+| TRI | Reducción ≥ 40 % vs. pretest | **1,4 min (−51,7 %)** |
+| TCI | ≥ 90 % | **93,3 % (28/30)** |
+| TSP | ≥ 80 % de acuerdo | **84,2 %** |
+| CFS | 9/9 | **100 % (9/9)** |
+| EP | ≥ 80 % | **83,5 % (137/164)** |
+
+Los 5 KPIs de tesis se mantienen dentro de meta con datos reales de 9 líneas × 2 turnos, sin alterar los totales
+fijos de los anexos.
+
+### Responsive
+
+Medido en 1440 / 1024 / 390 sobre `/tiempo-real`, `/configuracion?tab=productos`, `/configuracion?tab=sedes`,
+`/ordenes`, `/reportes` y `/tv`: **18/18 combinaciones sin scroll horizontal del body**; las tablas conservan su
+propio `overflow-x-auto`.
+
+### Consola
+
+Limpia (0 errores, 0 warnings) en todas las rutas recorridas, en ambos modos (`mock` y `api`).
+
+### Pendientes no corregidos en esta fase
+
+| # | Pendiente |
+|---|---|
+| 1 | El snapshot mock de `lineaEstados`, escrito a mano, difiere de la API en 3 líneas y en el turno |
+| 2 | La `LineCard` en estado «Sin orden» muestra la última OF cerrada en vez de indicar que no hay orden activa |
+| 3 | `/analitica` muestra riesgo por línea top-5 (API) frente a 9 líneas (mock) |
+| 4 | Configuración › Umbrales sigue con el modelo reducido de 5 campos (no las 8 + acciones de cabecera del frame) |
+| 5 | Los seeds de tesis en API usan el reloj real (`thesis-seed.util.ts: hoy()`) en vez de la constante `HOY` fija que usa el mock |
+| 6 | Cosméticos: presentación «2.54 kg(5L)» literal del dump sin normalizar, y chips que truncan texto largo |
+
+### Hallazgos de otras oleadas de esta fase (no exclusivos de este QA)
+
+- Bug corregido: ids `VE-` duplicados al crear velocidades.
+- `Merma` no persiste `evidenciaUrl` — la foto sólo se exige en el cliente, no queda guardada en el backend.
+- Ninguna causa de parada real del dump trae `requiereSolicitud` (sólo lo traen causas de merma).
+- Ninguna causa real trae `requiereEvidencia`.
+- El campo `sabor` no tiene FK en el dump original: 20 de 201 productos quedan sin sabor resuelto.
+- `tiempoEstandarMin` = 0 en todas las velocidades específicas — el dump es anterior a esa funcionalidad.
+
+---
+
+## QA fase 1 (28-ago-2026)
 
 Fecha: 2026-08-28 · App en `NEXT_PUBLIC_DATA_SOURCE=mock` (`next dev -p 3000`) · Referencia: `docs/figma-map.md`,
 `docs/design-system.md`, `docs/figma-specs-modulos.md` y el archivo Figma `WOfwZEmPx1Hcw7ehaIsnpx`.
@@ -15,9 +122,9 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 
 ---
 
-## 1. Resultado por frame
+### 1. Resultado por frame
 
-### 02 · Auth & Home
+#### 02 · Auth & Home
 
 | # | Frame | Ruta / estado | Veredicto | Nota |
 |---|---|---|---|---|
@@ -27,7 +134,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 | 4 | Home / Dashboard Maquinista **2165:769** | `/` (maquinista) | Alta fidelidad | Line card grande + Alert card + 3 KPI + "Mis últimos registros"; un solo Primary ("Registrar merma") más el de la Line card (excepción documentada) |
 | 5 | Home / Dashboard / Loading **2165:12928** | `/` loading | Alta fidelidad | `ShellSkeleton` + `HomeSkeleton` con la geometría real (KPI 267×112, filas 44) |
 
-### 03 · Tiempo real
+#### 03 · Tiempo real
 
 | # | Frame | Ruta / estado | Veredicto | Nota |
 |---|---|---|---|---|
@@ -37,7 +144,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 | 9 | Tiempo real / Líneas / Empty **2156:7386** | `/tiempo-real` vacío | Alta fidelidad | `EmptyState` Kind=NoData con acción secundaria |
 | 10 | Detalle de línea (drawer) **2156:7548** | overlay | Alta fidelidad | Drawer 480 × alto completo anclado a la derecha, scrim, Esc y clic en overlay cierran |
 
-### 04 · Captura rápida
+#### 04 · Captura rápida
 
 | # | Frame | Ruta / estado | Veredicto | Nota |
 |---|---|---|---|---|
@@ -52,7 +159,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 | 22 | IoT / Parada sugerida **2163:11217** | modal | Alta fidelidad | Modal 480 de un toque, Badge Informational, 4 Tags, Primary lg |
 | 23 | Captura / BASE **2156:93** | — | n/a | Frame de fondo, no es ruta |
 
-### 05 · Órdenes de fabricación
+#### 05 · Órdenes de fabricación
 
 | # | Frame | Ruta / estado | Veredicto | Nota |
 |---|---|---|---|---|
@@ -64,7 +171,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 | 29 | Editar parada (drawer) **2163:14623** | overlay | Alta fidelidad | Drawer medido **x=960, 480×1000** en 1440; Alert Warning de bitácora; Esc y overlay cierran |
 | 30 | Validar orden (modal) **2163:15629** | overlay | Alta fidelidad | Modal **560×496 r16** centrado, 4 Checkbox, Primary deshabilitado hasta marcar los 4 (verificado) |
 
-### 06 · Reportes
+#### 06 · Reportes
 
 | # | Frame | Ruta / estado | Veredicto | Nota |
 |---|---|---|---|---|
@@ -73,7 +180,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 | 33 | Reportes / Mermas **2163:19459** | `?tab=mermas` | Alta fidelidad | Barras apiladas MP/EP/PT + heatmap causa × turno que filtra la tabla |
 | 34 | Reportes / Exportar **2163:19635** | `?tab=exportar` | Alta fidelidad | Datasets con Checkbox, Radio de formato, Primary "Generar archivo", historial con Badge `Generando` (Warning) / `Listo` (Success) |
 
-### 07 · Alertas
+#### 07 · Alertas
 
 | # | Frame | Ruta / estado | Veredicto | Nota |
 |---|---|---|---|---|
@@ -84,7 +191,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 | 39 | Popover notificaciones **2163:13751** | topbar | Alta fidelidad | Dropdown 360 con `Shadow/Dropdown` medido `0 4px 12px -2px rgba(17,24,39,.10), 0 2px 4px -2px rgba(17,24,39,.06)` |
 | 40 | Configurar umbrales (drawer) **2163:15102** | overlay | Alta fidelidad | Drawer 480 con inputs numéricos y 2 Toggle |
 
-### 08 · Analítica IA
+#### 08 · Analítica IA
 
 | # | Frame | Ruta / estado | Veredicto | Nota |
 |---|---|---|---|---|
@@ -94,7 +201,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 | 44 | Analítica / Modelo (CRISP-DM) **2156:4634** | `?tab=modelo` | Alta fidelidad | Stepper de 6 fases, tarjetas por fase, versiones con Badge `Vigente`=Success / `Archivada`=Neutral y modal de confirmación al activar |
 | 45 | Analítica / Datos insuficientes **2156:4745** | vacío | Alta fidelidad | `EmptyState` + barra de progreso; bloquea "Reentrenar" |
 
-### 09 · Evidencia de tesis
+#### 09 · Evidencia de tesis
 
 | # | Frame | Ruta / estado | Veredicto | Nota |
 |---|---|---|---|---|
@@ -106,7 +213,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 | 51 | Evidencia / CFS **2163:17616** | `?tab=cfs` | Alta fidelidad | Checklist de 9 filas con Checkbox, observación y "Ver pantalla" |
 | 52 | Evidencia / EP **2163:18770** | `?tab=ep` | Alta fidelidad | Tabla del Anexo 06 + KPI PCC/PTG alimentados por las confirmaciones de alertas |
 
-### 10 · Configuración
+#### 10 · Configuración
 
 | # | Frame | Ruta / estado | Veredicto | Nota |
 |---|---|---|---|---|
@@ -115,7 +222,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 | 55 | Configuración / Umbrales **2165:13218** | `?tab=umbrales` | Alta fidelidad | Sticky footer medido **1116×64** que aparece al primer cambio (Figma 1180; 1116 es el ancho útil del contenido, coherente con el resto de bloques) |
 | 56 | Configuración / Eliminar causa (Danger) **2165:13853** | overlay | Alta fidelidad | Modal Danger con overline de acción irreversible, impacto ("27 paradas históricas"), Danger + Cancelar |
 
-### 00 · Overview
+#### 00 · Overview
 
 | # | Frame | Ruta | Veredicto | Nota |
 |---|---|---|---|---|
@@ -123,7 +230,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 
 **Recuento: 55 frames de pantalla evaluados → 43 Alta fidelidad · 12 Ajustados · 0 Pendientes de fidelidad.** Los 2 restantes de los 57 no son pantallas (23 `Captura / BASE` y 57 `Overview`). Ningún frame quedó como desviación sin explicar: las desviaciones conscientes están anotadas en su fila y resumidas abajo.
 
-### Desviaciones conscientes (no se corrigen)
+#### Desviaciones conscientes (no se corrigen)
 
 - **Gráficos con marco**: `ChartFrame` dibuja borde 1 px r12 sin sombra, como los frames `Chart / …`. No es una card (no lleva sombra ni agrupa contenido decorativo), así que no rompe la regla "cards sólo funcionales" del BRIEF.
 - **Selector inline de `/tiempo-real`**: Figma muestra "Turno", el código expone "Sede" porque es el filtro que cambia el conjunto de líneas. La sede del topbar y la de la barra quedan sincronizadas.
@@ -137,7 +244,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 
 ---
 
-## 2. Bugs corregidos
+### 2. Bugs corregidos
 
 | # | Problema | Archivo(s) |
 |---|---|---|
@@ -163,7 +270,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 
 ---
 
-## 3. Pendientes (fuera de mi alcance o requieren contrato/back)
+### 3. Pendientes (fuera de mi alcance o requieren contrato/back)
 
 | Pendiente | Archivo / responsable | Motivo |
 |---|---|---|
@@ -177,7 +284,7 @@ o por datos del mock) · **Pendiente** (requiere un cambio fuera de mi alcance).
 
 ---
 
-## 4. Responsive
+### 4. Responsive
 
 `document.documentElement.scrollWidth === clientWidth` medido dentro del iframe del ancho indicado, en todas las rutas
 del shell + `/login`, `/tv` y `/encuesta/[token]`.
@@ -199,7 +306,7 @@ Además:
 
 ---
 
-## 5. Consola
+### 5. Consola
 
 Recorridas `/`, `/tiempo-real`, `/ordenes`, `/ordenes/[id]` (`?tab=paradas` y `?tab=bitacora`), `/alertas`,
 `/reportes` (`indicadores`, `paradas`, `mermas`, `exportar`), `/analitica` (`resumen`, `predicciones`, `modelo`),
@@ -211,9 +318,13 @@ Recorridas `/`, `/tiempo-real`, `/ordenes`, `/ordenes/[id]` (`?tab=paradas` y `?
   `/configuracion?tab=umbrales` — corregido (bug 12) y verificado en recarga limpia.
 - Mensajes informativos que se mantienen (esperados en desarrollo): aviso de React DevTools y `[Fast Refresh]`.
 
+> Nota (fase 2): `/pasteurizacion` y `/personal` — listadas arriba porque en esta sesión (28-ago-2026) aún existían
+> como módulos placeholder — se retiraron de la navegación y del código en la fase 2 (ver «QA fase 2» al inicio de
+> este documento); hoy ambas rutas devuelven 404 por diseño.
+
 ---
 
-## 6. QA funcional — resumen de lo verificado
+### 6. QA funcional — resumen de lo verificado
 
 - **Login**: submit vacío → errores por campo; credenciales incorrectas → Input destructivo + hint; correctas → `/` según rol; `Salir` limpia la sesión y redirige a `/login`.
 - **Listado → detalle → editar → guardar → toast → refetch**: `/ordenes` (búsqueda `?search=`, tags `?turno=N`, "Limpiar filtros", Summary card `?resumen=por_validar`, paginación `?page=2` con "Mostrando 26–35 de 35") → `/ordenes/OF-2026-0815` → tab Paradas → fila/⋯ → drawer de edición → guardado con aviso de bitácora.
@@ -225,7 +336,7 @@ Recorridas `/`, `/tiempo-real`, `/ordenes`, `/ordenes/[id]` (`?tab=paradas` y `?
 
 ---
 
-## 7. Comandos finales
+### 7. Comandos finales
 
 - `pnpm --filter @mes/web typecheck` ✅ · `pnpm --filter @mes/ui typecheck` ✅
 - `pnpm --filter @mes/web lint` ✅ *No ESLint warnings or errors*

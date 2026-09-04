@@ -27,7 +27,7 @@ export class RegistroPretestDto {
   @Matches(FECHA, { message: 'Fecha inválida' })
   fecha!: string;
 
-  @ApiProperty({ example: 'Parada PM-01-03 · L2 Conos' })
+  @ApiProperty({ example: 'Parada PN-02-01 · Llenadora M2' })
   @IsString()
   @MinLength(3, { message: 'Describe el evento' })
   eventoRegistrado!: string;

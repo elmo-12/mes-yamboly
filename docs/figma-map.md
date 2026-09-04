@@ -2,6 +2,14 @@
 
 fileKey `WOfwZEmPx1Hcw7ehaIsnpx`. Node ids de `docs/figma-frames.md`; contenido de `docs/figma-specs-modulos.md`; medidas de `docs/design-system.md`.
 
+## Desviaciones respecto a Figma (sep-2026)
+La rama `feat/maestros-reales` migró los catálogos de ejemplo a los maestros reales de planta; el resto de este mapa (frames, node ids, mapa de navegación) describe la lectura original de Figma y **no se reescribió**. Al implementar:
+- **9 líneas reales** (`LLEN-M2`, `LLEN-M1`, `LLEN-A1`, `LLEN-A2`, `EXTR-2`, `EXTR-3`, `MOLD-A2`, `MOLD-A3`, `MOLD-A4`) en vez de `L1…L5`; Tiempo real usa 9 LineCard y el modo TV 9 filas.
+- **2 turnos** `D`/`N` en vez de Mañana/Tarde/Noche.
+- **Causas de merma** en árbol de 3 niveles con mantenedor completo (no 4 códigos planos).
+- **Productos y velocidades**, y **Sedes y usuarios**, con CRUD real en Configuración.
+- Rutas **`/pasteurizacion`** y **`/personal`** retiradas de la navegación (ver "Mapa de navegación" abajo, que conserva la lectura original de Figma).
+
 **Origen** de cada fila: `F` = leído de Figma en esta sesión (`get_design_context` / `get_metadata`) · `S` = solo desde spec textual (`docs/figma-specs-modulos.md`) · `F*` = leído parcialmente (metadata de estructura, sin código).
 
 Convenciones comunes a **todas** las pantallas del shell: `MES/Sidebar` (260) + `MES/Topbar` (1180×64) + `Content` (1180, padding 28/32/40/32, gap 24, útil **1116**) + `MES/Page header` (breadcrumb + H2 + subtítulo + acciones con **un solo Primary**).

@@ -1,13 +1,21 @@
 import { http, HttpResponse } from 'msw';
 import type { LineaTimeline, TiempoRealResumen, TimelineEvento, TvResumen, TvRow } from '@mes/types';
 import { ESTADO_LINEA_LABEL } from '@mes/types';
-import { AHORA_ISO, causaMermaPorId, lineaPorId, TURNO_ACTUAL, TURNO_ACTUAL_LABEL, TURNO_ACTUAL_RANGO } from '../data';
-import { getStore } from '../store';
+import {
+  AHORA_ISO,
+  lineaPorId,
+  SEDE_PRINCIPAL,
+  TURNO_ACTUAL,
+  TURNO_ACTUAL_LABEL,
+  TURNO_ACTUAL_RANGO,
+} from '../data';
+import { buscarCausaMerma, getStore } from '../store';
 import { API, ahoraIso, errores, listaQuery, preludio } from './_utils';
 
 function resumen(sedeId: string): TiempoRealResumen {
   return {
     actualizadoEn: ahoraIso(),
+    diaOperativo: AHORA_ISO.slice(0, 10),
     turno: TURNO_ACTUAL,
     turnoLabel: TURNO_ACTUAL_LABEL,
     turnoRango: TURNO_ACTUAL_RANGO,
@@ -57,7 +65,7 @@ function timeline(lineaId: string): LineaTimeline | null {
       });
     }
     for (const merma of store.mermas.filter((m) => m.ordenId === ordenId)) {
-      const causa = causaMermaPorId.get(merma.causaId);
+      const causa = buscarCausaMerma(merma.causaId);
       eventos.push({
         id: `EV-${merma.id}`,
         hora: merma.registradaEn.slice(11, 16),
@@ -66,10 +74,21 @@ function timeline(lineaId: string): LineaTimeline | null {
         detalle: `${causa?.codigo ?? ''} ${causa?.nombre ?? ''} · ${merma.sabor}`,
       });
     }
+    const ordenActual = store.ordenes.find((o) => o.id === ordenId);
+    if (ordenActual?.fin) {
+      eventos.push({
+        id: `EV-${ordenActual.id}-fin`,
+        hora: ordenActual.fin.slice(11, 16),
+        tipo: 'fin_of',
+        titulo: `Cierre ${ordenActual.codigo}`,
+        detalle: `${ordenActual.producido} unidades · OEE ${ordenActual.oee.oee} %`,
+      });
+    }
     if (estado?.alerta) {
+      /* Paridad con la API: la alerta se ubica por su `generadaEn`. */
       eventos.push({
         id: `EV-${estado.alerta.id}`,
-        hora: AHORA_ISO.slice(11, 16),
+        hora: estado.alerta.generadaEn.slice(11, 16),
         tipo: 'alerta',
         titulo: `Alerta · ${estado.alerta.riesgo} %`,
         detalle: estado.alerta.texto,
@@ -100,7 +119,7 @@ export const realtimeHandlers = [
     const simulado = await preludio(request);
     if (simulado) return simulado;
     const url = new URL(request.url);
-    const sedeId = url.searchParams.get('sedeId') ?? 'SED-01';
+    const sedeId = url.searchParams.get('sedeId') ?? SEDE_PRINCIPAL;
     const lineaIds = listaQuery(url, 'lineaId');
     const estados = listaQuery(url, 'estado');
     const base = resumen(sedeId);
@@ -149,7 +168,7 @@ export const realtimeHandlers = [
           const payload = JSON.stringify({
             tipo: 'estado',
             emitidoEn: ahoraIso(),
-            payload: resumen('SED-01'),
+            payload: resumen(SEDE_PRINCIPAL),
           });
           controller.enqueue(encoder.encode(`event: estado\ndata: ${payload}\n\n`));
           enviados += 1;

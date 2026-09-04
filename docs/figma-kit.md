@@ -61,7 +61,7 @@ Se pueden clonar frames de plantilla con `(await figma.getNodeByIdAsync("537:94"
 ## Componentes MES-local YA CREADOS (página 01 Shell & Patterns, id 2144:4) — INSTANCIAR ESTOS
 | Nombre | id | Tipo | Tamaño | Propiedades / variantes |
 |---|---|---|---|---|
-| MES / Sidebar | 2147:5 | COMPONENT | 260×1000 | sin props. Activo por defecto "Inicio". Para cambiar activo en la instancia: frame `Item / <Nombre>` → fills #EFF6FF, TEXT e icono #1D4ED8; el anterior → fills [] y #6B7280. Ítems: Inicio, Tiempo real, Alertas (badge "3"), Pasteurización, Órdenes de fabricación, Reportes, Analítica IA, Personal, Configuración, Evidencia de tesis |
+| MES / Sidebar | 2147:5 | COMPONENT | 260×1000 | sin props. Activo por defecto "Inicio". Para cambiar activo en la instancia: frame `Item / <Nombre>` → fills #EFF6FF, TEXT e icono #1D4ED8; el anterior → fills [] y #6B7280. Ítems: Inicio, Tiempo real, Alertas (badge "3"), Órdenes de fabricación, Reportes, Analítica IA, Configuración, Evidencia de tesis (el componente Figma original incluía además Pasteurización y Personal; ambas rutas se retiraron de la navegación real) |
 | MES / Topbar | 2149:13 | COMPONENT | 1180×64 | — |
 | MES / Page header | 2149:39 | COMPONENT | 1116×auto | Title#2149:3, Subtitle#2149:4, Crumb1#2149:5, Crumb2#2149:6, Crumb3#2149:7 (los botones de acción se editan en la instancia) |
 | MES / Breadcrumb | 2149:31 | COMPONENT | hug | Crumb1#2149:0, Crumb2#2149:1, Crumb3#2149:2 |

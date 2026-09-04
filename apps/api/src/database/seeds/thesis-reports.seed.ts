@@ -48,60 +48,68 @@ const FAVORABLE_SI_SUBE = new Set(['oee', 'disponibilidad', 'desempeno', 'calida
 
 /**
  * Magnitudes crudas por línea calculadas para que `computeOee()` devuelva
- * exactamente los porcentajes de la spec 06.A (10 080 min planificados = 7 d × 3 turnos).
+ * exactamente los porcentajes de la spec 06.A
+ * (10 080 min planificados = 7 d × 2 turnos × 720 min).
  */
 const HECHOS_LINEA: Record<string, { paradasMin: number; producidas: number; buenas: number }> = {
-  'LIN-01': { paradasMin: 662, producidas: 801610, buenas: 786329 },
-  'LIN-02': { paradasMin: 803, producidas: 1002979, buenas: 983872 },
-  'LIN-03': { paradasMin: 1116, producidas: 871609, buenas: 848026 },
-  'LIN-04': { paradasMin: 1590, producidas: 598325, buenas: 579129 },
-  'LIN-05': { paradasMin: 854, producidas: 1148218, buenas: 1122907 },
+  'LIN-EXTR-2': { paradasMin: 665, producidas: 3796128, buenas: 3724002 },
+  'LIN-EXTR-3': { paradasMin: 806, producidas: 2172527, buenas: 2131249 },
+  'LIN-LLEN-A1': { paradasMin: 1119, producidas: 2221987, buenas: 2161993 },
+  'LIN-LLEN-A2': { paradasMin: 1593, producidas: 2392655, buenas: 2316090 },
+  'LIN-LLEN-M1': { paradasMin: 857, producidas: 368966, buenas: 360849 },
+  'LIN-LLEN-M2': { paradasMin: 988, producidas: 406412, buenas: 396658 },
+  'LIN-MOLD-A2': { paradasMin: 696, producidas: 2550571, buenas: 2507211 },
+  'LIN-MOLD-A3': { paradasMin: 1371, producidas: 2657987, buenas: 2580905 },
+  'LIN-MOLD-A4': { paradasMin: 1038, producidas: 3928629, buenas: 3846128 },
 };
 
 const PLANIFICADO_LINEA_MIN = 10080;
 
 const TURNOS_OEE = [
-  { turno: 'M' as const, turnoLabel: 'Mañana', oee: 81.4, disponibilidad: 92.3, desempeno: 90.2, calidad: 97.8, deltaOee: 1.9 },
-  { turno: 'T' as const, turnoLabel: 'Tarde', oee: 78.2, disponibilidad: 89.4, desempeno: 89.6, calidad: 97.6, deltaOee: 0.6 },
-  { turno: 'N' as const, turnoLabel: 'Noche', oee: 76.9, disponibilidad: 88.1, desempeno: 88.7, calidad: 96.9, deltaOee: -0.8 },
+  { turno: 'D' as const, turnoLabel: 'Día', oee: 81.4, disponibilidad: 92.3, desempeno: 90.2, calidad: 97.8, deltaOee: 1.9 },
+  { turno: 'N' as const, turnoLabel: 'Noche', oee: 77.1, disponibilidad: 88.8, desempeno: 89.2, calidad: 97.3, deltaOee: -0.5 },
 ];
 
 /**
- * Paradas por causa raíz. `minutosPorTurno` reproduce el heatmap causa × turno
- * de Analítica (spec 08.B) y su suma es el minutaje del Pareto (spec 06.B).
+ * Paradas por tipo raíz del árbol real. `minutosPorTurno` reproduce el heatmap
+ * causa × turno de Analítica (spec 08.B, 5 tipos × 2 turnos) y su suma es el
+ * minutaje del Pareto (spec 06.B): 476 min y 48 paradas.
  */
 const CAUSAS_PARADA = [
-  { codigo: 'PM-01', nombre: 'Falla mecánica', categoria: 'fallas' as const, cantidad: 14, turnos: [38, 72, 32], linea: 'L2 Conos', tendencia: [18, 24, 21, 27, 22, 16, 14] },
-  { codigo: 'PL-03', nombre: 'Limpieza CIP', categoria: 'rutinarias' as const, cantidad: 11, turnos: [42, 31, 23], linea: 'L3 Vasos', tendencia: [12, 14, 13, 15, 14, 13, 15] },
-  { codigo: 'PC-04', nombre: 'Cambio de producto', categoria: 'rutinarias' as const, cantidad: 8, turnos: [26, 41, 21], linea: 'L1 Paletas', tendencia: [9, 11, 14, 12, 15, 13, 14] },
-  { codigo: 'PA-05', nombre: 'Falta de insumo', categoria: 'imprevistas' as const, cantidad: 6, turnos: [17, 21, 13], linea: 'L5 Bombones', tendencia: [6, 8, 7, 9, 7, 8, 6] },
-  { codigo: 'PO-06', nombre: 'Ajuste operativo', categoria: 'imprevistas' as const, cantidad: 5, turnos: [14, 19, 11], linea: 'L4 Sándwich', tendencia: [5, 6, 7, 6, 7, 6, 7] },
-  { codigo: 'PE-02', nombre: 'Falla eléctrica', categoria: 'fallas' as const, cantidad: 3, turnos: [11, 15, 11], linea: 'L3 Vasos', tendencia: [4, 6, 5, 7, 5, 6, 4] },
-  { codigo: 'PS-07', nombre: 'Sin personal', categoria: 'imprevistas' as const, cantidad: 1, turnos: [4, 6, 8], linea: 'L4 Sándwich', tendencia: [2, 3, 2, 4, 2, 3, 2] },
+  { codigo: 'PN-02', nombre: 'Paro por fallas', categoria: 'fallas' as const, cantidad: 14, turnos: [96, 83], linea: 'MOLD-A3 Moldeadora A3', tendencia: [24, 28, 25, 31, 26, 23, 22] },
+  { codigo: 'PP-01', nombre: 'Paro rutinario (planificado)', categoria: 'rutinarias' as const, cantidad: 13, turnos: [72, 62], linea: 'LLEN-M1 Llenadora M1', tendencia: [17, 20, 19, 22, 20, 18, 18] },
+  { codigo: 'PN-04', nombre: 'Paro imprevisto', categoria: 'imprevistas' as const, cantidad: 10, turnos: [45, 38], linea: 'LLEN-A2 Llenadora A2', tendencia: [10, 13, 11, 14, 12, 12, 11] },
+  { codigo: 'PN-03', nombre: 'Demoras', categoria: 'imprevistas' as const, cantidad: 7, turnos: [26, 24], linea: 'EXTR-3 Extrusora 3', tendencia: [6, 8, 7, 9, 7, 7, 6] },
+  { codigo: 'PS-05', nombre: 'Paro sin programa', categoria: 'rutinarias' as const, cantidad: 4, turnos: [17, 13], linea: 'MOLD-A4 Moldeadora A4', tendencia: [4, 5, 4, 5, 4, 4, 4] },
 ];
 
 /** Donut de la spec 06.B: los 612 min del KPI repartidos en tres categorías. */
 const CATEGORIAS_PARADA = [
-  { clave: 'rutinarias' as const, label: 'Rutinarias', minutos: 230 },
-  { clave: 'imprevistas' as const, label: 'Imprevistas', minutos: 138 },
-  { clave: 'fallas' as const, label: 'Fallas', minutos: 244 },
+  { clave: 'rutinarias' as const, label: 'Rutinarias', minutos: 211 },
+  { clave: 'imprevistas' as const, label: 'Imprevistas', minutos: 171 },
+  { clave: 'fallas' as const, label: 'Fallas', minutos: 230 },
 ];
 
 /** Merma por línea y tipo (kg). Total 412 kg. */
 const MERMA_LINEAS: Record<string, [number, number, number]> = {
-  'LIN-01': [18, 42, 21],
-  'LIN-02': [22, 58, 26],
-  'LIN-03': [16, 51, 19],
-  'LIN-04': [14, 37, 24],
-  'LIN-05': [11, 34, 19],
+  'LIN-EXTR-2': [9, 24, 11],
+  'LIN-EXTR-3': [7, 18, 9],
+  'LIN-LLEN-A1': [8, 22, 10],
+  'LIN-LLEN-A2': [6, 17, 8],
+  'LIN-LLEN-M1': [10, 26, 12],
+  'LIN-LLEN-M2': [11, 29, 13],
+  'LIN-MOLD-A2': [9, 25, 12],
+  'LIN-MOLD-A3': [12, 33, 15],
+  'LIN-MOLD-A4': [11, 32, 13],
 };
 
-/** Merma por causa y turno (kg). Suma por fila = kg de la tabla de detalle. */
+/** Merma por tipo raíz y turno (kg). Suma total = 412 kg de la spec 06.C. */
 const MERMA_CAUSAS = [
-  { codigo: 'MR-01', nombre: 'Sobrepeso', turnos: [41, 52, 34], tipo: 'PT' as const, linea: 'L2 Conos' },
-  { codigo: 'MR-02', nombre: 'Rotura', turnos: [28, 39, 26], tipo: 'PT' as const, linea: 'L4 Sándwich' },
-  { codigo: 'MR-03', nombre: 'Arranque', turnos: [46, 38, 29], tipo: 'EP' as const, linea: 'L3 Vasos' },
-  { codigo: 'MR-04', nombre: 'Contaminación', turnos: [12, 41, 26], tipo: 'MP' as const, linea: 'L1 Paletas' },
+  { codigo: 'MP-01', nombre: 'Merma del proceso', turnos: [78, 62], tipo: 'EP' as const, linea: 'MOLD-A3 Moldeadora A3' },
+  { codigo: 'MP-03', nombre: 'Merma por fallas operativas', turnos: [56, 47], tipo: 'EP' as const, linea: 'MOLD-A4 Moldeadora A4' },
+  { codigo: 'MP-02', nombre: 'Merma por desvío del proceso', turnos: [48, 40], tipo: 'PT' as const, linea: 'LLEN-M2 Llenadora M2' },
+  { codigo: 'MP-04', nombre: 'Merma por fallas de mantenimiento', turnos: [30, 25], tipo: 'MP' as const, linea: 'EXTR-2 Extrusora 2' },
+  { codigo: 'MP-05', nombre: 'Merma por fallas externas', turnos: [14, 12], tipo: 'MP' as const, linea: 'LLEN-M1 Llenadora M1' },
 ];
 
 export class ThesisReportsSeeder implements Seeder {

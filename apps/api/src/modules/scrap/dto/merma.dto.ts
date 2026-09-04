@@ -26,7 +26,7 @@ export class CreateMermaDto {
   @IsNotEmpty({ message: 'Orden requerida' })
   ordenId!: string;
 
-  @ApiProperty({ example: 'LIN-02' })
+  @ApiProperty({ example: 'LIN-LLEN-M2' })
   @IsString()
   @IsNotEmpty({ message: 'Selecciona una línea' })
   lineaId!: string;
@@ -47,10 +47,37 @@ export class CreateMermaDto {
   @IsNotEmpty({ message: 'Selecciona un sabor' })
   sabor!: string;
 
-  @ApiProperty({ example: 'CME-MR-03' })
+  @ApiPropertyOptional({
+    example: 'CME-MP-01',
+    description: 'Raíz del árbol (`nivel: tipo`); se deriva de la causa si no se envía',
+  })
+  @IsOptional()
+  @IsString()
+  tipoCausaId?: string;
+
+  @ApiPropertyOptional({
+    example: 'CME-MP-01-A',
+    nullable: true,
+    description: 'Nivel intermedio (`nivel: clasificacion`); se deriva de la causa si no se envía',
+  })
+  @IsOptional()
+  @IsString()
+  clasificacionId?: string | null;
+
+  @ApiProperty({ example: 'CME-MP-01-01', description: 'Hoja del árbol (`nivel: causa`)' })
   @IsString()
   @IsNotEmpty({ message: 'Selecciona una causa' })
   causaId!: string;
+
+  @ApiPropertyOptional({
+    example: 'SOL-2026-0417',
+    maxLength: 50,
+    description: 'Obligatorio si la causa tiene `requiereSolicitud`',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50, { message: 'Máximo 50 caracteres' })
+  numeroSolicitud?: string;
 
   @ApiProperty({ example: 'USR-02' })
   @IsString()
@@ -68,7 +95,10 @@ export class CreateMermaDto {
   @IsBoolean()
   enviarPasteurizacion?: boolean;
 
-  @ApiPropertyOptional({ maxLength: 300 })
+  @ApiPropertyOptional({
+    maxLength: 300,
+    description: 'Obligatoria si la causa tiene `requiereComentario`',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(300, { message: 'Máximo 300 caracteres' })

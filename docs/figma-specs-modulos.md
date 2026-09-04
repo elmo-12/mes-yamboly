@@ -1,6 +1,15 @@
 # Especificaciones por módulo — pantallas Figma MES Yamboly
 Todas las pantallas: shell (MES/Sidebar con ítem activo, MES/Topbar), Page header (breadcrumb + H2 + subtítulo + acciones, 1 solo Primary), contenido 1116 px, secciones separadas por whitespace/divisor, tablas integradas (sin card). Frame `MES / <Módulo> / <Pantalla> / <Estado> / 1440`.
 
+## Desviaciones respecto a Figma (sep-2026)
+La rama `feat/maestros-reales` migró los catálogos de ejemplo a los maestros reales de planta. El resto de este documento describe las specs **tal como se leyeron de Figma originalmente** (no se reescribió); al implementarlas, la app real difiere así:
+- **9 líneas reales** (máquinas físicas: `LLEN-M2`, `LLEN-M1`, `LLEN-A1`, `LLEN-A2`, `EXTR-2`, `EXTR-3`, `MOLD-A2`, `MOLD-A3`, `MOLD-A4`) en vez de `L1…L5`. Tiempo real muestra **9 LineCard** (no un grid de 5+1); el modo TV lista **9 filas**.
+- **2 turnos** `D` Día (06:00–18:00) y `N` Noche (18:00–06:00) en vez de Mañana/Tarde/Noche.
+- **Causas de merma** son un árbol de **3 niveles** (Tipo de producción → Clasificación → Causa) con mantenedor completo en Configuración, no solo 4 códigos planos `MR-01…MR-04`.
+- **Productos y velocidades**: la velocidad estándar vive en la matriz **producto × línea** (`VelocidadEstandar`), no en el producto; Configuración → "Productos y velocidades" gestiona ese par, no solo el producto.
+- **Sedes y usuarios**: pestaña de Configuración con CRUD real de sedes (9) y usuarios (11), no solo lectura.
+- Las rutas **`/pasteurizacion`** y **`/personal`** se retiraron de la navegación (el flag `enviarPasteurizacion` de merma se conserva como dato informativo).
+
 ## 02 Auth & Home (RF10, RF6, RF7)
 A. `Auth / Login / Default`: layout 2 columnas: izquierda 720 px panel #F9FAFB con logo, "MES Yamboly", frase "Control y monitoreo de la producción en tiempo real", 3 bullets (Registro en segundos · Indicadores OEE · Alertas tempranas con IA); derecha formulario 400 px centrado: H2 "Iniciar sesión", Input "Correo o DNI", Input password, Checkbox "Recordarme", link "¿Olvidaste tu contraseña?", Button Primary lg "Ingresar" ancho completo, pie "Acceso restringido al personal de Helatony's S.A.C.".
 B. `Auth / Login / Error`: Input Destructive con hint "Correo o contraseña incorrectos".

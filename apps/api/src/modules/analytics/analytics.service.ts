@@ -16,7 +16,7 @@ import type {
   Turno,
   VersionModelo,
 } from '@mes/types';
-import { TIPO_ALERTA_LABEL, TURNO_LABEL } from '@mes/types';
+import { TIPO_ALERTA_LABEL, TURNO_LABEL, TURNOS } from '@mes/types';
 import { ConflictoException, NoEncontradoException } from '../../common/exceptions';
 import { ahoraIso, hoyIso, redondear } from '../../common/utils';
 import {
@@ -106,7 +106,8 @@ export class AnalyticsService {
   /** Turno objetivo del riesgo: el siguiente al que corre ahora. */
   private riesgoPorLinea(): RiesgoLinea[] {
     const hora = new Date().getHours();
-    const siguiente: Turno = hora < 6 ? 'M' : hora < 14 ? 'T' : hora < 22 ? 'N' : 'M';
+    // Turnos reales: Día 06:00–18:00 y Noche 18:00–06:00.
+    const siguiente: Turno = hora >= 6 && hora < 18 ? 'N' : 'D';
     return RIESGO_POR_LINEA.map((r) => ({ ...r, turnoObjetivo: siguiente }));
   }
 
@@ -117,7 +118,7 @@ export class AnalyticsService {
   async patrones(): Promise<Patrones> {
     const causas = await this.paradas.find({ order: { orden: 'ASC' } });
     const heatmap: HeatmapCelda[] = causas.flatMap((c) =>
-      (['M', 'T', 'N'] as Turno[]).map((turno, i) => ({
+      TURNOS.map((turno, i) => ({
         fila: c.causaCodigo,
         filaLabel: `${c.causaCodigo} ${c.causaNombre}`,
         columna: turno,

@@ -42,12 +42,17 @@ export class SpeedsService {
     );
   }
 
-  /** El desvío se calcula contra la velocidad estándar del producto de la OF. */
+  /**
+   * El desvío se calcula contra la velocidad estándar **congelada en la orden**
+   * (u/min del par producto × línea); si la orden es anterior a la migración se
+   * recurre al par vigente. Nunca se toma del producto: ya no la tiene.
+   */
   async crear(dto: CreateVelocidadDto, usuario: AuthUser): Promise<RegistroVelocidadListItem> {
     const orden = await this.orders.buscar(dto.ordenId);
     const lookups = await this.lookups.load();
     const velocidadEstandar =
-      lookups.productos.get(orden.productoId)?.velocidadEstandar ?? orden.velocidadEstandar;
+      orden.velocidadEstandar ||
+      (LookupsService.parActivo(lookups, orden.productoId, orden.lineaId)?.velocidadUnidMin ?? 0);
 
     const registradaEn = ahoraIso();
     const total = await this.velocidades.count();
