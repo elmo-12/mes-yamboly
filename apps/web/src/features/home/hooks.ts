@@ -156,11 +156,16 @@ const MAX_TRAMOS = 6;
  */
 export function useResumenMaquinista(lineaId: string | undefined, limiteRegistros = 3) {
   const habilitado = Boolean(lineaId);
-  /* "del turno" = del día en curso: el rango acota paradas, mermas y velocidades. */
-  const dia = React.useMemo(() => rangoPeriodo(PERIODO_HOY), []);
+  const tiempoReal = useTiempoReal();
+
+  /* "del turno" = del día operativo que reporta tiempo real (no el reloj del
+   * navegador): el rango acota paradas, mermas y velocidades. */
+  const dia = React.useMemo(
+    () => rangoPeriodo(PERIODO_HOY, tiempoReal.data?.diaOperativo),
+    [tiempoReal.data?.diaOperativo],
+  );
   const filtro = habilitado ? { lineaId, desde: dia.desde, hasta: dia.hasta } : {};
 
-  const tiempoReal = useTiempoReal();
   const alertas = useAlertasRecientes(6);
   const paradas = useParadas(filtro);
   const mermas = useMermas(filtro);

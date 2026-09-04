@@ -61,7 +61,12 @@ export class AlertsLookupService implements AlertsLookup {
     return new Map(
       [...mapa].map(([lineaId, a]) => [
         lineaId,
-        { id: a.id, riesgo: a.probabilidad, texto: a.prediccion } satisfies AlertaLinea,
+        {
+          id: a.id,
+          riesgo: a.probabilidad,
+          texto: a.prediccion,
+          generadaEn: a.generadaEn,
+        } satisfies AlertaLinea,
       ]),
     );
   }

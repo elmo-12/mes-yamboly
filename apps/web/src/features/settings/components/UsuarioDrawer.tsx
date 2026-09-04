@@ -66,6 +66,11 @@ function FormularioAlta({
   const crear = useCrearUsuario();
   const { data: sedes } = useSedes();
   const { data: lineas } = useLineas();
+  /* Sólo sedes activas: una sede dada de baja no puede recibir usuarios nuevos. */
+  const sedesActivas = React.useMemo(
+    () => (sedes?.data ?? []).filter((s) => s.activa),
+    [sedes],
+  );
   const [verPassword, setVerPassword] = React.useState(false);
 
   const {
@@ -189,7 +194,7 @@ function FormularioAlta({
               <Select
                 label="Sede"
                 placeholder="Selecciona una sede"
-                options={(sedes?.data ?? []).map((s) => ({
+                options={sedesActivas.map((s) => ({
                   value: s.id,
                   label: `${s.codigo} · ${s.nombre}`,
                 }))}
@@ -271,6 +276,12 @@ function FormularioEdicion({
   const actualizar = useActualizarUsuario();
   const { data: sedes } = useSedes();
   const { data: lineas } = useLineas();
+  /* Sólo sedes activas, más la sede actual del usuario aunque se haya dado de
+   * baja, para no perder el valor guardado al abrir el formulario. */
+  const sedesActivas = React.useMemo(
+    () => (sedes?.data ?? []).filter((s) => s.activa || s.id === usuario.sedeId),
+    [sedes, usuario.sedeId],
+  );
 
   const {
     register,
@@ -383,7 +394,7 @@ function FormularioEdicion({
             render={({ field }) => (
               <Select
                 label="Sede"
-                options={(sedes?.data ?? []).map((s) => ({
+                options={sedesActivas.map((s) => ({
                   value: s.id,
                   label: `${s.codigo} · ${s.nombre}`,
                 }))}

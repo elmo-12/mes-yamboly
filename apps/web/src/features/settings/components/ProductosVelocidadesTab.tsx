@@ -76,6 +76,10 @@ export function ProductosVelocidadesTab() {
   const [estado, setEstado] = React.useState<FiltroEstado>(TODOS);
   const [pagina, setPagina] = React.useState(1);
   const [seleccionadoId, setSeleccionadoId] = React.useState<string>();
+  const matrizRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (seleccionadoId) matrizRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [seleccionadoId]);
   const [drawer, setDrawer] = React.useState<{ producto?: Producto }>();
   const [eliminar, setEliminar] = React.useState<Producto>();
 
@@ -345,6 +349,10 @@ export function ProductosVelocidadesTab() {
         )}
       </section>
 
+      {/* La matriz vive bajo la tabla: al elegir "Ver velocidades" desde una
+          fila alta hay que llevar al usuario hasta ella, o el cambio pasa
+          desapercibido. */}
+      <div ref={matrizRef}>
       {!cargando &&
         (seleccionado ? (
           <MatrizVelocidades
@@ -362,6 +370,7 @@ export function ProductosVelocidadesTab() {
             />
           )
         ))}
+      </div>
 
       <ProductoDrawer
         open={drawer !== undefined}

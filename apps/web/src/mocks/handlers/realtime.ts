@@ -15,6 +15,7 @@ import { API, ahoraIso, errores, listaQuery, preludio } from './_utils';
 function resumen(sedeId: string): TiempoRealResumen {
   return {
     actualizadoEn: ahoraIso(),
+    diaOperativo: AHORA_ISO.slice(0, 10),
     turno: TURNO_ACTUAL,
     turnoLabel: TURNO_ACTUAL_LABEL,
     turnoRango: TURNO_ACTUAL_RANGO,
@@ -84,9 +85,10 @@ function timeline(lineaId: string): LineaTimeline | null {
       });
     }
     if (estado?.alerta) {
+      /* Paridad con la API: la alerta se ubica por su `generadaEn`. */
       eventos.push({
         id: `EV-${estado.alerta.id}`,
-        hora: AHORA_ISO.slice(11, 16),
+        hora: estado.alerta.generadaEn.slice(11, 16),
         tipo: 'alerta',
         titulo: `Alerta · ${estado.alerta.riesgo} %`,
         detalle: estado.alerta.texto,

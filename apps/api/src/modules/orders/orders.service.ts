@@ -29,7 +29,7 @@ import {
 import { LookupsService } from '../../common/mappers/lookups.service';
 import { AuditService } from '../../common/services/audit.service';
 import { paginate } from '../../common/utils/paginate';
-import { ahoraIso, hoyIso, normalizar, redondear, toList } from '../../common/utils/query';
+import { ahoraIso, diaOperativo, normalizar, redondear, toList } from '../../common/utils/query';
 import {
   Merma,
   OrdenFabricacion,
@@ -74,13 +74,17 @@ export class OrdersService {
     const estados = toList(query.estado);
     const search = normalizar(query.search ?? '');
 
+    let items = await this.ordenes.find();
+
+    /* `hoy`/`semana`/`mes` se anclan al día operativo (la fecha de las órdenes
+     * vigentes), no al reloj del servidor: con el juego de datos congelado en
+     * una fecha fija, `?periodo=hoy` devolvía siempre una lista vacía. */
     let rango: { desde: string; hasta: string } | null = null;
     if (query.desde && query.hasta) rango = { desde: query.desde, hasta: query.hasta };
     else if (query.periodo && query.periodo !== 'personalizado') {
-      rango = rangoPeriodo(query.periodo, hoyIso());
+      rango = rangoPeriodo(query.periodo, diaOperativo(items));
     }
 
-    let items = await this.ordenes.find();
     if (rango) items = items.filter((o) => o.fecha >= rango.desde && o.fecha <= rango.hasta);
     if (lineaIds.length > 0) items = items.filter((o) => lineaIds.includes(o.lineaId));
     if (turnos.length > 0) items = items.filter((o) => turnos.includes(o.turno));

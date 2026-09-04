@@ -11,6 +11,10 @@ export function Toaster(props: React.ComponentProps<typeof SonnerToaster>) {
     <SonnerToaster
       position="bottom-right"
       gap={12}
+      /* 3 s: el toast se apoya en la esquina inferior derecha, justo donde cae
+       * el menú de acciones de la última fila de las tablas; más tiempo lo
+       * tapa. */
+      duration={3000}
       toastOptions={{
         classNames: {
           toast:

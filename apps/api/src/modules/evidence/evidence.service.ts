@@ -14,6 +14,7 @@ import {
   estadoTci,
   estadoTri,
   estadoTsp,
+  formatNumber,
   segundosAMinutos,
 } from '@mes/shared';
 import type {
@@ -91,7 +92,7 @@ export class EvidenceService {
         metaValor: METAS_TESIS.TRI_REDUCCION_PCT,
         estado: tri.estado,
         anexo: 'Anexo 02',
-        detalle: `${tri.promedioPostest} min frente a ${tri.promedioPretest} min del pretest (${tri.reduccionPct} %)`,
+        detalle: `${formatNumber(tri.promedioPostest, 1)} min frente a ${formatNumber(tri.promedioPretest, 1)} min del pretest (${formatNumber(tri.reduccionPct, 1)} %)`,
       },
       {
         id: 'TCI',
@@ -115,7 +116,7 @@ export class EvidenceService {
         metaValor: METAS_TESIS.TSP_PCT,
         estado: tsp.estado,
         anexo: 'Anexo 04',
-        detalle: `${tsp.respuestas} de ${tsp.invitados} encuestados · promedio ${tsp.promedio}`,
+        detalle: `${tsp.respuestas} de ${tsp.invitados} encuestados · promedio ${formatNumber(tsp.promedio, 1)}`,
       },
       {
         id: 'CFS',

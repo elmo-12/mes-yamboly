@@ -16,7 +16,14 @@ import { turnoInfo, turnoPorFecha, turnoRango } from '@mes/shared';
 import { NoEncontradoException } from '../../common/exceptions/business.exception';
 import { LookupsService, type Lookups } from '../../common/mappers/lookups.service';
 import { ALERTS_LOOKUP, type AlertsLookup } from '../../common/services/alerts-lookup';
-import { ahoraIso, diaOperativo, minutosEntreIso, redondear, toList } from '../../common/utils/query';
+import {
+  ahoraIso,
+  diaOperativo,
+  hoyIso,
+  minutosEntreIso,
+  redondear,
+  toList,
+} from '../../common/utils/query';
 import {
   DeteccionIoT,
   Merma,
@@ -62,13 +69,15 @@ export class RealtimeService {
     if (lineaIds.length > 0) lineas = lineas.filter((l) => lineaIds.includes(l.id));
 
     const dia = await this.diaOperativoActual();
+    const ahoraOp = await this.ahoraOperativo(dia);
     const estadoLineas: LineaEstado[] = [];
     for (const linea of lineas) {
-      estadoLineas.push(await this.estadoDeLinea(linea.id, lookups, dia));
+      estadoLineas.push(await this.estadoDeLinea(linea.id, lookups, dia, ahoraOp));
     }
 
     return {
       actualizadoEn: ahoraIso(ahora),
+      diaOperativo: dia,
       turno,
       turnoLabel: turnoInfo(turno).label,
       turnoRango: turnoRango(turno),
@@ -165,9 +174,12 @@ export class RealtimeService {
     }
 
     if (contexto.alerta) {
+      /* La alerta se ubica por su `generadaEn`, no por el reloj del servidor:
+       * con el reloj real una consulta de madrugada colocaba la alerta antes
+       * del `inicio_of` de la orden del día operativo. */
       eventos.push({
         id: `EV-${contexto.alerta.id}`,
-        hora: ahoraIso().slice(11, 16),
+        hora: contexto.alerta.generadaEn.slice(11, 16),
         tipo: 'alerta',
         titulo: `Alerta · ${contexto.alerta.riesgo} %`,
         detalle: contexto.alerta.texto,
@@ -193,6 +205,33 @@ export class RealtimeService {
   private async diaOperativoActual(): Promise<string> {
     const ordenes = await this.ordenes.find({ select: { fecha: true, estado: true } });
     return diaOperativo(ordenes);
+  }
+
+  /**
+   * "Ahora" del día operativo: la referencia con la que se miden los minutos
+   * en estado y la duración de las paradas abiertas. Cuando el día operativo
+   * es el día real se usa el reloj; cuando el juego de datos está congelado en
+   * una fecha anterior se usa la última marca registrada en ese día, para que
+   * una parada abierta a las 13:47 del 28-ago no se muestre con miles de
+   * minutos por la distancia hasta el reloj real.
+   */
+  private async ahoraOperativo(dia: string): Promise<string> {
+    if (dia === hoyIso()) return ahoraIso();
+    const delDia = (iso: string | null): iso is string => iso !== null && iso.startsWith(dia);
+    const marcas: string[] = [];
+    for (const orden of await this.ordenes.find()) {
+      if (orden.fecha !== dia) continue;
+      if (delDia(orden.inicio)) marcas.push(orden.inicio);
+      if (delDia(orden.fin)) marcas.push(orden.fin);
+    }
+    for (const parada of await this.paradas.find()) {
+      if (delDia(parada.inicio)) marcas.push(parada.inicio);
+      if (delDia(parada.fin)) marcas.push(parada.fin);
+    }
+    for (const deteccion of await this.detecciones.find()) {
+      if (delDia(deteccion.detectadaEn)) marcas.push(deteccion.detectadaEn);
+    }
+    return marcas.reduce((max, m) => (m > max ? m : max), `${dia}T00:00:00`);
   }
 
   /** Reúne los registros vivos que determinan el estado de una línea. */
@@ -235,10 +274,14 @@ export class RealtimeService {
     };
   }
 
-  private async estadoDeLinea(lineaId: string, lookups: Lookups, dia: string): Promise<LineaEstado> {
+  private async estadoDeLinea(
+    lineaId: string,
+    lookups: Lookups,
+    dia: string,
+    ahora: string,
+  ): Promise<LineaEstado> {
     const linea = lookups.lineas.get(lineaId)!;
     const ctx = await this.contexto(lineaId, lookups, dia);
-    const ahora = ahoraIso();
 
     /* Prioridad: parada abierta → detección sugerida → sin orden → alerta → produciendo. */
     let estado: EstadoLinea;

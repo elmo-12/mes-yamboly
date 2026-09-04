@@ -1,5 +1,6 @@
 import type { LineaEstado } from '@mes/types';
 import { detecciones } from './downtimes';
+import { HOY } from './seed';
 
 /**
  * Estado de tiempo real congelado (spec 03.A) sobre las 9 líneas reales, a las
@@ -57,7 +58,12 @@ export const lineaEstadosBase: LineaEstado[] = [
       duracionMin: 12,
       enCurso: false,
     },
-    alerta: { id: 'ALE-001', riesgo: 78, texto: 'Riesgo de parada en 40 min' },
+    alerta: {
+      id: 'ALE-001',
+      riesgo: 78,
+      texto: 'Riesgo de parada en 40 min',
+      generadaEn: `${HOY}T14:40:00`,
+    },
   },
   {
     lineaId: 'LIN-LLEN-A2',
@@ -96,7 +102,12 @@ export const lineaEstadosBase: LineaEstado[] = [
     velocidadEstandar: 8,
     tiempoEnEstadoMin: 127,
     maquinistaNombre: 'Luis Vargas',
-    alerta: { id: 'ALE-003', riesgo: 42, texto: 'Velocidad 6 % bajo estándar' },
+    alerta: {
+      id: 'ALE-003',
+      riesgo: 42,
+      texto: 'Velocidad 6 % bajo estándar',
+      generadaEn: `${HOY}T13:20:00`,
+    },
   },
   {
     lineaId: 'LIN-MOLD-A2',
@@ -130,7 +141,12 @@ export const lineaEstadosBase: LineaEstado[] = [
       duracionMin: 18,
       enCurso: true,
     },
-    alerta: { id: 'ALE-002', riesgo: 91, texto: 'En parada 18 min · PN-02 Paro por fallas' },
+    alerta: {
+      id: 'ALE-002',
+      riesgo: 91,
+      texto: 'En parada 18 min · PN-02 Paro por fallas',
+      generadaEn: `${HOY}T13:47:00`,
+    },
   },
   {
     lineaId: 'LIN-MOLD-A4',
