@@ -33,9 +33,13 @@ export interface OeePorLineaChartProps {
 
 /**
  * Gráfico dominante del Home (Figma 2163:19370 · design-system §7): 720×272.
- * Cinco barras horizontales de 16 px sobre track `divider`, etiqueta de línea a
- * la izquierda (104), valor a la derecha y línea de meta punteada al 85 %.
- * Va sobre la página, sin marco (regla MDS: card solo si es funcional).
+ * Barras horizontales de 16 px sobre track `divider`, etiqueta de línea a la
+ * izquierda (104), valor a la derecha y línea de meta punteada al 85 %.
+ *
+ * El alto crece con el número de filas: el de Figma da para cinco líneas y, con
+ * más, recharts empezaba a saltarse etiquetas del eje —se veían nueve barras y
+ * sólo cinco nombres—. El mínimo mantiene la proporción del frame cuando hay
+ * pocas líneas produciendo.
  */
 export function OeePorLineaChart({
   datos,
@@ -56,7 +60,7 @@ export function OeePorLineaChart({
     <ChartFrame
       title={title}
       note={`Meta ${formatPct(meta, 0)}`}
-      height={CHART_HEIGHT.home}
+      height={Math.max(CHART_HEIGHT.home, filas.length * 36 + 16)}
       className="min-w-0 flex-[720_1_0] basis-0"
     >
       <ResponsiveContainer width="100%" height="100%">

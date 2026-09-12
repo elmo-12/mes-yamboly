@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { CREDENCIALES, crearApp, login } from './app.factory';
+import { plantarPatron, type PatronPlantado } from './fixtures/analitica.fixture';
 
 /**
  * Módulos de tesis (B2): reportes, alertas, analítica y evidencia.
@@ -289,7 +290,7 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
   /* ---------------------------------------------------------------- */
 
   describe('reportes', () => {
-    it('GET /reportes/indicadores devuelve la forma completa con OEE 79,8 %', async () => {
+    it('GET /reportes/indicadores calcula OEE, líneas y turnos sobre la ventana pedida', async () => {
       const { body } = await get('/reportes/indicadores?periodo=semana').expect(200);
 
       expect(body).toEqual(
@@ -304,22 +305,29 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
         }),
       );
 
+      /* Los cuatro KPI salen de `computeOee` sobre las órdenes y paradas de la
+       * ventana, y el delta compara con los 7 días inmediatamente anteriores. */
       const oee = body.kpis.find((k: { id: string }) => k.id === 'oee');
-      expect(oee).toMatchObject({ valor: 79.8, unidad: '%', meta: 85 });
-      expect(oee.delta).toMatchObject({ valor: 1.4, unidad: 'pp', referencia: 'vs periodo anterior' });
+      expect(oee).toMatchObject({ valor: 75.1, unidad: '%', meta: 85 });
+      expect(oee.delta).toMatchObject({ valor: -6.9, unidad: 'pp', referencia: 'vs periodo anterior' });
 
+      /* Un punto por día operativo con órdenes; el último es el fin de ventana. */
       expect(body.tendenciaOee).toHaveLength(7);
-      expect(body.tendenciaOee.at(-1)).toMatchObject({ oee: 79.8, meta: 85 });
+      expect(body.tendenciaOee.at(-1)).toMatchObject({ fecha: body.hasta, meta: 85 });
 
-      /* OEE por línea se deriva con `computeOee` sobre las magnitudes crudas. */
+      /* Sólo aparecen las líneas que produjeron en la ventana (las 9, esa semana). */
       expect(body.oeePorLinea).toHaveLength(9);
       expect(body.oeePorLinea[0]).toMatchObject({
         lineaCodigo: 'EXTR-2',
-        oee: 82.1,
-        disponibilidad: 93.4,
-        desempeno: 89.6,
-        calidad: 98.1,
+        oee: 71.8,
+        disponibilidad: 89.6,
+        desempeno: 82,
+        calidad: 97.7,
       });
+      for (const linea of body.oeePorLinea) {
+        const producto = (linea.disponibilidad / 100) * (linea.desempeno / 100) * linea.calidad;
+        expect(linea.oee).toBeCloseTo(producto, 0);
+      }
 
       expect(body.comparativaTurno.map((t: { turno: string }) => t.turno)).toEqual(['D', 'N']);
     });
@@ -327,7 +335,8 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
     it('acepta el alias 7d y el filtro de línea recalculando los KPI', async () => {
       const { body } = await get('/reportes/indicadores?periodo=7d&lineaId=LIN-LLEN-A2').expect(200);
       expect(body.oeePorLinea).toHaveLength(1);
-      expect(body.kpis.find((k: { id: string }) => k.id === 'oee').valor).toBe(71.8);
+      expect(body.oeePorLinea[0].lineaCodigo).toBe('LLEN-A2');
+      expect(body.kpis.find((k: { id: string }) => k.id === 'oee').valor).toBe(75.6);
     });
 
     it('GET /reportes/paradas devuelve Pareto acumulado y donut de 612 min', async () => {
@@ -370,6 +379,17 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       expect(descarga.headers['content-type']).toContain('spreadsheetml');
     });
 
+    it('rechaza los formatos que el generador no sabe escribir (422)', async () => {
+      /* Antes se aceptaban: se producía un XLSX y se entregaba con extensión
+       * `.pdf` y `Content-Type: application/pdf`, o sea un archivo corrupto. */
+      for (const formato of ['pdf', 'csv']) {
+        const { body } = await post('/reportes/exportar')
+          .send({ datasets: ['paradas'], formato, desde: '2026-08-01', hasta: '2026-08-28' })
+          .expect(422);
+        expect(body.details).toHaveProperty('formato');
+      }
+    });
+
     it('rechaza una exportación sin datasets', async () => {
       await post('/reportes/exportar')
         .send({ datasets: [], formato: 'xlsx', desde: '2026-08-01', hasta: '2026-08-28' })
@@ -382,66 +402,182 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
   /* ---------------------------------------------------------------- */
 
   describe('analítica', () => {
-    it('GET /analitica/resumen describe el modelo v3.2 y sus KPI', async () => {
+    /**
+     * Los asserts de analítica son **invariantes estructurales**, no cifras
+     * fijas: desde que el módulo entrena sobre `orden_fabricacion`/`parada` los
+     * valores dependen del corpus, y clavarlos volvería a atar el test a una
+     * maqueta. Lo que se comprueba es que cada endpoint devuelva algo coherente
+     * con lo que hay en la base — y, al final, que el pipeline **descubra** un
+     * patrón plantado a propósito.
+     */
+    const esVersion = /^v\d+\.\d+$/;
+
+    it('GET /analitica/resumen describe el modelo entrenado sobre datos reales', async () => {
       const { body } = await get('/analitica/resumen').expect(200);
-      expect(body.modelo).toMatchObject({ version: 'v3.2', eventos: 2140, activo: true });
-      expect(body.kpis).toMatchObject({ precision: 81, recall: 77, alertas30d: 142 });
-      expect(body.insights).toHaveLength(3);
-      /* Top-5 de riesgo (no una fila por línea): lista curada en
-       * `analytics.constants.ts`, ya migrada a códigos de línea reales. */
-      expect(body.riesgoPorLinea).toHaveLength(5);
-      expect(body.prediccionesActivas.length).toBeGreaterThan(0);
+
+      expect(body.modelo.version).toMatch(esVersion);
+      expect(body.modelo.activo).toBe(true);
+      expect(body.modelo.eventos).toBeGreaterThan(0);
+      expect(body.modelo.algoritmo).toContain('logística');
+
+      for (const kpi of ['ep', 'precision', 'recall'] as const) {
+        expect(body.kpis[kpi]).toBeGreaterThanOrEqual(0);
+        expect(body.kpis[kpi]).toBeLessThanOrEqual(100);
+      }
+      expect(body.kpis.alertas30d).toBeGreaterThanOrEqual(0);
+
+      /* Los hallazgos salen de las reglas asociativas: como mucho 3, y cada uno
+       * con su métrica de apoyo verificable. */
+      expect(body.insights.length).toBeLessThanOrEqual(3);
+      for (const insight of body.insights) {
+        expect(['warning', 'info', 'success']).toContain(insight.tono);
+        expect(insight.soporte.length).toBeGreaterThan(0);
+      }
+
+      /* Una fila por línea activa del maestro, no un top-5 curado a mano. */
+      const lineas = await get('/lineas').expect(200);
+      const activas = (lineas.body.data as { id: string; estado: string }[]).filter(
+        (l) => l.estado === 'activo',
+      );
+      expect(body.riesgoPorLinea).toHaveLength(activas.length);
+
+      /* La causa probable tiene que existir de verdad en `causa_parada`. */
+      const causas = await get('/causas-parada?formato=plano').expect(200);
+      const etiquetas = new Set(
+        (causas.body.data as { codigo: string; nombre: string }[]).map(
+          (c) => `${c.codigo} ${c.nombre}`,
+        ),
+      );
+      for (const riesgo of body.riesgoPorLinea) {
+        expect(riesgo.riesgo).toBeGreaterThanOrEqual(0);
+        expect(riesgo.riesgo).toBeLessThanOrEqual(100);
+        expect(['D', 'N']).toContain(riesgo.turnoObjetivo);
+        expect(etiquetas.has(riesgo.causaProbable) || riesgo.causaProbable.startsWith('Sin causa')).toBe(
+          true,
+        );
+      }
+      /* Todas las líneas comparten el mismo turno objetivo (el siguiente). */
+      expect(new Set(body.riesgoPorLinea.map((r: { turnoObjetivo: string }) => r.turnoObjetivo)).size).toBe(1);
+
+      expect(Array.isArray(body.prediccionesActivas)).toBe(true);
     });
 
-    it('GET /analitica/patrones calcula el heatmap de 5 causas × 2 turnos', async () => {
+    it('GET /analitica/patrones calcula el heatmap sobre las paradas registradas', async () => {
       const { body } = await get('/analitica/patrones').expect(200);
-      expect(body.heatmap).toHaveLength(10);
-      const pn02Dia = body.heatmap.find(
-        (c: { fila: string; columna: string }) => c.fila === 'PN-02' && c.columna === 'D',
-      );
-      expect(pn02Dia.valor).toBe(96);
-      expect(body.recurrencias).toHaveLength(6);
+
+      const causas = await get('/causas-parada?formato=plano&nivel=tipo').expect(200);
+      const raices = (causas.body.data as { codigo: string }[]).length;
+      /* Una celda por causa raíz × turno (D y N). */
+      expect(body.heatmap).toHaveLength(raices * 2);
+      for (const celda of body.heatmap) {
+        expect(['D', 'N']).toContain(celda.columna);
+        expect(celda.valor).toBeGreaterThanOrEqual(0);
+      }
+
+      for (const recurrencia of body.recurrencias) {
+        expect(recurrencia.frecuencia).toBeGreaterThan(0);
+        expect(recurrencia.confianza).toBeGreaterThanOrEqual(0);
+        expect(recurrencia.confianza).toBeLessThanOrEqual(100);
+        expect(recurrencia.lineas.length).toBeGreaterThan(0);
+      }
     });
 
-    it('GET /analitica/modelo y /estado-datos', async () => {
-      const modelo = await get('/analitica/modelo').expect(200);
-      expect(modelo.body.fasesCrispDm).toHaveLength(6);
-      expect(modelo.body.metricas).toMatchObject({ registros: 2140, features: 14, auc: 0.86, f1: 0.79 });
-      expect(modelo.body.variablesEntrada).toHaveLength(8);
+    it('GET /analitica/modelo expone métricas calculadas y fases derivadas', async () => {
+      const { body } = await get('/analitica/modelo').expect(200);
+      expect(body.fasesCrispDm).toHaveLength(6);
+      for (const fase of body.fasesCrispDm) {
+        expect(['completada', 'en_curso', 'pendiente']).toContain(fase.estado);
+      }
 
-      /* 2 130 eventos migrados + 0 capturas del postest (el TRI arranca vacío). */
-      const datos = await get('/analitica/estado-datos').expect(200);
-      expect(datos.body).toMatchObject({ eventos: 2130, requeridos: 2000, suficiente: true });
+      const { metricas } = body;
+      expect(metricas.registros).toBeGreaterThan(0);
+      expect(metricas.features).toBeGreaterThan(0);
+      expect(metricas.auc).toBeGreaterThanOrEqual(0);
+      expect(metricas.auc).toBeLessThanOrEqual(1);
+      expect(metricas.f1).toBeGreaterThanOrEqual(0);
+      expect(metricas.f1).toBeLessThanOrEqual(1);
+      /* La matriz de confusión suma exactamente las muestras evaluadas. */
+      const evaluadas = metricas.vp + metricas.fp + metricas.vn + metricas.fn;
+      expect(evaluadas).toBeGreaterThan(0);
+      expect(evaluadas).toBeLessThanOrEqual(metricas.registros);
 
-      /* `?estado=insuficiente` fuerza el estado vacío de 08.E sin tocar los datos. */
+      /* Las variables de entrada son los grupos de features, con su peso real. */
+      expect(body.variablesEntrada.length).toBeGreaterThan(0);
+      expect(body.variablesEntrada[0].importancia).toBe(100);
+      for (const variable of body.variablesEntrada) {
+        expect(variable.importancia).toBeGreaterThanOrEqual(0);
+        expect(variable.importancia).toBeLessThanOrEqual(100);
+      }
+
+      /* `metricas.registros` es el nº de muestras con el que se entrenó. */
+      const resumen = await get('/analitica/resumen').expect(200);
+      expect(metricas.registros).toBe(resumen.body.modelo.eventos);
+    });
+
+    it('GET /analitica/estado-datos cuenta los eventos productivos reales', async () => {
+      const { body } = await get('/analitica/estado-datos').expect(200);
+      expect(body.requeridos).toBe(2000);
+      expect(body.eventos).toBeGreaterThan(0);
+      expect(body.suficiente).toBe(body.eventos >= body.requeridos);
+      expect(body.progresoPct).toBeCloseTo((body.eventos / body.requeridos) * 100, 0);
+
+      /* El interruptor de demo/QA se conserva: fuerza la variante 08.E vacía. */
       const insuficiente = await get('/analitica/estado-datos?estado=insuficiente').expect(200);
-      expect(insuficiente.body).toMatchObject({
-        eventos: 1250,
-        requeridos: 2000,
-        suficiente: false,
-        progresoPct: 62.5,
-      });
+      expect(insuficiente.body.suficiente).toBe(false);
+
+      const suficiente = await get('/analitica/estado-datos?estado=suficiente').expect(200);
+      expect(suficiente.body.suficiente).toBe(true);
     });
 
-    it('GET /analitica/predicciones devuelve 30 puntos de serie', async () => {
+    it('GET /analitica/predicciones devuelve la serie y el histórico contrastado', async () => {
       const { body } = await get('/analitica/predicciones').expect(200);
-      expect(body.serie).toHaveLength(30);
-      expect(body.historico).toHaveLength(24);
+
+      expect(body.serie.length).toBeLessThanOrEqual(30);
+      const fechas = body.serie.map((p: { fecha: string }) => p.fecha);
+      expect([...fechas].sort()).toEqual(fechas);
+      for (const punto of body.serie) {
+        expect(punto.predicho).toBeGreaterThanOrEqual(0);
+        expect(punto.real).toBeGreaterThanOrEqual(0);
+      }
+
+      expect(body.historico.length).toBeGreaterThan(0);
+      for (const fila of body.historico) {
+        expect([true, false, null]).toContain(fila.acierto);
+        expect(fila.probabilidad).toBeGreaterThanOrEqual(0);
+        expect(fila.probabilidad).toBeLessThanOrEqual(100);
+      }
+      expect(body.matrizConfusion).toEqual(
+        expect.objectContaining({ vp: expect.any(Number), fn: expect.any(Number) }),
+      );
     });
 
-    it('POST /analitica/reentrenar deja la nueva versión vigente', async () => {
+    it('POST /analitica/predicciones/recalcular puntúa las 9 líneas del turno siguiente', async () => {
+      const { body } = await post('/analitica/predicciones/recalcular').expect(200);
+      const lineas = await get('/lineas').expect(200);
+      const activas = (lineas.body.data as { estado: string }[]).filter((l) => l.estado === 'activo');
+      expect(body.predicciones).toBe(activas.length);
+      expect(body.proveedor).toContain('cascada');
+      /* Con `PREDICTION_SERVICE_URL` vacía la cascada no puede caer en Python. */
+      expect(body.proveedor).not.toContain('python');
+    });
+
+    it('POST /analitica/reentrenar ejecuta el pipeline y deja la versión vigente', async () => {
+      const antes = await get('/analitica/modelo').expect(200);
       const { body } = await post('/analitica/reentrenar').expect(202);
-      expect(body).toMatchObject({ estado: 'entrenando', version: 'v3.3' });
+      expect(body.estado).toBe('entrenando');
+      expect(body.version).toMatch(esVersion);
+      expect(body.version).not.toBe(antes.body.versiones[0].version);
 
-      await new Promise((r) => setTimeout(r, 3500));
-      const modelo = await get('/analitica/modelo').expect(200);
-      expect(modelo.body.versiones[0]).toMatchObject({ version: 'v3.3', estado: 'vigente' });
+      const vigente = await esperarVigente(body.version);
+      expect(vigente.versiones[0]).toMatchObject({ version: body.version, estado: 'vigente' });
+      expect(vigente.reentrenamiento).toMatchObject({ estado: 'listo', version: body.version });
 
-      /* Volver a v3.2 deja el resto archivado. */
-      const vuelta = await post('/analitica/modelo/v3.2/activar').expect(200);
-      expect(vuelta.body.versiones.find((v: { version: string }) => v.version === 'v3.2').estado).toBe(
-        'vigente',
-      );
+      /* Volver a la versión anterior deja el resto archivado. */
+      const anterior = antes.body.versiones[0].version;
+      const vuelta = await post(`/analitica/modelo/${anterior}/activar`).expect(200);
+      expect(
+        vuelta.body.versiones.find((v: { version: string }) => v.version === anterior).estado,
+      ).toBe('vigente');
     });
 
     it('404 al activar una versión inexistente', async () => {
@@ -454,6 +590,79 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
         .post('/api/v1/analitica/reentrenar')
         .set('Authorization', `Bearer ${tokenMaquinista}`)
         .expect(403);
+    });
+
+    /** Sondea `/analitica/modelo` hasta que la versión pedida queda vigente. */
+    async function esperarVigente(version: string, limiteMs = 20_000) {
+      const hasta = Date.now() + limiteMs;
+      let ultimo: Record<string, never> | undefined;
+      while (Date.now() < hasta) {
+        const { body } = await get('/analitica/modelo').expect(200);
+        ultimo = body;
+        const encontrada = (body.versiones as { version: string; estado: string }[]).find(
+          (v) => v.version === version,
+        );
+        if (encontrada?.estado === 'vigente') return body;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      throw new Error(`La versión ${version} no quedó vigente: ${JSON.stringify(ultimo)}`);
+    }
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* Analítica · el pipeline descubre un patrón plantado                */
+  /* ---------------------------------------------------------------- */
+
+  describe('analítica · patrón plantado', () => {
+    /**
+     * Prueba fuerte del pipeline (§8.2 del plan de IA): se siembran 30 días en
+     * los que `LLEN-M2` para **siempre** en turno Noche y **nunca** en Día, se
+     * reentrena y se exige que el modelo haya aprendido esa regularidad. Va al
+     * final del archivo porque altera el corpus del resto de módulos.
+     */
+    let plantado: PatronPlantado;
+
+    beforeAll(async () => {
+      plantado = await plantarPatron(app);
+      const { body } = await post('/analitica/reentrenar').expect(202);
+      const hasta = Date.now() + 30_000;
+      while (Date.now() < hasta) {
+        const modelo = await get('/analitica/modelo').expect(200);
+        const fila = (modelo.body.versiones as { version: string; estado: string }[]).find(
+          (v) => v.version === body.version,
+        );
+        if (fila?.estado === 'vigente') return;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      throw new Error('El reentrenamiento con el patrón plantado no terminó');
+    });
+
+    it('el feature store crece con los turnos plantados', async () => {
+      const { body } = await get('/analitica/modelo/diagnostico').expect(200);
+      expect(body.perfilDatos.muestras).toBeGreaterThanOrEqual(plantado.turnos);
+      expect(body.muestras).toBe(body.perfilDatos.muestras);
+    });
+
+    it('el modelo aprende que la línea plantada para en turno Noche', async () => {
+      const { body } = await get('/analitica/modelo/diagnostico').expect(200);
+
+      const top = (body.topFeatures as { nombre: string; importancia: number }[])
+        .slice(0, 5)
+        .map((f) => f.nombre);
+      /* `turnoEsNoche` es la variable que separa el patrón plantado. */
+      expect(top).toContain('turnoEsNoche');
+
+      /* Con una señal tan marcada el modelo tiene que superar claramente el azar. */
+      expect(body.auc).toBeGreaterThan(0.6);
+      expect(body.matrizConfusion.vp).toBeGreaterThan(0);
+      expect(body.umbralDecision).toBeGreaterThan(0);
+      expect(body.umbralDecision).toBeLessThan(100);
+    });
+
+    it('la validación es temporal: el corte de prueba va después del de entrenamiento', async () => {
+      const { body } = await get('/analitica/modelo/diagnostico').expect(200);
+      expect(body.validacion).toContain('walk-forward');
+      expect(body.corteEntrenamiento < body.cortePrueba).toBe(true);
     });
   });
 });

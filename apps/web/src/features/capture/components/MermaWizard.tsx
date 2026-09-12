@@ -112,7 +112,8 @@ export interface MermaWizardProps {
 export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProps) {
   const [paso, setPaso] = React.useState(0);
   const [cantidadTexto, setCantidadTexto] = React.useState('');
-  const [fotoNombre, setFotoNombre] = React.useState<string>();
+  /** Foto ya subida: `url` es lo que viaja a la API, `nombre` lo que se muestra. */
+  const [foto, setFoto] = React.useState<{ url: string; nombre: string }>();
   const [errorEvidencia, setErrorEvidencia] = React.useState<string>();
   const tri = useTriTimer(abierto);
   const { user } = useSession();
@@ -160,7 +161,7 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
     if (!abierto) return;
     setPaso(0);
     setCantidadTexto('');
-    setFotoNombre(undefined);
+    setFoto(undefined);
     setErrorEvidencia(undefined);
     form.reset(defaults());
   }, [abierto, defaults, form]);
@@ -231,7 +232,7 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
       const extra = reglasDeCausa(causaActual).safeParse({
         observacion: valores.observacion,
         numeroSolicitud: valores.numeroSolicitud,
-        evidencia: fotoNombre,
+        evidencia: foto?.url,
       });
       setErrorEvidencia(undefined);
       if (!extra.success) {
@@ -259,6 +260,7 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
         codigoBalde: values.codigoBalde || undefined,
         observacion: values.observacion || undefined,
         numeroSolicitud: values.numeroSolicitud || undefined,
+        evidenciaUrl: foto?.url,
         tiempoRegistroSeg: segundos,
       });
       toast.success(`Merma registrada en ${formatTriCorto(segundos)}`);
@@ -520,9 +522,9 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
                       <AdjuntarFoto
                         label="Evidencia (foto)"
                         cta="Adjuntar foto"
-                        value={fotoNombre}
-                        onChange={(nombre) => {
-                          setFotoNombre(nombre);
+                        value={foto?.nombre}
+                        onChange={(evidencia) => {
+                          setFoto(evidencia);
                           setErrorEvidencia(undefined);
                         }}
                       />

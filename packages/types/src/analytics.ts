@@ -17,6 +17,11 @@ export interface InsightCard {
   texto: string;
   /** Métrica de apoyo mostrada bajo el texto. */
   soporte: string;
+  /**
+   * Confianza 0–100 de la regla asociativa que generó el hallazgo.
+   * Mientras la UI no la consuma sigue mostrando su propia constante. (aditivo · V5)
+   */
+  confianza?: number;
 }
 
 export interface RiesgoLinea {
@@ -27,6 +32,10 @@ export interface RiesgoLinea {
   riesgo: number;
   turnoObjetivo: Turno;
   causaProbable: string;
+  /** Probabilidad 0–100 de que la causa probable sea la que efectivamente pare. (aditivo · V5) */
+  probabilidadCausa?: number;
+  /** Ventana del turno objetivo (`18:00–06:00`). (aditivo · V5) */
+  ventana?: string;
 }
 
 export interface PrediccionActiva {
@@ -41,11 +50,18 @@ export interface PrediccionActiva {
 
 export interface AnaliticaResumen {
   modelo: ModeloInfo;
+  /** Nº de variables de proceso con las que se entrenó el modelo. (aditivo · V5) */
+  variablesModelo?: number;
   kpis: {
     ep: number;
     precision: number;
     recall: number;
     alertas30d: number;
+    /* Variación frente a la versión anterior del modelo. (aditivos · V5) */
+    epDelta?: number;
+    precisionDelta?: number;
+    recallDelta?: number;
+    alertas30dDelta?: number;
   };
   insights: InsightCard[];
   riesgoPorLinea: RiesgoLinea[];
@@ -71,6 +87,8 @@ export interface Patrones {
   /** Heatmap causa × turno en minutos. */
   heatmap: HeatmapCelda[];
   recurrencias: Recurrencia[];
+  /** Paradas + mermas sobre las que se calcularon los patrones. */
+  eventosAnalizados?: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -98,6 +116,8 @@ export interface PrediccionHistorico {
 export interface Predicciones {
   serie: PrediccionPunto[];
   historico: PrediccionHistorico[];
+  /** Matriz de confusión del backtest de la versión vigente. (aditivo · V5) */
+  matrizConfusion?: MatrizConfusion;
 }
 
 /* ------------------------------------------------------------------ */
@@ -127,12 +147,29 @@ export interface FaseCrispDm {
   metricas: { label: string; valor: string }[];
 }
 
+/** Matriz de confusión del conjunto de evaluación temporal. */
+export interface MatrizConfusion {
+  vp: number;
+  fp: number;
+  vn: number;
+  fn: number;
+}
+
 export interface MetricasModelo {
   registros: number;
   features: number;
   algoritmo: string;
   auc: number;
   f1: number;
+  /* Matriz de confusión de la validación walk-forward. (aditivos · V5) */
+  vp?: number;
+  fp?: number;
+  vn?: number;
+  fn?: number;
+  /** Última fecha del tramo de entrenamiento del corte temporal (`YYYY-MM-DD`). (aditivo · V5) */
+  corteEntrenamiento?: string;
+  /** Última fecha del tramo de prueba del corte temporal (`YYYY-MM-DD`). (aditivo · V5) */
+  corteValidacion?: string;
 }
 
 export interface VersionModelo {

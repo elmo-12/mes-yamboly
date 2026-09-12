@@ -11,6 +11,8 @@ export interface RiesgoPorLineaChartProps {
   lineas: readonly RiesgoLinea[];
   /** Umbral de alerta en % (vertical punteada `error`). */
   umbral?: number;
+  /** Nº de variables con las que se entrenó el modelo; sin él se omite la frase. */
+  variables?: number;
 }
 
 /** Escala de riesgo del MDS: ≥70 crítico · 50–69 atención · <50 neutro. */
@@ -25,7 +27,7 @@ export function colorRiesgo(riesgo: number): BadgeColor {
  * etiqueta 140, track 20 px `background/subtle` r4, relleno `primary` (el
  * color no codifica la severidad: eso lo dice el Badge) y umbral punteado.
  */
-export function RiesgoPorLineaChart({ lineas, umbral = 60 }: RiesgoPorLineaChartProps) {
+export function RiesgoPorLineaChart({ lineas, umbral = 60, variables }: RiesgoPorLineaChartProps) {
   const turno = lineas[0]?.turnoObjetivo;
   const orden = [...lineas].sort((a, b) => b.riesgo - a.riesgo);
 
@@ -33,7 +35,7 @@ export function RiesgoPorLineaChart({ lineas, umbral = 60 }: RiesgoPorLineaChart
     <ChartFrame
       bordered={false}
       title={`Riesgo de parada por línea · próximo turno${turno ? ` (${TURNO_LABEL[turno]})` : ''}`}
-      subtitle="Probabilidad estimada por el modelo a partir de 14 variables de proceso"
+      subtitle={`Probabilidad estimada por el modelo${variables ? ` a partir de ${variables} variables de proceso` : ''}`}
       height={Math.max(180, orden.length * 36 + 56)}
       footer="Probabilidad de parada durante el turno"
     >

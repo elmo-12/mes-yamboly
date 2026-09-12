@@ -46,8 +46,20 @@ export function colorEstadoPrediccion(estado: string): BadgeColor {
   return 'neutral';
 }
 
-/** Confianza del modelo por hallazgo, en el orden en que los devuelve la API. */
-const CONFIANZAS = [88, 81, 76] as const;
+/**
+ * Formatea el delta que publica el modelo frente a la versión anterior.
+ * `undefined` cuando todavía no hay con qué comparar (primer entrenamiento).
+ */
+function delta(valor: number | undefined, unidad = 'pp'): string | undefined {
+  if (valor === undefined) return undefined;
+  const signo = valor > 0 ? '+' : valor < 0 ? '−' : '';
+  return `${signo}${formatNumber(Math.abs(valor), 1)} ${unidad}`;
+}
+
+function tendencia(valor: number | undefined): 'up' | 'down' | 'flat' {
+  if (valor === undefined || valor === 0) return 'flat';
+  return valor > 0 ? 'up' : 'down';
+}
 
 function esTipoAlerta(v: string): v is TipoAlerta {
   return (TIPOS_ALERTA as readonly string[]).includes(v);
@@ -60,7 +72,7 @@ function etiquetaTipo(tipo: string): string {
 
 /** `Analítica / Resumen` (Figma 2156:4301). */
 export function ResumenTab({ resumen }: ResumenTabProps) {
-  const { kpis, insights, riesgoPorLinea, prediccionesActivas } = resumen;
+  const { kpis, insights, riesgoPorLinea, prediccionesActivas, variablesModelo } = resumen;
 
   return (
     <div className="flex flex-col gap-6">
@@ -68,56 +80,56 @@ export function ResumenTab({ resumen }: ResumenTabProps) {
         <KpiCard
           label="Exactitud de predicción (EP)"
           value={formatPct(kpis.ep)}
-          trend="up"
-          favorable
-          delta="+2,4 pp"
+          trend={tendencia(kpis.epDelta)}
+          favorable={(kpis.epDelta ?? 0) >= 0}
+          delta={delta(kpis.epDelta)}
           context="vs modelo anterior"
         />
         <KpiCard
           label="Precisión"
           value={formatPct(kpis.precision)}
-          trend="up"
-          favorable
-          delta="+1,6 pp"
+          trend={tendencia(kpis.precisionDelta)}
+          favorable={(kpis.precisionDelta ?? 0) >= 0}
+          delta={delta(kpis.precisionDelta)}
           context={`sobre ${formatNumber(kpis.alertas30d)} alertas`}
         />
         <KpiCard
           label="Recall"
           value={formatPct(kpis.recall)}
-          trend="down"
-          favorable={false}
-          delta="−1,1 pp"
+          trend={tendencia(kpis.recallDelta)}
+          favorable={(kpis.recallDelta ?? 0) >= 0}
+          delta={delta(kpis.recallDelta)}
           context="vs modelo anterior"
         />
         <KpiCard
           label="Alertas generadas (30 d)"
           value={formatNumber(kpis.alertas30d)}
-          trend="flat"
-          delta="0,0 %"
+          trend={tendencia(kpis.alertas30dDelta)}
+          favorable={(kpis.alertas30dDelta ?? 0) >= 0}
+          delta={delta(kpis.alertas30dDelta, 'alertas')}
           context="últimos 30 días"
         />
       </div>
 
       <SectionTitle
         title="Hallazgos del modelo"
-        description="Patrones con mayor impacto detectados en los últimos 90 días de operación"
+        description="Patrones con mayor impacto detectados en la ventana analizada"
       />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {insights.map((i, indice) => {
-          const confianza = CONFIANZAS[indice] ?? 75;
-          return (
-            <InsightCard
-              key={i.id}
-              title={i.texto}
-              text={i.soporte}
-              confidence={`Confianza ${formatPct(confianza, 0)}`}
-              confidenceColor={colorConfianza(confianza)}
-            />
-          );
-        })}
+        {insights.map((i) => (
+          <InsightCard
+            key={i.id}
+            title={i.texto}
+            text={i.soporte}
+            confidence={
+              i.confianza === undefined ? undefined : `Confianza ${formatPct(i.confianza, 0)}`
+            }
+            confidenceColor={colorConfianza(i.confianza ?? 0)}
+          />
+        ))}
       </div>
 
-      <RiesgoPorLineaChart lineas={riesgoPorLinea} />
+      <RiesgoPorLineaChart lineas={riesgoPorLinea} variables={variablesModelo} />
 
       <SectionTitle
         title="Predicciones activas"

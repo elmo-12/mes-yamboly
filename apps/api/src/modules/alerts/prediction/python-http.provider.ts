@@ -25,7 +25,15 @@ export class PythonHttpPredictionProvider implements PredictionProvider {
   ) {}
 
   async predict(ctx: PredictionContext): Promise<PredictionResult> {
-    if (!this.url) return this.fallback.predict(ctx);
+    return (await this.intentar(ctx)) ?? this.fallback.predict(ctx);
+  }
+
+  /**
+   * Devuelve `null` —en vez de caer en reglas— cuando el servicio no está o no
+   * responde, para que la cascada pueda probar antes el modelo local entrenado.
+   */
+  async intentar(ctx: PredictionContext): Promise<PredictionResult | null> {
+    if (!this.url) return null;
 
     const abort = new AbortController();
     const temporizador = setTimeout(() => abort.abort(), this.timeoutMs);
@@ -44,9 +52,9 @@ export class PythonHttpPredictionProvider implements PredictionProvider {
       return { probabilidad: cuerpo.probabilidad, factores: cuerpo.factores };
     } catch (error: unknown) {
       this.logger.warn(
-        `Servicio de predicción no disponible (${(error as Error).message}); se usan reglas`,
+        `Servicio de predicción no disponible (${(error as Error).message}); se baja de nivel`,
       );
-      return this.fallback.predict(ctx);
+      return null;
     } finally {
       clearTimeout(temporizador);
     }

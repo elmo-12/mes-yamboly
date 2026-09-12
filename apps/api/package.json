@@ -12,6 +12,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node -r tsconfig-paths/register src/database/seed.ts",
     "migrar:pg": "ts-node -r tsconfig-paths/register scripts/migrar-sqlite-a-postgres.ts",
+    "sincronizar": "ts-node -r tsconfig-paths/register scripts/sincronizar-produccion.ts",
+    "simular": "ts-node -r tsconfig-paths/register scripts/simular-sensores.ts",
+    "entrenar": "ts-node -r tsconfig-paths/register scripts/entrenar-modelo.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {
@@ -24,6 +27,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.10",
+    "@nestjs/schedule": "^6.1.3",
     "@nestjs/swagger": "^11.0.3",
     "@nestjs/typeorm": "^11.0.0",
     "bcryptjs": "^3.0.2",

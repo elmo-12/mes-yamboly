@@ -43,6 +43,25 @@ export function turnoRango(turno: Turno): string {
   return `${info.inicio}–${info.fin}`;
 }
 
+/** Instante en que arranca el turno de una fecha operativa (`…T06:00:00`). */
+export function inicioDeTurno(fecha: string, turno: Turno): string {
+  return `${fecha}T${turnoInfo(turno).inicio}:00`;
+}
+
+/**
+ * Instante en que cierra el turno de una fecha operativa, en ISO local sin zona
+ * (`2026-09-11T18:00:00`). El turno Noche cierra a las 06:00 del día siguiente.
+ *
+ * Sirve para acotar una orden que se quedó abierta: sin este tope, una orden sin
+ * `fin` acumula como tiempo planificado todos los días transcurridos desde que
+ * se inició y hunde la disponibilidad del periodo.
+ */
+export function finDeTurno(fecha: string, turno: Turno): string {
+  const info = turnoInfo(turno);
+  const dia = turno === 'N' ? toIsoDate(addDays(fecha, 1)) : fecha;
+  return `${dia}T${info.fin}:00`;
+}
+
 export function addDays(value: Date | string | number, dias: number): Date {
   const d = toDate(value);
   const out = new Date(d);

@@ -14,6 +14,8 @@
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
     "db:migrar": "pnpm --filter @mes/api migrar:pg",
+    "sync:real": "pnpm --filter @mes/api sincronizar",
+    "simular": "pnpm --filter @mes/api simular",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {

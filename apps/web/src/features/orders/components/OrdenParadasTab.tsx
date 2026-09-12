@@ -27,6 +27,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/services/api/query-keys';
 import { useActualizarParada } from '@/features/downtimes/hooks';
 import { hora } from '../format';
+import { EvidenciaFoto } from './EvidenciaFoto';
 import { ParadaDrawer } from './ParadaDrawer';
 
 export interface OrdenParadasTabProps {
@@ -138,8 +139,11 @@ export function OrdenParadasTab({
                     {p.fin ? `${p.duracionMin} min` : 'Abierta'}
                   </TCell>
                   <TCell className="px-2">
-                    <Badge color={p.afectaOee ? 'critical' : 'neutral'}>
-                      {p.afectaOee ? 'No planificada' : 'Planificada'}
+                    {/* La columna es el tipo de parada del maestro, no su
+                        impacto en el OEE: un refrigerio es programado y aun así
+                        descuenta disponibilidad. */}
+                    <Badge color={p.clasificacion === 'programada' ? 'neutral' : 'critical'}>
+                      {p.clasificacion === 'programada' ? 'Planificada' : 'No planificada'}
                     </Badge>
                   </TCell>
                   <TCell
@@ -156,13 +160,7 @@ export function OrdenParadasTab({
                     {p.responsableNombre}
                   </TCell>
                   <TCell className="px-2">
-                    {p.evidenciaUrl ? (
-                      <span className="inline-flex items-center gap-1.5 text-neutral-text">
-                        <Icon name="file" size={16} />1
-                      </span>
-                    ) : (
-                      <span className="text-text-disabled">—</span>
-                    )}
+                    <EvidenciaFoto url={p.evidenciaUrl} />
                   </TCell>
                   <TCell>
                     <Switch

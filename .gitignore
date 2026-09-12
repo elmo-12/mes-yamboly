@@ -8,6 +8,10 @@ dist
 .env.local
 .DS_Store
 apps/api/data/exports/*.xlsx
+# Fotos de evidencia subidas desde los asistentes de captura
+apps/api/data/evidencias/
+# Valores originales de las órdenes que toca el simulador de conteo
+apps/api/data/simulacion-sensores.json
 
 .next-qa
 

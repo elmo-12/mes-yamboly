@@ -30,7 +30,7 @@ const PERIODOS = ['30 días', '90 días', 'Año'] as const;
 
 /** `Analítica / Patrones` (Figma 2156:4412). */
 export function PatronesTab({ patrones }: PatronesTabProps) {
-  const [periodo, setPeriodo] = React.useState<string>('90 días');
+  const [periodo, setPeriodo] = React.useState<string>('30 días');
   const [variables, setVariables] = React.useState<Variable[]>(['Turno', 'Causa']);
   const [linea, setLinea] = React.useState<string>('Todas');
 
@@ -90,7 +90,11 @@ export function PatronesTab({ patrones }: PatronesTabProps) {
 
       <SectionTitle
         title="Mapa de calor · causa de parada × turno"
-        description="Minutos de parada acumulados en el periodo · 2 140 eventos registrados"
+        description={`Minutos de parada acumulados en el periodo${
+          patrones.eventosAnalizados === undefined
+            ? ''
+            : ` · ${formatNumber(patrones.eventosAnalizados)} eventos analizados`
+        }`}
       />
       <HeatmapCausaTurno
         celdas={patrones.heatmap}

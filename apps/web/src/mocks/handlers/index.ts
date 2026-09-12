@@ -1,5 +1,6 @@
 import { alertsHandlers } from './alerts';
 import { analyticsHandlers } from './analytics';
+import { attachmentsHandlers } from './attachments';
 import { authHandlers } from './auth';
 import { catalogsHandlers } from './catalogs';
 import { downtimesHandlers } from './downtimes';
@@ -26,11 +27,13 @@ export const handlers = [
   ...downtimesHandlers,
   ...scrapHandlers,
   ...speedsHandlers,
+  ...attachmentsHandlers,
 ];
 
 export {
   alertsHandlers,
   analyticsHandlers,
+  attachmentsHandlers,
   authHandlers,
   catalogsHandlers,
   downtimesHandlers,

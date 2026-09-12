@@ -58,7 +58,9 @@ describe('ordenes (e2e)', () => {
       .set(auth())
       .expect(200);
 
-    expect(body).toMatchObject({ todas: 1248, porValidar: 12, conParadas: 37, conMermas: 21 });
+    /* `todas` cuenta las órdenes que hay en la base (60 en la siembra), no un
+     * total histórico fijo: tras `pnpm sync:real` refleja las órdenes reales. */
+    expect(body).toMatchObject({ todas: 60, porValidar: 12, conParadas: 37, conMermas: 21 });
   });
 
   it('devuelve el detalle de OF-2026-0815 con sus números', async () => {

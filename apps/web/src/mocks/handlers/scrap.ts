@@ -155,6 +155,7 @@ export const scrapHandlers = [
       clasificacionId: jerarquia!.clasificacionId,
       causaId: jerarquia!.causaId,
       numeroSolicitud: opcional(body.numeroSolicitud) ?? null,
+      evidenciaUrl: opcional(body.evidenciaUrl) ?? null,
       responsableId: String(body.responsableId ?? 'USR-04'),
       codigoBalde: opcional(body.codigoBalde),
       enviarPasteurizacion: Boolean(body.enviarPasteurizacion),

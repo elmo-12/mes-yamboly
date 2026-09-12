@@ -20,6 +20,12 @@ export interface PredictionContext {
   oeeActual: number;
   /** Minutos desde el último cambio de producto. */
   minutosDesdeCambio: number;
+  /**
+   * Vector completo de features del feature store, cuando quien pide la
+   * predicción lo tiene (el ciclo de inferencia). Opcional: el motor de alertas
+   * sigue enviando sólo el contexto estrecho de arriba. (aditivo · plan de IA §5.2)
+   */
+  features?: Record<string, number>;
 }
 
 export interface PredictionResult {

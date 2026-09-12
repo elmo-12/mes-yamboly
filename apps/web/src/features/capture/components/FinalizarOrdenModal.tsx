@@ -40,7 +40,8 @@ export interface FinalizarOrdenModalProps {
  * de etiqueta, comentario y OEE estimado del turno (3 mini KPI).
  */
 export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: FinalizarOrdenModalProps) {
-  const [fotoNombre, setFotoNombre] = React.useState<string>();
+  /** Foto de la etiqueta ya subida: `url` es lo que se guarda en la orden. */
+  const [foto, setFoto] = React.useState<{ url: string; nombre: string }>();
   const tri = useTriTimer(abierto);
   const ordenId = contexto.ordenId ?? '';
   const { data: orden } = useOrden(abierto ? ordenId : undefined);
@@ -60,7 +61,7 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
   /* Solo al abrir: el refresco de 5 s no debe pisar lo que escribe el operario. */
   React.useEffect(() => {
     if (!abierto) return;
-    setFotoNombre(undefined);
+    setFoto(undefined);
     form.reset({
       producido: producidoRef.current,
       conteoCodificadora: producidoRef.current,
@@ -95,7 +96,7 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
       await finalizar.mutateAsync({
         ...values,
         comentario: values.comentario || undefined,
-        evidenciaUrl: fotoNombre ? `evidencia/${fotoNombre}` : undefined,
+        evidenciaUrl: foto?.url,
         tiempoRegistroSeg: segundos,
       });
       toast.success(
@@ -175,8 +176,8 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
           <AdjuntarFoto
             label="Evidencia · foto de etiqueta"
             cta="Adjuntar foto de etiqueta"
-            value={fotoNombre}
-            onChange={setFotoNombre}
+            value={foto?.nombre}
+            onChange={setFoto}
           />
           <Textarea
             rows={3}

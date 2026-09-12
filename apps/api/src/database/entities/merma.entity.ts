@@ -43,6 +43,10 @@ export class Merma {
   @Column('text', { nullable: true })
   numeroSolicitud!: string | null;
 
+  /** Foto de evidencia guardada por `AdjuntosService` (`/api/v1/evidencias/…`). */
+  @Column('text', { nullable: true })
+  evidenciaUrl!: string | null;
+
   @Column('text')
   responsableId!: string;
 

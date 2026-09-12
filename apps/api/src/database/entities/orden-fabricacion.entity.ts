@@ -86,6 +86,10 @@ export class OrdenFabricacion {
   @Column('text', { nullable: true })
   observacion?: string | null;
 
+  /** Foto de la etiqueta que se adjunta al finalizar (`/api/v1/evidencias/…`). */
+  @Column('text', { nullable: true })
+  evidenciaUrl?: string | null;
+
   /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
   @Index()
   @ManyToOne(() => Linea, { onDelete: 'RESTRICT' })

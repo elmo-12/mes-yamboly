@@ -39,6 +39,7 @@ export function enriquecerParada(parada: Parada): ParadaListItem {
     causaNombre: causa?.nombre ?? '—',
     tipoCausaCodigo: tipo?.codigo ?? '—',
     tipoCausaNombre: tipo?.nombre ?? '—',
+    clasificacion: tipo?.clasificacion ?? causa?.clasificacion ?? 'imprevista',
     responsableNombre: nombreUsuario(parada.responsableId),
     ordenCodigo: ordenCodigo(parada.ordenId),
   };

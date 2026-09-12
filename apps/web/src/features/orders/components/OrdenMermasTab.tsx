@@ -16,6 +16,7 @@ import { TIPO_MERMA_LABEL } from '@mes/types';
 import type { MermaListItem } from '@mes/types';
 import { formatKg, formatNumber } from '@mes/shared';
 import { hora } from '../format';
+import { EvidenciaFoto } from './EvidenciaFoto';
 import { FilasSkeleton } from './OrdenParadasTab';
 
 const TIPO_COLOR = { MP: 'informational', EP: 'warning', PT: 'accent' } as const;
@@ -59,6 +60,7 @@ export function OrdenMermasTab({ mermas, resumen, cargando }: OrdenMermasTabProp
                 <TH className="min-w-[200px]">Causa</TH>
                 <TH className="w-[150px]">Responsable</TH>
                 <TH className="w-[140px]">Balde</TH>
+                <TH className="w-[120px]">Evidencia</TH>
                 <TH className="w-[150px]">Pasteurización</TH>
               </tr>
             </THead>
@@ -85,6 +87,9 @@ export function OrdenMermasTab({ mermas, resumen, cargando }: OrdenMermasTabProp
                   </TCell>
                   <TCell className="text-neutral-text">{m.responsableNombre}</TCell>
                   <TCell className="text-neutral-text">{m.codigoBalde ?? '—'}</TCell>
+                  <TCell>
+                    <EvidenciaFoto url={m.evidenciaUrl} />
+                  </TCell>
                   <TCell>
                     {m.enviarPasteurizacion ? (
                       <Badge color="success">Enviada</Badge>

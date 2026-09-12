@@ -68,6 +68,8 @@ export interface OrdenFabricacion {
   /** ISO-8601 con hora; `null` mientras la orden sigue en curso. */
   fin: string | null;
   observacion?: string;
+  /** Foto de la etiqueta adjuntada al finalizar la orden. */
+  evidenciaUrl?: string | null;
 }
 
 /** Fila de listado con los textos ya resueltos (línea, producto, personas). */

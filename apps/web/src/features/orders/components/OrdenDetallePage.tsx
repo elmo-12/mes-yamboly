@@ -29,7 +29,7 @@ import { ESTADO_ORDEN_COLOR } from '../format';
 import { EditarOrdenModal } from './EditarOrdenModal';
 import { OrdenBitacoraTab } from './OrdenBitacoraTab';
 import { OrdenCalidadTab } from './OrdenCalidadTab';
-import { OrdenConsumoTab } from './OrdenConsumoTab';
+import { OrdenVelocidadesTab } from './OrdenVelocidadesTab';
 import { OrdenEvidenciasTab } from './OrdenEvidenciasTab';
 import { OrdenMermasTab } from './OrdenMermasTab';
 import { OrdenParadasTab } from './OrdenParadasTab';
@@ -41,7 +41,7 @@ const TABS = [
   'paradas',
   'mermas',
   'calidad',
-  'consumo',
+  'velocidades',
   'evidencias',
   'bitacora',
 ] as const;
@@ -163,7 +163,7 @@ export function OrdenDetallePage({ id }: OrdenDetallePageProps) {
             Mermas
           </TabsTrigger>
           <TabsTrigger value="calidad">Calidad</TabsTrigger>
-          <TabsTrigger value="consumo">Consumo</TabsTrigger>
+          <TabsTrigger value="velocidades">Velocidades</TabsTrigger>
           <TabsTrigger value="evidencias">Evidencias</TabsTrigger>
           <TabsTrigger value="bitacora">Bitácora</TabsTrigger>
         </TabsList>
@@ -198,8 +198,8 @@ export function OrdenDetallePage({ id }: OrdenDetallePageProps) {
           <OrdenCalidadTab orden={of} mermas={mermas.data?.data ?? []} />
         </TabsContent>
 
-        <TabsContent value="consumo">
-          <OrdenConsumoTab
+        <TabsContent value="velocidades">
+          <OrdenVelocidadesTab
             orden={of}
             velocidades={velocidades.data?.data ?? []}
             cargando={velocidades.isPending}

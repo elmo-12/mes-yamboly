@@ -19,6 +19,8 @@ export interface Merma {
   causaId: string;
   /** N.º de solicitud exigido por causas con `requiereSolicitud`. */
   numeroSolicitud?: string | null;
+  /** Ruta de la foto de evidencia exigida por causas con `requiereEvidencia`. */
+  evidenciaUrl?: string | null;
   responsableId: string;
   /** Código del balde escaneado (QR) cuando la merma se recupera. */
   codigoBalde?: string;
@@ -74,6 +76,8 @@ export const createMermaSchema = z.object({
    */
   observacion: z.string().max(300, 'Máximo 300 caracteres').optional(),
   numeroSolicitud: z.string().max(50, 'Máximo 50 caracteres').optional(),
+  /** La devuelve `POST /evidencias` tras subir la foto; el cliente no la inventa. */
+  evidenciaUrl: z.string().optional(),
   tiempoRegistroSeg: z.coerce.number().min(0).default(0),
 });
 export type CreateMermaInput = z.infer<typeof createMermaSchema>;

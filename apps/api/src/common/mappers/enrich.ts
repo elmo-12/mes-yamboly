@@ -55,6 +55,7 @@ export function enriquecerParada(parada: Parada, lookups: Lookups): ParadaListIt
     causaNombre: causa?.nombre ?? GUION,
     tipoCausaCodigo: tipo?.codigo ?? GUION,
     tipoCausaNombre: tipo?.nombre ?? GUION,
+    clasificacion: tipo?.clasificacion ?? causa?.clasificacion ?? 'imprevista',
     responsableNombre: nombreUsuario(lookups, parada.responsableId),
     ordenCodigo: codigoOrden(lookups, parada.ordenId),
   };
@@ -70,6 +71,7 @@ export function enriquecerMerma(merma: Merma, lookups: Lookups): MermaListItem {
     codigoBalde: opcional(merma.codigoBalde),
     observacion: opcional(merma.observacion),
     numeroSolicitud: merma.numeroSolicitud ?? null,
+    evidenciaUrl: merma.evidenciaUrl ?? null,
     tipoCausaId: tipoId,
     clasificacionId,
     lineaCodigo: lookups.lineas.get(merma.lineaId)?.codigo ?? GUION,

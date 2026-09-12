@@ -38,6 +38,12 @@ export interface ParadaListItem extends Parada {
   causaNombre: string;
   tipoCausaCodigo: string;
   tipoCausaNombre: string;
+  /**
+   * Clasificación heredada del tipo raíz (`PP-01` es programada; el resto,
+   * imprevista). No es lo mismo que `afectaOee`: un refrigerio es programado y
+   * aun así descuenta disponibilidad.
+   */
+  clasificacion: 'programada' | 'imprevista';
   responsableNombre: string;
   ordenCodigo: string;
 }

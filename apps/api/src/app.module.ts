@@ -15,6 +15,7 @@ import { DowntimesModule } from './modules/downtimes/downtimes.module';
 import { ScrapModule } from './modules/scrap/scrap.module';
 import { SpeedsModule } from './modules/speeds/speeds.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
+import { AdjuntosModule } from './modules/attachments/adjuntos.module';
 /* Módulos B2 */
 import { ReportsModule } from './modules/reports/reports.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
@@ -35,6 +36,7 @@ import { EvidenceModule } from './modules/evidence/evidence.module';
     ScrapModule,
     SpeedsModule,
     RealtimeModule,
+    AdjuntosModule,
     ReportsModule,
     AlertsModule,
     AnalyticsModule,

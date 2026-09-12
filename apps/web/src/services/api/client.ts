@@ -146,6 +146,35 @@ export const api = {
  * `path` acepta una ruta relativa al prefijo del API (`/reportes/…/descargar`)
  * o una URL absoluta.
  */
+/**
+ * Abre un archivo del API en una pestaña nueva. Igual que `descargarArchivo`,
+ * el binario se pide con `fetch` para poder mandar el token; un enlace normal
+ * no lleva cabeceras y el endpoint respondería 401.
+ *
+ * La pestaña se abre **antes** de esperar a la red: si se abriera después, el
+ * bloqueador de ventanas emergentes la descartaría por no venir de un clic.
+ */
+export async function abrirArchivo(path: string): Promise<void> {
+  /* Sin `noopener`: con esa opción `window.open` devuelve `null` y no habría
+     dónde poner la imagen. El blob es del propio origen, así que no hay riesgo. */
+  const pestana = window.open('', '_blank');
+  try {
+    const token = tokenGetter();
+    const url = /^https?:\/\//.test(path) ? path : buildUrl(path);
+    const response = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!response.ok) throw new ApiClientError(await parseError(response));
+
+    const objectUrl = URL.createObjectURL(await response.blob());
+    if (pestana) pestana.location.href = objectUrl;
+    else window.location.href = objectUrl;
+  } catch (error) {
+    pestana?.close();
+    throw error;
+  }
+}
+
 export async function descargarArchivo(path: string, nombreSugerido: string): Promise<void> {
   const token = tokenGetter();
   const url = /^https?:\/\//.test(path) ? path : buildUrl(path);

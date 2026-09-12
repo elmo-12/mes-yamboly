@@ -20,6 +20,7 @@ import { AuditService } from '../../common/services/audit.service';
 import { paginate } from '../../common/utils/paginate';
 import { minutosEntreIso, toList } from '../../common/utils/query';
 import { DeteccionIoT, Parada } from '../../database/entities';
+import { AdjuntosService } from '../attachments/adjuntos.service';
 import { OrdersService } from '../orders/orders.service';
 import type {
   ConfirmarDeteccionDto,
@@ -38,6 +39,7 @@ export class DowntimesService {
     private readonly audit: AuditService,
     private readonly orders: OrdersService,
     private readonly events: EventEmitter2,
+    private readonly adjuntos: AdjuntosService,
   ) {}
 
   async listar(query: ParadaQueryDto): Promise<Paginated<ParadaListItem>> {
@@ -83,6 +85,13 @@ export class DowntimesService {
     if (causa.requiereSolicitud && !dto.numeroSolicitud) {
       throw new ValidationException({
         numeroSolicitud: `La causa ${causa.codigo} exige el número de solicitud de mantenimiento`,
+      });
+    }
+    /* La foto tiene que existir en el almacén: antes bastaba con mandar una ruta
+     * inventada desde el cliente. */
+    if (causa.requiereEvidencia && !this.adjuntos.existe(dto.evidenciaUrl)) {
+      throw new ValidationException({
+        evidenciaUrl: `La causa ${causa.codigo} exige una foto de evidencia`,
       });
     }
     const orden = await this.orders.buscar(dto.ordenId);

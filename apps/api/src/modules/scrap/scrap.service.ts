@@ -13,6 +13,7 @@ import { paginate } from '../../common/utils/paginate';
 import { ahoraIso, toList } from '../../common/utils/query';
 import { Merma } from '../../database/entities';
 import { OrdersService } from '../orders/orders.service';
+import { AdjuntosService } from '../attachments/adjuntos.service';
 import type { CreateMermaDto, MermaQueryDto, UpdateMermaDto } from './dto/merma.dto';
 
 @Injectable()
@@ -23,6 +24,7 @@ export class ScrapService {
     private readonly audit: AuditService,
     private readonly orders: OrdersService,
     private readonly events: EventEmitter2,
+    private readonly adjuntos: AdjuntosService,
   ) {}
 
   async listar(query: MermaQueryDto): Promise<Paginated<MermaListItem>> {
@@ -102,6 +104,14 @@ export class ScrapService {
         numeroSolicitud: `La causa ${causa.codigo} exige un n.º de solicitud`,
       });
     }
+    /* La foto ya no es sólo una regla del asistente: si la causa la exige, la
+     * merma no se guarda sin ella, y la ruta tiene que apuntar a un archivo que
+     * `AdjuntosService` haya guardado de verdad. */
+    if (causa.requiereEvidencia && !this.adjuntos.existe(dto.evidenciaUrl)) {
+      throw new ValidationException({
+        evidenciaUrl: `La causa ${causa.codigo} exige una foto de evidencia`,
+      });
+    }
 
     return { causaId: causa.id, tipoCausaId, clasificacionId };
   }
@@ -132,6 +142,7 @@ export class ScrapService {
       clasificacionId: jerarquia.clasificacionId,
       causaId: jerarquia.causaId,
       numeroSolicitud: dto.numeroSolicitud ?? null,
+      evidenciaUrl: dto.evidenciaUrl ?? null,
       responsableId: dto.responsableId,
       codigoBalde: dto.codigoBalde ?? null,
       enviarPasteurizacion: dto.enviarPasteurizacion ?? false,

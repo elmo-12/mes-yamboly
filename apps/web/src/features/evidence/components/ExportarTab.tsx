@@ -36,7 +36,10 @@ interface ArchivoGenerado {
 export function ExportarTab({ kpis }: { kpis: readonly KpiTesis[] }) {
   const exportar = useExportarEvidencia();
   const [seleccion, setSeleccion] = React.useState<KpiTesisId[]>([...KPIS_TESIS]);
-  const [formato, setFormato] = React.useState<FormatoExport>('xlsx');
+  /* El único formato que el generador escribe es XLSX; lo que sí decide el
+     usuario es el destino, que cambia cómo se codifican los booleanos. */
+  const formato: FormatoExport = 'xlsx';
+  const [destino, setDestino] = React.useState<'spss' | 'informe'>('spss');
   const [archivos, setArchivos] = React.useState<ArchivoGenerado[]>([]);
 
   const anexoDe = (id: KpiTesisId) => kpis.find((k) => k.id === id)?.anexo ?? '';
@@ -54,7 +57,7 @@ export function ExportarTab({ kpis }: { kpis: readonly KpiTesis[] }) {
       const respuesta = await exportar.mutateAsync({
         kpis: seleccion,
         formato,
-        destino: formato === 'csv' ? 'spss' : 'informe',
+        destino,
       });
       setArchivos((prev) => [
         {
@@ -70,7 +73,7 @@ export function ExportarTab({ kpis }: { kpis: readonly KpiTesis[] }) {
         ...prev,
       ]);
       toast.success('Exportación en preparación', {
-        description: `${seleccion.length} instrumentos en ${formato.toUpperCase()}. Te avisamos cuando el archivo esté listo.`,
+        description: `${seleccion.length} instrumentos en XLSX para ${destino === 'spss' ? 'SPSS' : 'informe'}. Te avisamos cuando el archivo esté listo.`,
       });
     } catch (e) {
       toast.error('No se pudo generar la exportación', {
@@ -104,15 +107,18 @@ export function ExportarTab({ kpis }: { kpis: readonly KpiTesis[] }) {
         </fieldset>
 
         <fieldset className="flex shrink-0 flex-col gap-3 md:w-72">
-          <legend className="pb-2 text-body-md font-semibold text-text-primary">Formato</legend>
+          <legend className="pb-2 text-body-md font-semibold text-text-primary">Destino</legend>
           <RadioGroup
-            value={formato}
-            onValueChange={(v) => setFormato(v as FormatoExport)}
-            aria-label="Formato de exportación"
+            value={destino}
+            onValueChange={(v) => setDestino(v as 'spss' | 'informe')}
+            aria-label="Destino de la exportación"
           >
-            <Radio value="csv" label="CSV" supporting="Plano y codificado para SPSS" />
-            <Radio value="xlsx" label="XLSX" supporting="Una hoja por anexo, con fórmulas" />
+            <Radio value="spss" label="SPSS" supporting="Booleanos como 1/0, listo para importar" />
+            <Radio value="informe" label="Informe" supporting="Booleanos como Sí/No, para leer" />
           </RadioGroup>
+          <p className="text-body-sm text-text-secondary">
+            Una hoja por anexo en XLSX.
+          </p>
           <div className="pt-2">
             <Button variant="primary" onClick={generar} loading={exportar.isPending}>
               Generar
@@ -131,7 +137,7 @@ export function ExportarTab({ kpis }: { kpis: readonly KpiTesis[] }) {
         <EmptyState
           icon={<Icon name="file-export" size={40} />}
           title="Todavía no generaste archivos"
-          description="Selecciona los instrumentos y el formato, y pulsa Generar para preparar el paquete de anexos."
+          description="Selecciona los instrumentos y el destino, y pulsa Generar para preparar el paquete de anexos."
         />
       ) : (
         <Table density="dense">

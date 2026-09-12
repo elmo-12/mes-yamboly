@@ -16,27 +16,27 @@ import { formatNumber, formatPct, formatSpeed } from '@mes/shared';
 import { hora } from '../format';
 import { FilasSkeleton } from './OrdenParadasTab';
 
-export interface OrdenConsumoTabProps {
+export interface OrdenVelocidadesTabProps {
   orden: OrdenListItem;
   velocidades: readonly RegistroVelocidadListItem[];
   cargando: boolean;
 }
 
 /**
- * Pestaña Consumo. El contrato de API no expone todavía la lista de insumos
- * (no hay `GET /ordenes/:id/consumo`), así que se muestra el consumo de
- * capacidad de la línea con los registros de velocidad de la OF, que sí son
- * datos reales de la orden; sin ellos, empty state.
+ * Pestaña Velocidades: las lecturas de velocidad de la OF (`registro_velocidad`),
+ * con su desvío frente al estándar congelado en la orden. No es consumo de
+ * insumos — el contrato de API no expone esa lista (no hay
+ * `GET /ordenes/:id/consumo`) y el dato que sí llega de la línea es la velocidad.
  */
-export function OrdenConsumoTab({ orden, velocidades, cargando }: OrdenConsumoTabProps) {
+export function OrdenVelocidadesTab({ orden, velocidades, cargando }: OrdenVelocidadesTabProps) {
   if (cargando) return <FilasSkeleton filas={3} />;
 
   if (velocidades.length === 0) {
     return (
       <EmptyState
-        icon={<Icon name="boxes" size={40} />}
-        title="Sin datos de consumo registrados"
-        description="Esta orden no tiene lecturas de velocidad ni consumo de insumos sincronizados desde la línea."
+        icon={<Icon name="gauge" size={40} />}
+        title="Sin lecturas de velocidad"
+        description="Esta orden no tiene lecturas de velocidad sincronizadas desde la línea."
       />
     );
   }
@@ -44,7 +44,7 @@ export function OrdenConsumoTab({ orden, velocidades, cargando }: OrdenConsumoTa
   return (
     <div className="flex flex-col gap-4">
       <SectionTitle
-        title="Consumo de capacidad de la línea"
+        title="Lecturas de velocidad de la línea"
         description={`Velocidad estándar ${formatSpeed(orden.velocidadEstandar)} · ${velocidades.length} lecturas del turno`}
       />
       <Table density="dense">

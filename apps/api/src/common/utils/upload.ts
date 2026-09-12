@@ -46,6 +46,55 @@ export function esXlsx(nombre: string): boolean {
   return nombre.toLowerCase().endsWith('.xlsx');
 }
 
+/** Tamaño máximo de una foto de evidencia. */
+export const MAX_BYTES_IMAGEN = 8 * 1024 * 1024;
+
+/** Extensiones aceptadas como evidencia fotográfica. */
+export const EXTENSIONES_IMAGEN = ['.jpg', '.jpeg', '.png', '.webp', '.heic'] as const;
+
+/**
+ * Mimetypes de foto. La cámara de iOS manda `image/heic` y algunos navegadores
+ * de Android mandan `application/octet-stream`, así que además se comprueba la
+ * extensión.
+ */
+const MIMETYPES_IMAGEN = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'application/octet-stream',
+]);
+
+/** `true` si el nombre termina en una extensión de imagen aceptada. */
+export function extensionImagenAceptada(nombre: string): boolean {
+  const minuscula = nombre.toLowerCase();
+  return EXTENSIONES_IMAGEN.some((ext) => minuscula.endsWith(ext));
+}
+
+/**
+ * Opciones de `FileInterceptor` para subir una foto de evidencia: memoria,
+ * ≤ 8 MB y sólo imagen. El límite es más alto que el de las plantillas porque
+ * una foto de móvil sin recomprimir ronda los 3-5 MB.
+ */
+export const OPCIONES_SUBIDA_IMAGEN: MulterOptions = {
+  limits: { fileSize: MAX_BYTES_IMAGEN, files: 1 },
+  fileFilter(_req, file, callback) {
+    const aceptado = extensionImagenAceptada(file.originalname) && MIMETYPES_IMAGEN.has(file.mimetype);
+    if (!aceptado) {
+      callback(
+        new ValidationException(
+          { archivo: 'Sube una foto .jpg, .png, .webp o .heic' },
+          'El archivo no es una imagen admitida',
+        ),
+        false,
+      );
+      return;
+    }
+    callback(null, true);
+  },
+};
+
 /**
  * Opciones de `FileInterceptor` para subir una plantilla: memoria (el archivo
  * no se guarda en disco), ≤ 5 MB y sólo XLSX/CSV.

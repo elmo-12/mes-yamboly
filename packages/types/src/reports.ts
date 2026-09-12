@@ -178,6 +178,15 @@ export const DATASET_EXPORT_LABEL: Record<DatasetExport, string> = {
 export const FORMATOS_EXPORT = ['xlsx', 'csv', 'pdf'] as const;
 export type FormatoExport = (typeof FORMATOS_EXPORT)[number];
 
+/**
+ * Formatos que el generador sabe producir de verdad. `FORMATOS_EXPORT` se
+ * conserva completo porque el histórico guarda trabajos antiguos en CSV y PDF,
+ * pero ni la UI los ofrece ni la API los acepta: hasta ahora el servicio escribía
+ * siempre un XLSX y lo servía con extensión `.pdf`, así que al usuario le
+ * llegaba un archivo corrupto.
+ */
+export const FORMATOS_EXPORT_DISPONIBLES = ['xlsx'] as const satisfies readonly FormatoExport[];
+
 export const ESTADOS_EXPORT = ['listo', 'generando', 'error'] as const;
 export type EstadoExport = (typeof ESTADOS_EXPORT)[number];
 

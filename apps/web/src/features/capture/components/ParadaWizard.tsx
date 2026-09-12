@@ -58,7 +58,8 @@ export interface ParadaWizardProps {
  */
 export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardProps) {
   const [paso, setPaso] = React.useState(0);
-  const [fotoNombre, setFotoNombre] = React.useState<string>();
+  /** Foto ya subida: `url` es lo que se guarda, `nombre` lo que se muestra. */
+  const [foto, setFoto] = React.useState<{ url: string; nombre: string }>();
   const tri = useTriTimer(abierto);
   const { user } = useSession();
   const { data: arbol } = useCausasParada(contexto.lineaId);
@@ -99,7 +100,7 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
   React.useEffect(() => {
     if (!abierto) return;
     setPaso(0);
-    setFotoNombre(undefined);
+    setFoto(undefined);
     form.reset(valoresIniciales());
   }, [abierto, form, valoresIniciales]);
 
@@ -133,7 +134,7 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
         ...values,
         inicio: isoDesdeHora(values.inicio),
         numeroSolicitud: values.numeroSolicitud || undefined,
-        evidenciaUrl: fotoNombre ? `evidencia/${fotoNombre}` : undefined,
+        evidenciaUrl: foto?.url,
         tiempoRegistroSeg: segundos,
       });
       toast.success(`Parada registrada en ${formatTriCorto(segundos)}`);
@@ -300,8 +301,8 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
                 <AdjuntarFoto
                   label="Evidencia (foto)"
                   cta="Adjuntar foto"
-                  value={fotoNombre}
-                  onChange={setFotoNombre}
+                  value={foto?.nombre}
+                  onChange={setFoto}
                 />
               </div>
               <Controller

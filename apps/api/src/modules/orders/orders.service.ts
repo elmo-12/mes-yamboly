@@ -40,9 +40,6 @@ import { colaboradoresBase } from '../../database/seeds/data/users';
 import type { CreateOrdenDto, FinalizeOrdenDto, ValidateOrdenDto } from './dto/orden-mutations.dto';
 import type { OrdenQueryDto } from './dto/orden-query.dto';
 
-/** Total histórico del repositorio mostrado en la summary card «Todas» (spec 05.A). */
-const TOTAL_HISTORICO_ORDENES = 1248;
-
 /** Minutos de un turno completo, base del cálculo de disponibilidad. */
 const MINUTOS_TURNO = 480;
 
@@ -121,7 +118,8 @@ export class OrdersService {
   async resumen(): Promise<OrdenesResumen> {
     const items = await this.ordenes.find();
     return {
-      todas: TOTAL_HISTORICO_ORDENES,
+      /* Spec 05.A: la card «Todas» cuenta el repositorio completo de órdenes. */
+      todas: items.length,
       porValidar: items.filter((o) => o.estado === 'por_validar').length,
       conParadas: items.filter((o) => o.paradasCount > 0).length,
       conMermas: items.filter((o) => o.mermasKg > 0).length,
@@ -232,6 +230,9 @@ export class OrdersService {
     orden.fin = ahoraIso();
     orden.estado = 'por_validar';
     if (dto.comentario) orden.observacion = dto.comentario;
+    /* La foto de la etiqueta ya viene subida (`POST /evidencias`); aquí sólo se
+     * guarda su ruta, que antes se descartaba. */
+    if (dto.evidenciaUrl) orden.evidenciaUrl = dto.evidenciaUrl;
     await this.recalcular(orden);
     await this.ordenes.save(orden);
 

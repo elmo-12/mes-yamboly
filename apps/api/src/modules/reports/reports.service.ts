@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { computeOee } from '@mes/shared';
+import { Repository } from 'typeorm';
 import type {
   ComparativaTurno,
   Delta,
@@ -24,14 +23,17 @@ import { TURNO_LABEL, TURNOS } from '@mes/types';
 import {
   IndicadorDiario,
   IndicadorKpi,
-  IndicadorLinea,
-  IndicadorTurno,
+  Linea,
   MermaAgregada,
   MermaCausa,
+  OrdenFabricacion,
+  Parada,
   ParadaAgregada,
   ParadaCategoria,
 } from '../../database/entities';
+import { META_OEE } from '@mes/shared';
 import { diaOperativo } from '../../common/utils';
+import { agregarVentana, nuevoAcumulado, oeeDe, type AgregadoVentana } from './reports-oee';
 import { etiquetaFecha, redondear, toList } from './reports.util';
 import type { PeriodoReporte, ReporteQueryDto } from './dto/reporte-query.dto';
 
@@ -68,12 +70,13 @@ export class ReportsService {
   constructor(
     @InjectRepository(IndicadorKpi) private readonly kpis: Repository<IndicadorKpi>,
     @InjectRepository(IndicadorDiario) private readonly diarios: Repository<IndicadorDiario>,
-    @InjectRepository(IndicadorLinea) private readonly lineas: Repository<IndicadorLinea>,
-    @InjectRepository(IndicadorTurno) private readonly turnos: Repository<IndicadorTurno>,
     @InjectRepository(ParadaAgregada) private readonly paradas: Repository<ParadaAgregada>,
     @InjectRepository(ParadaCategoria) private readonly categorias: Repository<ParadaCategoria>,
     @InjectRepository(MermaAgregada) private readonly mermasLinea: Repository<MermaAgregada>,
     @InjectRepository(MermaCausa) private readonly mermasCausa: Repository<MermaCausa>,
+    @InjectRepository(OrdenFabricacion) private readonly ordenes: Repository<OrdenFabricacion>,
+    @InjectRepository(Parada) private readonly paradasCrudas: Repository<Parada>,
+    @InjectRepository(Linea) private readonly catalogoLineas: Repository<Linea>,
   ) {}
 
   /* ---------------------------------------------------------------- */
@@ -85,101 +88,119 @@ export class ReportsService {
     const lineaIds = toList(query.lineaId);
     const turnosFiltro = toList(query.turno) as Turno[];
 
-    const filasLinea = await this.lineas.find({ order: { orden: 'ASC' } });
-    const seleccionadas = lineaIds.length
-      ? filasLinea.filter((l) => lineaIds.includes(l.lineaId))
-      : filasLinea;
-
-    const oeePorLinea: OeePorLinea[] = seleccionadas.map((l) => {
-      const detalle = computeOee({
-        tiempoPlanificadoMin: l.tiempoPlanificadoMin,
-        paradasMin: l.paradasMin,
-        unidadesProducidas: l.unidadesProducidas,
-        unidadesBuenas: l.unidadesBuenas,
-        velocidadEstandar: l.velocidadEstandar,
-      });
-      return {
-        lineaId: l.lineaId,
-        lineaCodigo: l.lineaCodigo,
-        lineaNombre: l.lineaNombre,
-        oee: detalle.oee,
-        disponibilidad: detalle.disponibilidad,
-        desempeno: detalle.desempeno,
-        calidad: detalle.calidad,
-      };
+    /* Se calcula sobre las órdenes y paradas de la ventana, no sobre las tablas
+     * pre-agregadas: son una foto sin periodo y hacían que el Home enseñara las
+     * 9 líneas del mes bajo el título «turno actual». */
+    const [ordenes, paradas] = await Promise.all([
+      this.ordenes.find(),
+      this.paradasCrudas.find(),
+    ]);
+    const opciones = { lineaIds, turnos: turnosFiltro };
+    const actual = agregarVentana(ordenes, paradas, {
+      desde: ventana.desde,
+      hasta: ventana.hasta,
+      ...opciones,
     });
-
-    const filasTurno = await this.turnos.find({ order: { orden: 'ASC' } });
-    const comparativaTurno: ComparativaTurno[] = filasTurno
-      .filter((t) => turnosFiltro.length === 0 || turnosFiltro.includes(t.turno))
-      .map((t) => ({
-        turno: t.turno,
-        turnoLabel: t.turnoLabel ?? TURNO_LABEL[t.turno],
-        oee: t.oee,
-        disponibilidad: t.disponibilidad,
-        desempeno: t.desempeno,
-        calidad: t.calidad,
-        deltaOee: t.deltaOee,
-      }));
-
-    const kpis = lineaIds.length
-      ? this.kpisDesdeLineas(seleccionadas, query.comparar)
-      : await this.kpisDe('indicadores', query.comparar);
+    const previa = this.ventanaPrevia(ventana);
+    const anterior = agregarVentana(ordenes, paradas, { ...previa, ...opciones });
 
     return {
       periodo: ventana.periodo,
       desde: ventana.desde,
       hasta: ventana.hasta,
-      kpis,
-      tendenciaOee: await this.tendencia(ventana),
-      oeePorLinea,
-      comparativaTurno,
+      kpis: this.kpisDeVentana(actual, anterior, query.comparar),
+      tendenciaOee: this.tendencia(actual),
+      oeePorLinea: await this.oeePorLinea(actual),
+      comparativaTurno: this.comparativaTurno(actual, anterior),
     };
   }
 
-  /** Cuando hay filtro de línea, los KPI se recalculan con `computeOee`. */
-  private kpisDesdeLineas(filas: IndicadorLinea[], comparar: string): KpiValor[] {
-    const total = filas.reduce(
-      (acc, l) => ({
-        plan: acc.plan + l.tiempoPlanificadoMin,
-        paradas: acc.paradas + l.paradasMin,
-        producidas: acc.producidas + l.unidadesProducidas,
-        buenas: acc.buenas + l.unidadesBuenas,
-        teorico: acc.teorico + (l.tiempoPlanificadoMin - l.paradasMin) * l.velocidadEstandar,
-      }),
-      { plan: 0, paradas: 0, producidas: 0, buenas: 0, teorico: 0 },
-    );
-    const disponibilidad = total.plan > 0 ? redondear(((total.plan - total.paradas) / total.plan) * 100) : 0;
-    const desempeno = total.teorico > 0 ? redondear((total.producidas / total.teorico) * 100) : 0;
-    const calidad = total.producidas > 0 ? redondear((total.buenas / total.producidas) * 100) : 0;
-    const oee = redondear((disponibilidad / 100) * (desempeno / 100) * (calidad / 100) * 100);
+  /** Ventana inmediatamente anterior, de la misma longitud, para los deltas. */
+  private ventanaPrevia(ventana: Ventana): { desde: string; hasta: string } {
+    const dia = (iso: string, delta: number): string => {
+      const d = new Date(`${iso}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + delta);
+      return d.toISOString().slice(0, 10);
+    };
+    return { desde: dia(ventana.desde, -ventana.dias), hasta: dia(ventana.desde, -1) };
+  }
+
+  /** Sólo se publican las líneas que tuvieron órdenes dentro de la ventana. */
+  private async oeePorLinea(agregado: AgregadoVentana): Promise<OeePorLinea[]> {
+    const catalogo = await this.catalogoLineas.find();
+    const porId = new Map(catalogo.map((l) => [l.id, l]));
+    return [...agregado.porLinea.entries()]
+      .filter(([, a]) => a.ordenes > 0)
+      .map(([lineaId, a]) => {
+        const detalle = oeeDe(a);
+        const linea = porId.get(lineaId);
+        return {
+          lineaId,
+          lineaCodigo: linea?.codigo ?? lineaId,
+          lineaNombre: linea?.nombre ?? lineaId,
+          oee: detalle.oee,
+          disponibilidad: detalle.disponibilidad,
+          desempeno: detalle.desempeno,
+          calidad: detalle.calidad,
+        };
+      })
+      .sort((a, b) => a.lineaCodigo.localeCompare(b.lineaCodigo));
+  }
+
+  private comparativaTurno(actual: AgregadoVentana, anterior: AgregadoVentana): ComparativaTurno[] {
+    return TURNOS.filter((turno) => (actual.porTurno.get(turno)?.ordenes ?? 0) > 0).map((turno) => {
+      const detalle = oeeDe(actual.porTurno.get(turno) ?? nuevoAcumulado());
+      const previo = anterior.porTurno.get(turno);
+      return {
+        turno,
+        turnoLabel: TURNO_LABEL[turno],
+        oee: detalle.oee,
+        disponibilidad: detalle.disponibilidad,
+        desempeno: detalle.desempeno,
+        calidad: detalle.calidad,
+        deltaOee: previo && previo.ordenes > 0 ? redondear(detalle.oee - oeeDe(previo).oee) : 0,
+      };
+    });
+  }
+
+  /** Los cuatro KPI de la cabecera, con su delta frente a la ventana anterior. */
+  private kpisDeVentana(
+    actual: AgregadoVentana,
+    anterior: AgregadoVentana,
+    comparar: string,
+  ): KpiValor[] {
+    const detalle = oeeDe(actual.total);
+    const previo = anterior.total.ordenes > 0 ? oeeDe(anterior.total) : null;
     const referencia = comparar === 'anio_anterior' ? 'vs año anterior' : 'vs periodo anterior';
-    const kpi = (id: string, label: string, valor: number, meta?: number): KpiValor => ({
+    const kpi = (id: string, label: string, valor: number, previoValor?: number, meta?: number): KpiValor => ({
       id,
       label,
       valor,
       unidad: '%',
       meta,
-      delta: { valor: 0, unidad: 'pp', favorableSiSube: true, referencia },
+      delta:
+        previoValor === undefined
+          ? undefined
+          : { valor: redondear(valor - previoValor), unidad: 'pp', favorableSiSube: true, referencia },
     });
     return [
-      kpi('oee', 'OEE', oee, 85),
-      kpi('disponibilidad', 'Disponibilidad', disponibilidad),
-      kpi('desempeno', 'Desempeño', desempeno),
-      kpi('calidad', 'Calidad', calidad),
+      kpi('oee', 'OEE', detalle.oee, previo?.oee, 85),
+      kpi('disponibilidad', 'Disponibilidad', detalle.disponibilidad, previo?.disponibilidad),
+      kpi('desempeno', 'Desempeño', detalle.desempeno, previo?.desempeno),
+      kpi('calidad', 'Calidad', detalle.calidad, previo?.calidad),
     ];
   }
 
-  private async tendencia(ventana: Ventana): Promise<TendenciaOeePunto[]> {
-    const filas = await this.diarios.find({ order: { fecha: 'ASC' } });
-    const dentro = filas.filter((f) => f.fecha >= ventana.desde && f.fecha <= ventana.hasta);
-    const serie = dentro.length ? dentro : filas.slice(-ventana.dias);
-    return serie.map((f) => ({
-      fecha: f.fecha,
-      etiqueta: etiquetaFecha(f.fecha),
-      oee: f.oee,
-      meta: f.meta,
-    }));
+  /** Un punto por día operativo con órdenes dentro de la ventana. */
+  private tendencia(agregado: AgregadoVentana): TendenciaOeePunto[] {
+    return [...agregado.porFecha.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([fecha, acumulado]) => ({
+        fecha,
+        etiqueta: etiquetaFecha(fecha),
+        oee: oeeDe(acumulado).oee,
+        meta: META_OEE,
+      }));
   }
 
   /* ---------------------------------------------------------------- */
@@ -357,8 +378,4 @@ export class ReportsService {
   }
 
   /** Utilizado por las exportaciones para nombrar las líneas filtradas. */
-  async nombresLinea(ids: string[]): Promise<IndicadorLinea[]> {
-    if (!ids.length) return this.lineas.find({ order: { orden: 'ASC' } });
-    return this.lineas.find({ where: { lineaId: In(ids) }, order: { orden: 'ASC' } });
-  }
 }

@@ -5,6 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as ExcelJS from 'exceljs';
 import type { ClaveCriterioTci, KpiTesisId } from '@mes/types';
+import { FORMATOS_EXPORT_DISPONIBLES } from '@mes/types';
+import { ValidationException } from '../../common/exceptions';
 import { ahoraIso } from '../../common/utils';
 import { ExportJob } from '../../database/entities';
 import { EvidenceService } from './evidence.service';
@@ -39,6 +41,13 @@ export class EvidenceExportService {
   ) {}
 
   async exportar(dto: ExportEvidenciaDto, solicitadoPor: string): Promise<{ id: string; estado: 'generando' }> {
+    /* Los anexos se escriben con ExcelJS: sólo hay XLSX. Pedir CSV devolvía un
+     * XLSX renombrado, así que ahora se rechaza en vez de engañar. */
+    if (!(FORMATOS_EXPORT_DISPONIBLES as readonly string[]).includes(dto.formato)) {
+      throw new ValidationException({
+        formato: `Formato no disponible; usa ${FORMATOS_EXPORT_DISPONIBLES.join(', ')}`,
+      });
+    }
     const id = await this.siguienteId();
     await this.jobs.save(
       this.jobs.create({

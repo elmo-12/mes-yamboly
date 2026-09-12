@@ -43,7 +43,7 @@ export function ReportesPage() {
     paradas: 'Análisis de paradas · Causas codificadas y minutos perdidos',
     mermas: 'Mermas por línea, tipo y causa · MP / EP / PT',
     tiempos: 'Tiempos estándar frente al promedio real por causa',
-    exportar: 'Exportar datos · Genera archivos XLSX, CSV o PDF con los datos del periodo',
+    exportar: 'Exportar datos · Genera un XLSX con los datos del periodo',
   };
 
   const exportarRapido = () => {

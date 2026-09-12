@@ -27,7 +27,7 @@ import type { DatasetExport, ExportJob, ExportRequestInput, FormatoExport } from
 import {
   DATASETS_EXPORT,
   DATASET_EXPORT_LABEL,
-  FORMATOS_EXPORT,
+  FORMATOS_EXPORT_DISPONIBLES,
   exportRequestSchema,
 } from '@mes/types';
 import { formatDate, formatDateTime, formatNumber } from '@mes/shared';
@@ -57,6 +57,11 @@ const FORMATO_AYUDA: Record<FormatoExport, { label: string; ayuda: string }> = {
   csv: { label: 'CSV', ayuda: 'Un archivo plano por conjunto, UTF-8' },
   pdf: { label: 'PDF', ayuda: 'Reporte con gráficos, listo para imprimir' },
 };
+
+/* Sólo se ofrecen los formatos que el generador sabe escribir. El histórico
+   puede contener trabajos antiguos en CSV o PDF, y por eso `FORMATO_AYUDA` los
+   sigue etiquetando en la tabla. */
+const FORMATOS_OFRECIDOS = FORMATOS_EXPORT_DISPONIBLES;
 
 const ESTADO_BADGE = {
   listo: { color: 'success' as const, label: 'Listo' },
@@ -127,7 +132,7 @@ export function ExportarTab({ desde, hasta }: ExportarTabProps) {
     <div className="flex flex-col gap-6">
       <SectionTitle
         title="Configurar exportación"
-        description="Selecciona los conjuntos de datos, el formato y el rango. El archivo queda registrado en el historial como evidencia (RF13)."
+        description="Selecciona los conjuntos de datos y el rango. El archivo queda registrado en el historial como evidencia (RF13)."
       />
 
       <form onSubmit={onSubmit} className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-4">
@@ -187,7 +192,7 @@ export function ExportarTab({ desde, hasta }: ExportarTabProps) {
               name="formato"
               render={({ field }) => (
                 <RadioGroup value={field.value} onValueChange={field.onChange}>
-                  {FORMATOS_EXPORT.map((f) => (
+                  {FORMATOS_OFRECIDOS.map((f) => (
                     <Radio
                       key={f}
                       value={f}

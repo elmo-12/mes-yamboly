@@ -1,4 +1,4 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { Controller, Get, Header, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type {
   AnaliticaResumen,
@@ -60,6 +60,29 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Encola un reentrenamiento — sólo jefe e investigador' })
   reentrenar(): Promise<ReentrenamientoJob> {
     return this.analitica.reentrenar();
+  }
+
+  @Get('modelo/diagnostico')
+  @Roles('jefe', 'investigador')
+  @ApiOperation({ summary: 'Matriz de confusión, corte temporal y perfil del corpus' })
+  diagnostico(): Promise<Record<string, unknown>> {
+    return this.analitica.diagnostico();
+  }
+
+  @Get('dataset/exportar')
+  @Roles('investigador')
+  @Header('content-type', 'text/csv; charset=utf-8')
+  @ApiOperation({ summary: 'CSV del feature store (una fila por línea × fecha × turno × modo)' })
+  exportarDataset(): Promise<string> {
+    return this.analitica.exportarDataset();
+  }
+
+  @Post('predicciones/recalcular')
+  @HttpCode(HttpStatus.OK)
+  @Roles('jefe', 'investigador')
+  @ApiOperation({ summary: 'Fuerza un ciclo de inferencia sin esperar al cron de 15 min' })
+  recalcular(): Promise<{ predicciones: number; alertas: number; vencidas: number; proveedor: string }> {
+    return this.analitica.recalcular();
   }
 
   @Post('modelo/:version/activar')

@@ -1,13 +1,13 @@
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { extname, join, resolve } from 'node:path';
 import type { ReadStream } from 'node:fs';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
 import * as ExcelJS from 'exceljs';
 import type { DatasetExport, ExportJob as ExportJobDto } from '@mes/types';
-import { DATASET_EXPORT_LABEL } from '@mes/types';
-import { NoEncontradoException } from '../../common/exceptions';
+import { DATASET_EXPORT_LABEL, FORMATOS_EXPORT_DISPONIBLES } from '@mes/types';
+import { NoEncontradoException, ValidationException } from '../../common/exceptions';
 import {
   Alerta,
   EvaluacionCalidad,
@@ -60,6 +60,13 @@ export class ReportsExportService {
   }
 
   async crear(dto: ExportRequestDto, solicitadoPor: string): Promise<ExportJobDto> {
+    /* Sólo se acepta lo que el generador sabe escribir: antes se admitía CSV y
+     * PDF, se producía un XLSX y se entregaba con la extensión pedida. */
+    if (!(FORMATOS_EXPORT_DISPONIBLES as readonly string[]).includes(dto.formato)) {
+      throw new ValidationException({
+        formato: `Formato no disponible; usa ${FORMATOS_EXPORT_DISPONIBLES.join(', ')}`,
+      });
+    }
     const id = await this.siguienteId();
     const nombre = `${dto.datasets.map((d) => DATASET_EXPORT_LABEL[d]).join(' y ')} · ${dto.desde} a ${dto.hasta}`;
     const job = await this.jobs.save(
@@ -99,17 +106,26 @@ export class ReportsExportService {
       if (!regenerado?.rutaArchivo || !existsSync(regenerado.rutaArchivo)) {
         throw new NoEncontradoException('Archivo de exportación');
       }
-      return {
-        stream: createReadStream(regenerado.rutaArchivo),
-        nombre: `${job.id}.xlsx`,
-        tipo: MIME_POR_FORMATO.xlsx,
-      };
+      return this.aDescarga(job.id, regenerado.rutaArchivo);
     }
 
+    return this.aDescarga(job.id, job.rutaArchivo);
+  }
+
+  /**
+   * El nombre y el `Content-Type` salen de la **extensión real del archivo**, no
+   * del formato que pidió el trabajo: si difieren, el navegador guarda un
+   * archivo que ningún programa sabe abrir.
+   */
+  private aDescarga(
+    id: string,
+    ruta: string,
+  ): { stream: ReadStream; nombre: string; tipo: string } {
+    const extension = extname(ruta).toLowerCase().replace('.', '') || 'xlsx';
     return {
-      stream: createReadStream(job.rutaArchivo),
-      nombre: `${job.id}.${job.formato}`,
-      tipo: MIME_POR_FORMATO[job.formato] ?? 'application/octet-stream',
+      stream: createReadStream(ruta),
+      nombre: `${id}.${extension}`,
+      tipo: MIME_POR_FORMATO[extension] ?? 'application/octet-stream',
     };
   }
 

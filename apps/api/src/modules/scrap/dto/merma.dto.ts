@@ -79,6 +79,12 @@ export class CreateMermaDto {
   @MaxLength(50, { message: 'Máximo 50 caracteres' })
   numeroSolicitud?: string;
 
+  @ApiPropertyOptional({ example: '/api/v1/evidencias/EV-20260911-a1b2c3d4.jpg' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  evidenciaUrl?: string;
+
   @ApiProperty({ example: 'USR-02' })
   @IsString()
   @IsNotEmpty({ message: 'Selecciona un responsable' })

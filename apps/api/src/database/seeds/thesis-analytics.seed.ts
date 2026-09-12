@@ -1,53 +1,57 @@
+import { Logger } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
-import { ModeloVersion, Prediccion } from '../entities';
-import { fechaMenos, pad, rng } from './thesis-seed.util';
+import { crearPipelineAnalitica } from '../../modules/analytics/pipeline.factory';
+import { DatosInsuficientesError } from '../../modules/analytics/modelado';
+import { ModeloVersion, OrdenFabricacion, Parada } from '../entities';
 import type { Seeder } from './seeder.interface';
 
-/** Analítica IA (spec 08): modelo v3.2 sobre 2 140 eventos, AUC 0,86 · F1 0,79. */
+/** Corpus mínimo para que entrenar algo tenga sentido (plan de IA §8.1). */
+const MIN_ORDENES = 30;
+const MIN_PARADAS = 50;
 
-const VERSIONES = [
-  { version: 'v3.2', entrenadoEn: '2026-08-24', eventos: 2140, auc: 0.86, f1: 0.79, precision: 81, recall: 77, features: 14, alertas30d: 142, estado: 'vigente' as const },
-  { version: 'v3.1', entrenadoEn: '2026-07-27', eventos: 1880, auc: 0.83, f1: 0.75, precision: 78, recall: 73, features: 13, alertas30d: 128, estado: 'archivada' as const },
-  { version: 'v3.0', entrenadoEn: '2026-06-29', eventos: 1610, auc: 0.79, f1: 0.71, precision: 74, recall: 69, features: 12, alertas30d: 111, estado: 'archivada' as const },
-];
+/** Primera versión entrenada con datos reales; la maqueta numeraba en v3.2. */
+const VERSION_INICIAL = 'v1.0';
 
+/**
+ * Analítica (spec 08). Este seeder **ya no inventa** un modelo v3.2 con 2 140
+ * eventos ni 24 predicciones con `rng(707)`: arranca el pipeline real sobre las
+ * órdenes, paradas y mermas que haya en la base.
+ *
+ * Si no hay corpus suficiente no siembra nada, a propósito: cero filas en
+ * `modelo_version` y `prediccion` hacen que `/analitica` caiga en el estado
+ * «datos insuficientes», que es el diseño 08.E y una descripción honesta de la
+ * situación — mucho mejor que una maqueta que parece un modelo entrenado.
+ */
 export class ThesisAnalyticsSeeder implements Seeder {
-  readonly name = 'analítica (modelo y predicciones)';
+  readonly name = 'analítica (bootstrap del pipeline IA)';
+  private readonly logger = new Logger('ThesisAnalyticsSeeder');
 
   async run(dataSource: DataSource): Promise<void> {
-    const repoVersion = dataSource.getRepository(ModeloVersion);
-    if (!(await repoVersion.count())) {
-      await repoVersion.save(VERSIONES.map((v, i) => repoVersion.create({ ...v, orden: i })));
+    if (await dataSource.getRepository(ModeloVersion).count()) return;
+
+    const ordenes = await dataSource.getRepository(OrdenFabricacion).count();
+    const paradas = await dataSource.getRepository(Parada).count();
+    if (ordenes < MIN_ORDENES || paradas < MIN_PARADAS) {
+      this.logger.warn(
+        `Sin corpus suficiente (${ordenes} órdenes, ${paradas} paradas): no se siembra ningún modelo`,
+      );
+      return;
     }
 
-    const repo = dataSource.getRepository(Prediccion);
-    if (await repo.count()) return;
-    /* `rng(707)` reproduce las probabilidades del histórico del mock. */
-    const r = rng(707);
-    const lineas = [
-      'EXTR-2', 'EXTR-3', 'LLEN-A1', 'LLEN-A2', 'LLEN-M1',
-      'LLEN-M2', 'MOLD-A2', 'MOLD-A3', 'MOLD-A4',
-    ];
-    const tipos = ['Parada prevista', 'Merma prevista', 'Velocidad baja', 'OEE bajo umbral'];
-    const filas: Prediccion[] = [];
-    for (let i = 0; i < 24; i += 1) {
-      const lineaCodigo = lineas[i % lineas.length]!;
-      const tipo = tipos[i % tipos.length]!;
-      const acierto = i % 6 !== 5;
-      filas.push(
-        repo.create({
-          id: `PRD-HIS-${pad(i + 1)}`,
-          fecha: fechaMenos(Math.floor(i / 2) + 1),
-          lineaCodigo,
-          tipo,
-          prediccion: `${tipo} en ${lineaCodigo}`,
-          probabilidad: r.int(70, 94),
-          eventoReal: acierto ? 'Evento ocurrido dentro de la ventana' : 'Sin evento en la ventana',
-          acierto,
-          modeloVersion: 'v3.2',
-        }),
+    const { entrenamiento } = crearPipelineAnalitica(dataSource);
+    try {
+      const resultado = await entrenamiento.entrenar(VERSION_INICIAL);
+      this.logger.log(
+        `${resultado.version} · ${resultado.muestras} muestras · ${resultado.features} features · ` +
+          `AUC ${resultado.auc} · F1 ${resultado.f1} · lift@3 ${resultado.liftTop3}`,
       );
+    } catch (error: unknown) {
+      if (error instanceof DatosInsuficientesError) {
+        this.logger.warn(`No se pudo entrenar: ${error.message}`);
+        await dataSource.getRepository(ModeloVersion).delete({ version: VERSION_INICIAL });
+        return;
+      }
+      throw error;
     }
-    await repo.save(filas);
   }
 }

@@ -6,6 +6,7 @@ export {
   setUnauthorizedHandler,
   tokenActual,
   descargarArchivo,
+  abrirArchivo,
 } from './client';
 export type { QueryParams } from './client';
 export { API_BASE_URL, getDataSource, isMock } from './data-source';

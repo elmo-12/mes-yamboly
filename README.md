@@ -16,6 +16,7 @@ mes-yamboly/
 │   └── api/                 Backend NestJS
 │       ├── scripts/         extraer-maestros.mjs (dump → seeds/data/real/*.json)
 │       │                    migrar-sqlite-a-postgres.ts (SQLite → PostgreSQL)
+│       │                    sincronizar-produccion.ts + sincronizacion/ (planta real → MES)
 │       └── src/{main.ts,config,common,database/{entities,seeds},modules/<dominio>}
 ├── docker-compose.yml       PostgreSQL 16 (`pnpm db:up`)
 ├── packages/
@@ -23,7 +24,8 @@ mes-yamboly/
 │   ├── types/                @mes/types — contratos front↔back (tipos + zod)
 │   ├── shared/               @mes/shared — formatters es-PE, OEE, KPIs de tesis
 │   └── config/               @mes/config — tsconfig base
-└── docs/                     contratos, mapa Figma, design system, QA, resumen de implementación
+└── docs/                     contratos, mapa Figma, design system, QA, resumen de implementación,
+                            plan-modulo-ia-analitica.md
 ```
 Capa de datos del frontend: `UI → hooks (TanStack Query) → features/<dominio>/api.ts → services/api/client → mock (msw) | API NestJS`. Las vistas nunca importan mocks.
 
@@ -125,9 +127,44 @@ Los catálogos de planta (líneas, sabores, productos, velocidades estándar, ca
   - **Turnos:** `D` (Día, 06:00–18:00) y `N` (Noche, 18:00–06:00); reemplazan al esquema anterior de 3 turnos.
 - Contrato completo de cada endpoint, conteos y convención de ids: `docs/api-contracts.md` (sección "Datos maestros reales").
 
+## Sincronización con la producción real
+`pnpm sync:real` (o `pnpm --filter @mes/api sincronizar`) trae de la base del sistema **en producción** —`yamboli-back`, Strapi 5 sobre PostgreSQL `sitemaster`— las últimas jornadas de planta y **reemplaza** con ellas los datos de producción sembrados. Es la diferencia entre navegar una demo y navegar la planta: Tiempo real muestra el turno de hoy con sus OF, maquinistas y paradas abiertas; Órdenes, las OF reales del último mes con sus paradas y mermas; Reportes, el OEE calculado sobre esos mismos registros.
+
+```bash
+pnpm sync:real                        # últimos 30 días hasta hoy
+pnpm sync:real -- --dias=90           # ventana más larga
+pnpm sync:real -- --desde=2026-08-01 --hasta=2026-08-31
+pnpm sync:real -- --simular           # lee y mapea, no escribe nada (dry run)
+pnpm sync:real -- --sin-agregados     # no recalcula las tablas de Reportes
+pnpm sync:real -- --tiempos-tri       # vuelca los eventos en la hoja del TRI (ver abajo)
+```
+
+- **Conexión al origen:** `--origen=postgres://…`, si no `ORIGEN_DATABASE_URL`, y si no las claves `DATABASE_*` del `.env` de `yamboli-back` (`ORIGEN_ENV_YAMBOLI_BACK`, por defecto `../../../yamboli-back/.env`). La sesión se abre en **sólo lectura**: el script nunca escribe en producción.
+- **Qué se trae** (sólo lo que el MES ya modela; el origen guarda mucho más):
+
+  | Origen (Strapi) | MES |
+  |---|---|
+  | `orden_fabricacion_dbs` + `orden_fabricacions` | `orden_fabricacion` |
+  | `paradas` | `parada` |
+  | `calidads` | `merma` |
+  | `rendimientos` | `registro_velocidad` |
+
+- **Reemplaza, no acumula:** cada corrida vacía `orden_fabricacion`, `parada`, `merma`, `registro_velocidad`, `audit_event` y `deteccion_iot`, e inserta la ventana pedida. Es idempotente: volver a ejecutarlo deja el mismo resultado.
+- **Catálogos:** se resuelven contra el maestro real que ya vive en el MES (línea por nombre, producto por código, causas por `codigoLegado` y nombre). Lo que el origen usa y el maestro aún no conoce se da de alta y se lista al final de la corrida — así aparecieron los 15 maquinistas y supervisores reales, la causa `PS-05-09` y `PN-04-SC`.
+- **Conversiones y criterios** (documentados en `apps/api/scripts/sincronizacion/`):
+  - El origen trabaja en **cajas** y el MES en **unidades**: todo se multiplica por `unidadesPorCaja`. La velocidad estándar pasa de u/h a u/min.
+  - Las horas de negocio del origen (`hora_inicio`, `hora_fin`, `hora`) están en hora de Lima; `created_at` en UTC. De la diferencia entre ambas sale `tiempoRegistroSeg`, el KPI de tiempo de registro (TRI).
+  - El OEE de las órdenes cerradas es el que publica el sistema real. Las órdenes aún abiertas llegan sin desempeño ni calidad calculados, así que se completan con `computeOee` del propio MES sobre datos igualmente reales (unidades de la codificadora, minutos transcurridos, paradas con impacto, kg de merma).
+  - Las paradas que el origen cerró **sin categorizar** no se descartan: van a la causa `PN-04-SC · Sin categorizar`, para no falsear la disponibilidad y dejar el hueco a la vista.
+  - `tipo_mermas` del origen clasifica por **destino** (recuperable / reproceso / desperdicio) y el MES por **estado del material** (MP / EP / PT). La correspondencia está en `mapeo.ts` y el nombre original se conserva en `observacion`, así que la traducción es reversible.
+  - La línea `MIXPLANT 2` (pasteurización) y las OF planificadas que nunca se ejecutaron quedan fuera: no tienen representación en el MES.
+- **Reportes** se recalcula al final de cada corrida (`sincronizacion/agregados.ts`): las pestañas Paradas y Mermas leen tablas pre-agregadas, no las transaccionales. La pestaña **Indicadores** es la excepción — desde `reports-oee.ts` se calcula sobre las órdenes y paradas de la ventana pedida (ver abajo).
+- **Hoja del TRI (Anexo 02), desactivada por defecto:** `--tiempos-tri` vuelca los eventos importados en `registro_tiempo`. No se hace por defecto porque mide otra cosa: el MES cronometra el formulario (RF14) y el sistema anterior sólo guarda la hora declarada del evento y el `created_at` de la fila, así que lo medible es la **latencia hasta el registro** (220,8 min de media, 97,8 de mediana sobre 668 paradas). Contarla como postest del MES convierte el 86,2 % de reducción frente al pretest manual en un «no cumple». El indicador se puebla registrando paradas desde el propio MES.
+- **Lo que sigue sembrado:** `alerta`, `prediccion` y `modelo_version` —es decir, las vistas **Alertas** y **Analítica IA**— no vienen del sistema real porque allí no existen. El plan para sustituirlas por un módulo de IA entrenado con estos datos está en `docs/plan-modulo-ia-analitica.md`.
+
 ## Variables de entorno
 - `apps/web/.env.local` (ver `.env.example`): `NEXT_PUBLIC_DATA_SOURCE`, `NEXT_PUBLIC_API_URL`.
-- `apps/api/.env` (ver `.env.example`): `PORT`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `DATABASE_URL` (PostgreSQL; si está definida manda sobre `DB_PATH`), `DB_PATH` (respaldo SQLite), `CORS_ORIGIN`, `SWAGGER_PATH`, `PREDICTION_SERVICE_URL` (microservicio Python opcional; sin él se usan reglas), `PREDICTION_TIMEOUT_MS`.
+- `apps/api/.env` (ver `.env.example`): `PORT`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `DATABASE_URL` (PostgreSQL; si está definida manda sobre `DB_PATH`), `DB_PATH` (respaldo SQLite), `CORS_ORIGIN`, `SWAGGER_PATH`, `PREDICTION_SERVICE_URL` (microservicio Python opcional; sin él se usan reglas), `PREDICTION_TIMEOUT_MS`, `ORIGEN_DATABASE_URL` y `ORIGEN_ENV_YAMBOLI_BACK` (origen de `pnpm sync:real`).
 
 ## Scripts
 | Comando | Qué hace |
@@ -135,12 +172,90 @@ Los catálogos de planta (líneas, sabores, productos, velocidades estándar, ca
 | `pnpm dev` | web + api en paralelo |
 | `pnpm db:up` / `pnpm db:down` / `pnpm db:logs` | PostgreSQL 16 en Docker: levantar / parar / seguir el log |
 | `pnpm db:migrar` | copia `apps/api/data/mes.sqlite` a PostgreSQL (`--reset` para vaciar antes) |
+| `pnpm sync:real` | trae la producción real de `yamboli-back` (30 días por defecto) y recalcula Reportes |
+| `pnpm simular` | genera el conteo de línea para demostraciones (`--revertir` lo deshace) |
 | `pnpm build` | build de todos los paquetes |
 | `pnpm typecheck` / `pnpm lint` | TypeScript / ESLint en todo el monorepo |
 | `pnpm --filter @mes/api test:e2e` | tests e2e (SQLite en memoria, sin Docker), incluye `catalogs-crud` y `users` sobre el maestro real |
 | `pnpm seed` / `pnpm --filter @mes/api seed` | regenera la base (PostgreSQL o SQLite, según `DATABASE_URL`) con los datos maestros reales |
 | `pnpm --filter @mes/web dev` / `--filter @mes/api dev` | una sola app |
 | `node apps/api/scripts/extraer-maestros.mjs` | regenera `seeds/data/real/*.json` desde el dump Postgres (requiere `pg_restore`) |
+
+## Exponer la aplicación (mes.yamboly.lat)
+El frontend habla con la API **a través del propio servidor de Next**: `NEXT_PUBLIC_API_URL=/api/v1` y un `rewrites` en `apps/web/next.config.ts` reenvía `/api/v1/*` a `API_PROXY_URL` (por defecto `http://localhost:4000`). Como la petición sale del mismo origen que la página, **no hay CORS que ajustar**: ni en local, ni detrás de un túnel, donde el navegador ve el dominio público y el backend sigue escuchando en `localhost`. Un único túnel basta para servir la aplicación y la API.
+
+```bash
+cloudflared tunnel --config ~/.cloudflared/mes-yamboly.yml run mes-yamboly
+```
+
+El túnel con nombre ya está creado y su `ingress` apunta a `http://localhost:3000`:
+
+```yaml
+tunnel: 8b1444e4-d7b6-4d14-b47b-ea492fe20d52
+credentials-file: ~/.cloudflared/8b1444e4-….json
+ingress:
+  - hostname: mes.yamboly.lat
+    service: http://localhost:3000
+  - service: http_status:404
+```
+
+Notas:
+- Los túneles rápidos (`cloudflared tunnel --url …`, dominios `trycloudflare.com`) no funcionaron: registran una sola conexión y el nombre devuelve 404. El túnel con nombre registra las cuatro y responde de inmediato.
+- `CORS_ORIGIN` de `apps/api/.env` ya incluye `https://mes.yamboly.lat`; con el proxy no interviene, pero deja la puerta abierta a apuntar el navegador directamente a la API.
+- Con `pnpm dev` el proxy también funciona en local, así que no hay que cambiar nada al pasar de local a dominio.
+
+## Conteo de línea para demostraciones
+`pnpm simular` genera el pulso que en planta publican los sensores de línea, que hoy están desconectados. Sin ese pulso, «Tiempo real» enseña tarjetas a 0 unidades y no se puede mostrar cómo se comporta la aplicación mientras una línea produce.
+
+```bash
+pnpm simular                          # cuenta cada 5 s hasta Ctrl+C
+pnpm simular -- --oee=85 --avance=50  # otro objetivo y otro punto de arranque
+pnpm simular -- --sin-paradas         # aparta las paradas de la orden (ver abajo)
+pnpm simular -- --una-vez             # una sola lectura
+pnpm simular -- --revertir            # deja las órdenes como estaban
+```
+
+Cómo se comporta:
+- **Sólo cuentan las líneas con una orden `en_curso`**. Una línea sin orden no suma nada, igual que en planta.
+- Con una **parada abierta** el contador se congela y no se registra velocidad: la línea está detenida.
+- En la primera lectura recoloca la orden sobre el momento actual —calcula la ventana que necesita para el avance pedido al OEE objetivo y desplaza `inicio` junto con sus paradas y mermas, los mismos minutos— para que la cronología del turno cuadre. Las órdenes que llegan del sistema real vienen de una jornada ya avanzada: su plan se completa en una fracción del turno y nadie las cerró, así que sin recolocarlas el reloj corre sobre una ventana enorme y el desempeño se hunde.
+- A partir de ahí el contador **sigue** al ritmo objetivo en lugar de perseguirlo a saltos, con un vaivén suave, y nunca entra más de lo que la línea daría en esos segundos.
+- Cada ~18 min deja una lectura de velocidad, que es lo que la tarjeta muestra en «VELOCIDAD».
+- Cuando una orden alcanza su plan **la cierra y pone en curso la siguiente** de la misma línea y jornada, como haría el maquinista. Si la línea se queda sin órdenes pasa a «Sin orden», que es como acaba un turno. Las candidatas son las OF que el sistema real dejó `incompleta`; las que nunca llegaron a ejecutarse no se sincronizan, así que una línea sin ellas se apaga al terminar su OF.
+
+`--sin-paradas` existe porque hay órdenes cuyo plan vale menos tiempo del que ya perdieron en paradas: la OF de la Extrusora 3, por ejemplo, tiene 228 min de paradas registradas contra un plan que son 192 min de trabajo. Ninguna simulación del conteo puede hacer que esa línea marque 90 % sin apartar esas paradas, así que la opción es explícita y no el comportamiento por defecto.
+
+**Qué toca y cómo se deshace.** Escribe en las mismas columnas que alimentaría el sensor (`producido`, `conteoCodificadora`, `oee` y `registro_velocidad`) y, al recolocar, en `inicio` y en las horas de paradas y mermas. Antes de modificar nada guarda los valores originales en `apps/api/data/simulacion-sensores.json` —fuera de la base y fuera del repositorio—, así que `--revertir` lo deja todo como estaba. Conviene revertir, o volver a ejecutar `pnpm sync:real`, antes de usar los datos para cualquier cálculo que tenga que ser real.
+
+## Fotos de evidencia
+Las causas de parada y de merma pueden exigir una foto (`requiereEvidencia`). Hasta ahora el asistente la pedía y la validaba en el navegador, pero **el archivo no salía de ahí**: sólo viajaba `file.name`. Ahora se guarda de verdad.
+
+- `POST /api/v1/evidencias` (multipart, ≤ 8 MB, jpg/png/webp/heic) guarda la foto en `apps/api/data/evidencias/` —carpeta en `.gitignore`, como la de exportaciones— y devuelve la ruta con la que se referencia. El nombre en disco lo pone el servidor (`EV-<AAAAMMDD>-<8 hex>.<ext>`), nunca el cliente.
+- `GET /api/v1/evidencias/:archivo` la sirve con su tipo de imagen. Va autenticado, así que la UI la abre pidiéndola con el token y mostrando el blob, no con un `<a href>` (`abrirArchivo`).
+- La ruta se guarda en `parada.evidenciaUrl`, `merma.evidenciaUrl` y `orden_fabricacion.evidenciaUrl` (las tres columnas se usaban a medias o no existían). En el detalle de la orden aparece como «Ver foto» en las pestañas Paradas y Mermas.
+- La foto **se sube al elegirla**, no al enviar el formulario: si falla la red, el maquinista se entera antes de perder lo que lleva escrito.
+- Si la causa marca `requiereEvidencia`, la API rechaza el alta sin foto (422) y comprueba que el archivo exista en el almacén. Hoy ninguna causa del maestro real lo exige, así que la regla queda latente hasta que se active una desde Configuración.
+- Se guarda en disco y no en la base porque una foto de móvil ronda los megas: en una columna `bytea` inflaría cada copia de seguridad.
+
+## Formatos de exportación
+Sólo se genera **XLSX**. El servicio escribía siempre un XLSX y lo entregaba con la extensión pedida, de modo que elegir PDF o CSV producía un archivo que ningún programa abría. Ahora:
+
+- La API rechaza con 422 cualquier formato que no sepa escribir (`FORMATOS_EXPORT_DISPONIBLES` en `@mes/types`).
+- La descarga toma el nombre y el `Content-Type` de la **extensión real del archivo**, no del formato del trabajo.
+- Reportes › Exportar ofrece sólo XLSX; Evidencia › Exportar cambia el selector de formato por el de **destino** (SPSS / informe), que es la opción que de verdad cambia la salida (booleanos 1/0 frente a Sí/No).
+- `FORMATOS_EXPORT` se conserva completo porque el histórico guarda trabajos antiguos en CSV y PDF; esos siguen listándose pero no son descargables.
+
+## Reportes: indicadores por ventana
+`GET /reportes/indicadores` (pestaña Indicadores de `/reportes` y gráfico dominante del Home) **se calcula sobre `orden_fabricacion` y `parada` de la ventana pedida**, no sobre las tablas pre-agregadas. El resto de Reportes (Paradas, Mermas) sigue leyendo la foto agregada, que no tiene periodo.
+
+El motivo: `indicador_linea`, `indicador_turno` e `indicador_kpi` son una foto única que se regenera entera en cada siembra o sincronización y no sabe de periodos. Servirla tal cual hacía que «OEE por línea — turno actual» del Home mostrara las 9 líneas del mes aunque hoy sólo estuvieran produciendo 4, y que el selector de periodo no cambiara nada salvo la tendencia diaria.
+
+Consecuencias:
+- Sólo aparecen las líneas y los turnos **con órdenes dentro de la ventana**.
+- Los KPI, la tendencia diaria, el OEE por línea y la comparativa por turno salen todos del mismo cálculo (`computeOee`), así que ya no pueden discrepar entre sí.
+- El delta «vs periodo anterior» compara con la ventana inmediatamente anterior de la misma longitud.
+- Una orden que quedó abierta se acota al cierre de su turno (`finDeTurno` en `@mes/shared`): sin ese tope acumulaba como tiempo planificado todos los días transcurridos desde que se inició.
+- `indicador_linea` e `indicador_turno` ya no los lee nadie; se siguen escribiendo por compatibilidad, pero son candidatos a retirarse.
 
 ## Frontend
 Rutas: `/login`, `/` (Home por rol), `/tiempo-real` (+ captura rápida: parada, merma, velocidad, iniciar/finalizar orden, parada sugerida IoT), `/tv`, `/ordenes`, `/ordenes/[id]`, `/reportes`, `/alertas`, `/analitica`, `/evidencia`, `/encuesta/[token]`, `/configuracion`, `/perfil`. Páginas de QA en desarrollo: `/dev/ui` (todo el Design System) y `/dev/api` (endpoints).
