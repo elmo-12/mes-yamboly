@@ -18,5 +18,52 @@ services:
       retries: 10
       start_period: 10s
 
+  # Bloque A (docs/prediccion-python.md): servicio de inferencia/entrenamiento
+  # en Python. No depende de `postgres` — no la toca (regla dura §1 del
+  # contrato) — y el puerto sólo se publica en 127.0.0.1 porque `/entrenar`
+  # y las mutaciones de `/modelo` no llevan más protección que el token
+  # opcional `PREDICCION_TOKEN`.
+  prediccion:
+    build:
+      context: ./services/prediccion-py
+    container_name: mes-prediccion
+    restart: unless-stopped
+    environment:
+      MODELOS_DIR: /modelos
+      TZ: America/Lima
+      PREDICCION_TOKEN: ${PREDICCION_TOKEN:-}
+      RETENCION_VERSIONES: '12'
+    ports:
+      - '127.0.0.1:8001:8000'
+    volumes:
+      - mes_modelos_prediccion:/modelos
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request as u, sys; sys.exit(0 if u.urlopen('http://127.0.0.1:8000/salud', timeout=3).status == 200 else 1)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Cron (alpine + crond) que dispara el reentrenamiento continuo de Nest los
+  # domingos 03:00 (America/Lima). No hay servicio `api` en este compose (la
+  # API corre fuera de Docker en desarrollo); `API_URL` por defecto apunta al
+  # host vía `host.docker.internal`, ajustable en despliegue.
+  entrenador:
+    build:
+      context: ./services/entrenador
+    container_name: mes-entrenador
+    restart: unless-stopped
+    environment:
+      TZ: America/Lima
+      API_URL: ${API_URL:-http://host.docker.internal:4000}
+      PREDICCION_TOKEN: ${PREDICCION_TOKEN:-}
+
 volumes:
   mes_pgdata:
+  mes_modelos_prediccion:

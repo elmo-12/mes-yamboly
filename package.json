@@ -16,7 +16,13 @@
     "db:migrar": "pnpm --filter @mes/api migrar:pg",
     "sync:real": "pnpm --filter @mes/api sincronizar",
     "simular": "pnpm --filter @mes/api simular",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "py:sync": "cd services/prediccion-py && uv sync",
+    "py:test": "cd services/prediccion-py && uv run pytest -q",
+    "py:dev": "cd services/prediccion-py && uv run uvicorn prediccion.main:app --reload --port 8001",
+    "prediccion:up": "docker compose up -d prediccion",
+    "prediccion:logs": "docker compose logs -f prediccion",
+    "prediccion:build": "docker compose build prediccion"
   },
   "devDependencies": {
     "turbo": "^2.5.0",

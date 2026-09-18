@@ -20,3 +20,14 @@ apps/api/data/simulacion-sensores.json
 *.sql.gz
 *.pgdump
 pgdata/
+
+# Python (services/prediccion-py)
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+# artefactos de modelo: viven en el volumen de Docker, nunca en el repo
+services/prediccion-py/modelos/

@@ -1,0 +1,43 @@
+{
+  "descripcion": "Vector dorado de canonicalización del snapshot (docs/prediccion-python.md §3.1). Lo leen a la vez el test de Jest (apps/api/src/modules/analytics/modelado/snapshot-sha256.spec.ts) y el de pytest (services/prediccion-py/tests/test_snapshot_sha256.py). Si alguien cambia la canonicalización de un lado, falla el test del otro ANTES de que el fallo aparezca como un 422 en producción. Cubre a propósito: claves desordenadas, anidamiento, negativos, decimales, enteros, null y no-ASCII.",
+  "sha256Esperado": "7f8e22dbbd443fb1c603188e3540acc88631d1def18acd6bec930cc1a91805e4",
+  "muestras": [
+    {
+      "turno": "N",
+      "lineaId": "LIN-LLEN-M2",
+      "lineaCodigo": "LLEN-M2",
+      "fecha": "2026-03-04",
+      "modo": "anticipado",
+      "inicioTurno": "2026-03-04T18:00:00",
+      "features": {
+        "turnoEsNoche": 1,
+        "mermaKg7d": 12.5,
+        "desvioVelocidadTurnoPrevio": -4.25,
+        "linea_LLEN_M2": 1
+      },
+      "huboParadaImprevista": 1,
+      "mermaSobreEstandar": 0,
+      "minutosImprevistos": 34,
+      "tipoCausaDominante": "CPA-PN-02"
+    },
+    {
+      "turno": "D",
+      "lineaId": "LIN-EXTR-A1",
+      "lineaCodigo": "EXTR-A1",
+      "fecha": "2026-03-05",
+      "modo": "anticipado",
+      "inicioTurno": "2026-03-05T06:00:00",
+      "features": {
+        "turnoEsNoche": 0,
+        "mermaKg7d": 0,
+        "desvioVelocidadTurnoPrevio": 0,
+        "linea_EXTR_A1": 1
+      },
+      "huboParadaImprevista": 0,
+      "mermaSobreEstandar": 1,
+      "minutosImprevistos": 0,
+      "tipoCausaDominante": null,
+      "notaAcentuada": "cambio de formato · línea ñ"
+    }
+  ]
+}

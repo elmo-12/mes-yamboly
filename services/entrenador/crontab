@@ -1,0 +1,2 @@
+# Domingos 03:00 (TZ=America/Lima, fijado en el Dockerfile/compose).
+0 3 * * 0 /usr/local/bin/reentrenar.sh >> /var/log/entrenador.log 2>&1
