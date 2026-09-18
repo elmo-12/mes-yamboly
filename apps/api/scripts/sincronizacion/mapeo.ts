@@ -115,6 +115,8 @@ export function velocidadUnidHora(texto: string | null | undefined): number {
 export interface Incidencia {
   motivo: string;
   detalle: string;
+  /** Mes de la fila de origen (`YYYY-MM`), o `sin-fecha` si no existe. */
+  mes: string;
 }
 
 /** Filas ya listas para insertar en el MES, más el registro de lo descartado. */
@@ -180,8 +182,9 @@ export class Mapeador {
     return m;
   }
 
-  private anotar(motivo: string, detalle: string): void {
-    this.incidencias.push({ motivo, detalle });
+  private anotar(motivo: string, detalle: string, fecha?: string | null): void {
+    const mes = fecha && /^\d{4}-\d{2}/.test(fecha) ? fecha.slice(0, 7) : 'sin-fecha';
+    this.incidencias.push({ motivo, detalle, mes });
   }
 
   /* ------------------------------------------------------------------ */
@@ -235,7 +238,7 @@ export class Mapeador {
   }
 
   /** Hoja `PN-04-SC`, donde aterrizan las paradas cuya causa no se puede resolver. */
-  private causaSinCategorizar(): CausaParada | null {
+  private causaSinCategorizar(fecha?: string | null): CausaParada | null {
     const existente = this.causasParada.find((c) => c.codigo === CODIGO_SIN_CATEGORIZAR);
     if (existente) return existente;
 
@@ -243,7 +246,11 @@ export class Mapeador {
       (c) => c.nivel === 'tipo' && normalizar(c.nombre) === normalizar('Paro imprevisto'),
     );
     if (!tipo) {
-      this.anotar('parada sin causa resoluble', 'no existe el tipo «Paro imprevisto» en el maestro');
+      this.anotar(
+        'parada sin causa resoluble',
+        'no existe el tipo «Paro imprevisto» en el maestro',
+        fecha,
+      );
       return null;
     }
     const general =
@@ -296,8 +303,9 @@ export class Mapeador {
         fila.categoriaEspecificaId == null
           ? `parada ${fila.paradaId}`
           : `categoria_especifica_id=${fila.categoriaEspecificaId}`,
+        fila.inicio,
       );
-      const sinCategorizar = this.causaSinCategorizar();
+      const sinCategorizar = this.causaSinCategorizar(fila.inicio);
       return sinCategorizar ? [sinCategorizar, this.raizParada(sinCategorizar)] : null;
     }
     return [hoja, this.raizParada(hoja)];
@@ -315,8 +323,11 @@ export class Mapeador {
     const hoja = idMes ? this.causasMerma.find((c) => c.id === idMes) : undefined;
     if (!hoja) {
       this.anotar(
-        'causa de merma fuera del maestro',
+        fila.causaLegadoId == null
+          ? 'merma descartada por causa nula'
+          : 'causa de merma fuera del maestro',
         `merma_causa_id=${fila.causaLegadoId ?? 'nulo'} · ${fila.causaNombre ?? 'sin nombre'}`,
+        fila.hora,
       );
       return null;
     }
@@ -377,22 +388,26 @@ export class Mapeador {
   orden(fila: OrdenOrigen): { orden: Record<string, unknown>; unidadesPorCaja: number } | null {
     const linea = this.linea(fila.lineaProduccion);
     if (!linea) {
-      this.anotar('línea fuera del maestro del MES', `${fila.lineaProduccion ?? '—'} · OF ${fila.codigo}`);
+      this.anotar(
+        'línea fuera del maestro del MES',
+        `${fila.lineaProduccion ?? '—'} · OF ${fila.codigo}`,
+        fila.fecha,
+      );
       return null;
     }
     const producto = this.producto(fila.codigoProducto);
     if (!producto) {
-      this.anotar('producto sin ficha', `${fila.codigoProducto ?? '—'} · OF ${fila.codigo}`);
+      this.anotar('producto sin ficha', `${fila.codigoProducto ?? '—'} · OF ${fila.codigo}`, fila.fecha);
       return null;
     }
     if (!fila.inicio) {
-      this.anotar('orden sin hora de inicio', `OF ${fila.codigo}`);
+      this.anotar('orden sin hora de inicio', `OF ${fila.codigo}`, fila.fecha);
       return null;
     }
     const maquinista = this.usuario(fila.maquinista, 'maquinista', linea.id);
     const supervisor = this.usuario(fila.supervisor, 'supervisor', null);
     if (!maquinista || !supervisor) {
-      this.anotar('orden sin maquinista o supervisor', `OF ${fila.codigo}`);
+      this.anotar('orden sin maquinista o supervisor', `OF ${fila.codigo}`, fila.fecha);
       return null;
     }
 
@@ -512,13 +527,28 @@ export class Mapeador {
     correlativo: number,
   ): Record<string, unknown> | null {
     if (!fila.inicio) {
-      this.anotar('parada sin hora de inicio', `id origen ${fila.paradaId}`);
+      this.anotar('parada sin hora de inicio', `id origen ${fila.paradaId}`, fila.inicio);
       return null;
     }
     const causas = this.causaParada(fila);
     if (!causas) return null;
     const [hoja, raiz] = causas;
-    const duracionMin = fila.segundos != null ? Math.round(fila.segundos / 60) : 0;
+    let duracionMin: number;
+    if (fila.segundos != null) {
+      duracionMin = Math.round(fila.segundos / 60);
+    } else {
+      const inicioMs = new Date(fila.inicio).getTime();
+      const finMs = fila.fin ? new Date(fila.fin).getTime() : Number.NaN;
+      duracionMin =
+        Number.isFinite(inicioMs) && Number.isFinite(finMs) && finMs >= inicioMs
+          ? Math.round((finMs - inicioMs) / 60_000)
+          : 0;
+      this.anotar(
+        'informativa: duración de parada calculada desde inicio y fin',
+        `id origen ${fila.paradaId} · ${duracionMin} min`,
+        fila.inicio,
+      );
+    }
 
     return {
       id: `PAR-${orden.id.replace('ORD-', '')}-${String(correlativo).padStart(2, '0')}`,
@@ -547,7 +577,7 @@ export class Mapeador {
     correlativo: number,
   ): Record<string, unknown> | null {
     if (!fila.hora) {
-      this.anotar('merma sin hora', `id origen ${fila.mermaId}`);
+      this.anotar('merma sin hora', `id origen ${fila.mermaId}`, fila.hora);
       return null;
     }
     const causas = this.causaMerma(fila);

@@ -13,7 +13,7 @@
  * No hay dato del año anterior, así que `deltaAnioValor` queda en `null` y la
  * UI simplemente no pinta esa comparación.
  */
-import type { DataSource } from 'typeorm';
+import { In, MoreThanOrEqual, type DataSource } from 'typeorm';
 import { computeOee } from '@mes/shared';
 import type { TipoMermaCodigo, Turno as TurnoCodigo } from '@mes/types';
 import { ahoraIso } from '../../src/common/utils';
@@ -53,6 +53,10 @@ const ETIQUETA_CATEGORIA: Record<CategoriaParada, string> = {
 export interface OpcionesAgregados {
   /** Coste unitario con el que se valoriza la merma en el KPI de Reportes (S/ por kg). */
   costoMermaSolKg: number;
+  /** Días más recientes que alimentan la foto pre-agregada de Reportes. */
+  dias: number;
+  /** Último día de la ventana sincronizada (`YYYY-MM-DD`). */
+  hasta: string;
 }
 
 function redondear(valor: number, decimales = 1): number {
@@ -138,9 +142,18 @@ export async function recalcularAgregados(
   /* Hora local: la aplicación guarda todas sus marcas sin zona. */
   const ahora = ahoraIso();
 
-  const ordenes = await destino.getRepository(OrdenFabricacion).find();
-  const paradas = await destino.getRepository(Parada).find();
-  const mermas = await destino.getRepository(Merma).find();
+  const repositorioOrdenes = destino.getRepository(OrdenFabricacion);
+  const fechaCorte = new Date(`${opciones.hasta}T00:00:00Z`);
+  fechaCorte.setUTCDate(fechaCorte.getUTCDate() - opciones.dias + 1);
+  const corte = fechaCorte.toISOString().slice(0, 10);
+  const ordenes = await repositorioOrdenes.find({ where: { fecha: MoreThanOrEqual(corte) } });
+  const ordenIds = ordenes.map((orden) => orden.id);
+  const paradas = ordenIds.length
+    ? await destino.getRepository(Parada).find({ where: { ordenId: In(ordenIds) } })
+    : [];
+  const mermas = ordenIds.length
+    ? await destino.getRepository(Merma).find({ where: { ordenId: In(ordenIds) } })
+    : [];
   const lineas = await destino.getRepository(Linea).find();
   const productos = await destino.getRepository(Producto).find();
   const causasParada = await destino.getRepository(CausaParada).find();
@@ -562,27 +575,36 @@ export async function recalcularAgregados(
   /* ---------------------------------------------------------------- */
 
   await destino.transaction(async (gestor) => {
-    for (const entidad of [
-      IndicadorDiario,
-      IndicadorLinea,
-      IndicadorTurno,
-      IndicadorKpi,
-      ParadaAgregada,
-      ParadaCategoria,
-      MermaAgregada,
-      MermaCausa,
-    ]) {
-      await gestor.getRepository(entidad).createQueryBuilder().delete().execute();
+    for (const [nombre, entidad] of [
+      ['indicador_diario', IndicadorDiario],
+      ['indicador_linea', IndicadorLinea],
+      ['indicador_turno', IndicadorTurno],
+      ['indicador_kpi', IndicadorKpi],
+      ['parada_agregada', ParadaAgregada],
+      ['parada_categoria', ParadaCategoria],
+      ['merma_agregada', MermaAgregada],
+      ['merma_causa', MermaCausa],
+    ] as const) {
+      const inicio = Date.now();
+      const resultado = await gestor.getRepository(entidad).createQueryBuilder().delete().execute();
+      console.log(`  borrado ${nombre}: ${resultado.affected ?? 0} · ${Date.now() - inicio} ms`);
     }
-    if (diarios.length) await gestor.getRepository(IndicadorDiario).insert(diarios);
-    if (indicadoresLinea.length) await gestor.getRepository(IndicadorLinea).insert(indicadoresLinea);
-    if (indicadoresTurno.length) await gestor.getRepository(IndicadorTurno).insert(indicadoresTurno);
-    if (kpis.length) await gestor.getRepository(IndicadorKpi).insert(kpis);
-    if (agregadasParada.length) await gestor.getRepository(ParadaAgregada).insert(agregadasParada);
-    if (categorias.length) await gestor.getRepository(ParadaCategoria).insert(categorias);
-    if (agregadasMerma.length) await gestor.getRepository(MermaAgregada).insert(agregadasMerma);
-    if (causasMermaAgregadas.length)
-      await gestor.getRepository(MermaCausa).insert(causasMermaAgregadas);
+    for (const [nombre, entidad, filas] of [
+      ['indicador_diario', IndicadorDiario, diarios],
+      ['indicador_linea', IndicadorLinea, indicadoresLinea],
+      ['indicador_turno', IndicadorTurno, indicadoresTurno],
+      ['indicador_kpi', IndicadorKpi, kpis],
+      ['parada_agregada', ParadaAgregada, agregadasParada],
+      ['parada_categoria', ParadaCategoria, categorias],
+      ['merma_agregada', MermaAgregada, agregadasMerma],
+      ['merma_causa', MermaCausa, causasMermaAgregadas],
+    ] as const) {
+      const inicio = Date.now();
+      if (filas.length) {
+        await gestor.getRepository(entidad as never).insert(filas as never);
+      }
+      console.log(`  inserción ${nombre}: ${filas.length} · ${Date.now() - inicio} ms`);
+    }
   });
 
   return {

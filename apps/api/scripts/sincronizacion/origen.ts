@@ -1,7 +1,7 @@
 /**
  * Lectura del sistema **real** de planta: `yamboli-back` (Strapi 5 sobre la base
  * PostgreSQL `sitemaster`). Este módulo sólo **lee**: abre un `Client` de `pg`,
- * ejecuta cuatro consultas acotadas a una ventana de fechas y devuelve filas
+ * ejecuta cinco consultas bajo un único snapshot consistente y devuelve filas
  * planas. Nunca escribe en el origen.
  *
  * Convenciones del origen descubiertas al mapear el esquema (importantes, porque
@@ -179,18 +179,55 @@ export function ocultarClave(url: string): string {
 }
 
 export class OrigenReal {
+  private cerrada = false;
+  private enTransaccion = false;
+
   private constructor(private readonly cliente: Client) {}
 
   static async abrir(url: string): Promise<OrigenReal> {
-    const cliente = new Client({ connectionString: url, ssl: false });
-    await cliente.connect();
-    /* Sesión de sólo lectura: cualquier INSERT/UPDATE accidental falla. */
-    await cliente.query('set session characteristics as transaction read only');
-    return new OrigenReal(cliente);
+    const cliente = new Client({ connectionString: url, ssl: false, application_name: 'mes-sync' });
+    try {
+      await cliente.connect();
+      /* Sesión de sólo lectura: cualquier INSERT/UPDATE accidental falla. */
+      await cliente.query('set session characteristics as transaction read only');
+      await cliente.query(`set statement_timeout='120s'`);
+      await cliente.query(`set lock_timeout='5s'`);
+      await cliente.query(`set idle_in_transaction_session_timeout='600s'`);
+      const { rows } = await cliente.query<{ zonaHoraria: string }>(
+        `select current_setting('TimeZone') as "zonaHoraria"`,
+      );
+      console.log(`  zona horaria del origen  ${rows[0].zonaHoraria}`);
+      return new OrigenReal(cliente);
+    } catch (error) {
+      await cliente.end().catch(() => undefined);
+      throw error;
+    }
   }
 
   async cerrar(): Promise<void> {
-    await this.cliente.end();
+    if (this.cerrada) return;
+    try {
+      if (this.enTransaccion) await this.cliente.query('rollback');
+    } finally {
+      this.enTransaccion = false;
+      try {
+        await this.cliente.end();
+      } finally {
+        this.cerrada = true;
+      }
+    }
+  }
+
+  /** Fija un único snapshot para las cinco consultas de extracción. */
+  async iniciarSnapshot(): Promise<void> {
+    await this.cliente.query('begin transaction isolation level repeatable read read only');
+    this.enTransaccion = true;
+  }
+
+  async confirmarSnapshot(): Promise<void> {
+    if (!this.enTransaccion) return;
+    await this.cliente.query('commit');
+    this.enTransaccion = false;
   }
 
   async fechaDelServidor(): Promise<string> {

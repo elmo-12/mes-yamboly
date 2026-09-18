@@ -132,14 +132,18 @@ Los catálogos de planta (líneas, sabores, productos, velocidades estándar, ca
 
 ```bash
 pnpm sync:real                        # últimos 30 días hasta hoy
-pnpm sync:real -- --dias=90           # ventana más larga
 pnpm sync:real -- --desde=2026-08-01 --hasta=2026-08-31
 pnpm sync:real -- --simular           # lee y mapea, no escribe nada (dry run)
+pnpm sync:real -- --desde=2026-03-01 --hasta=2026-08-27 --simular --informe=sync-180-dry.json
+pnpm sync:real -- --desde=2026-03-01 --hasta=2026-08-27 --agregados-dias=30 --informe=sync-180.json
 pnpm sync:real -- --sin-agregados     # no recalcula las tablas de Reportes
 pnpm sync:real -- --tiempos-tri       # vuelca los eventos en la hoja del TRI (ver abajo)
 ```
 
-- **Conexión al origen:** `--origen=postgres://…`, si no `ORIGEN_DATABASE_URL`, y si no las claves `DATABASE_*` del `.env` de `yamboli-back` (`ORIGEN_ENV_YAMBOLI_BACK`, por defecto `../../../yamboli-back/.env`). La sesión se abre en **sólo lectura**: el script nunca escribe en producción.
+- **Ventana reproducible:** `--dias` vale 30 por defecto. Si supera 60 es obligatorio indicar `--desde` y `--hasta`; `--desde` tampoco se acepta solo. Así una ventana usada para ML no cambia según el día de ejecución.
+- **Opciones de control:** `--agregados-dias=30` limita la foto pre-agregada de Reportes a los últimos 30 días de la carga; `--informe=ruta.json` guarda `{ ventana, comando, conteos, incidencias[motivo][mes], altas, verificaciones }`; `--costo-merma=9.5`, `--sin-agregados` y `--tiempos-tri` conservan el comportamiento descrito arriba.
+- **Conexión al origen:** `--origen=postgres://…`, si no `ORIGEN_DATABASE_URL`, y si no las claves `DATABASE_*` del `.env` de `yamboli-back` (`ORIGEN_ENV_YAMBOLI_BACK`, por defecto `../../../yamboli-back/.env`). La sesión usa `application_name=mes-sync`, es **sólo lectura**, aplica límites de consulta/bloqueo y extrae las cinco consultas bajo un único snapshot `REPEATABLE READ`. El log muestra la zona horaria de PostgreSQL y la conexión se cierra antes de tocar el destino.
+- **Orden operativo obligatorio para una carga:** (1) `pnpm simular -- --revertir`; (2) respaldo recuperable del MES, por ejemplo `pg_dump "$DATABASE_URL" --format=custom --file=mes-antes-sync.dump`; (3) el mismo comando de ventana con `--simular --informe=…`; (4) revisar el informe y ejecutar la carga quitando únicamente `--simular`. No se debe omitir el respaldo: la sincronización reemplaza las seis tablas indicadas abajo.
 - **Qué se trae** (sólo lo que el MES ya modela; el origen guarda mucho más):
 
   | Origen (Strapi) | MES |
@@ -150,15 +154,16 @@ pnpm sync:real -- --tiempos-tri       # vuelca los eventos en la hoja del TRI (v
   | `rendimientos` | `registro_velocidad` |
 
 - **Reemplaza, no acumula:** cada corrida vacía `orden_fabricacion`, `parada`, `merma`, `registro_velocidad`, `audit_event` y `deteccion_iot`, e inserta la ventana pedida. Es idempotente: volver a ejecutarlo deja el mismo resultado.
+- **Verificación y aborto:** el reemplazo, los conteos y las validaciones ocurren en una sola transacción; cualquier fallo revierte todo. Se aborta si los conteos insertados no coinciden, alguna fecha cae fuera de la ventana, queda una orden abierta anterior a `hasta − 1 día`, se descarta más de 0,5 % de las órdenes, se intenta dar de alta una causa distinta de `PN-04-SC`, las paradas `PN-04-SC` superan 1 % global o 2 % en cualquier mes, o las mermas descartadas por causa nula superan 3 % global o 5 % en cualquier mes.
 - **Catálogos:** se resuelven contra el maestro real que ya vive en el MES (línea por nombre, producto por código, causas por `codigoLegado` y nombre). Lo que el origen usa y el maestro aún no conoce se da de alta y se lista al final de la corrida — así aparecieron los 15 maquinistas y supervisores reales, la causa `PS-05-09` y `PN-04-SC`.
 - **Conversiones y criterios** (documentados en `apps/api/scripts/sincronizacion/`):
   - El origen trabaja en **cajas** y el MES en **unidades**: todo se multiplica por `unidadesPorCaja`. La velocidad estándar pasa de u/h a u/min.
   - Las horas de negocio del origen (`hora_inicio`, `hora_fin`, `hora`) están en hora de Lima; `created_at` en UTC. De la diferencia entre ambas sale `tiempoRegistroSeg`, el KPI de tiempo de registro (TRI).
   - El OEE de las órdenes cerradas es el que publica el sistema real. Las órdenes aún abiertas llegan sin desempeño ni calidad calculados, así que se completan con `computeOee` del propio MES sobre datos igualmente reales (unidades de la codificadora, minutos transcurridos, paradas con impacto, kg de merma).
-  - Las paradas que el origen cerró **sin categorizar** no se descartan: van a la causa `PN-04-SC · Sin categorizar`, para no falsear la disponibilidad y dejar el hueco a la vista.
+  - Las paradas que el origen cerró **sin categorizar** no se descartan: van a la causa `PN-04-SC · Sin categorizar`, para no falsear la disponibilidad y dejar el hueco a la vista. Si `tiempo` viene nulo, `duracionMin` se reconstruye como `fin − inicio` y la incidencia queda en el informe mensual.
   - `tipo_mermas` del origen clasifica por **destino** (recuperable / reproceso / desperdicio) y el MES por **estado del material** (MP / EP / PT). La correspondencia está en `mapeo.ts` y el nombre original se conserva en `observacion`, así que la traducción es reversible.
   - La línea `MIXPLANT 2` (pasteurización) y las OF planificadas que nunca se ejecutaron quedan fuera: no tienen representación en el MES.
-- **Reportes** se recalcula al final de cada corrida (`sincronizacion/agregados.ts`): las pestañas Paradas y Mermas leen tablas pre-agregadas, no las transaccionales. La pestaña **Indicadores** es la excepción — desde `reports-oee.ts` se calcula sobre las órdenes y paradas de la ventana pedida (ver abajo).
+- **Reportes** se recalcula al final de cada corrida (`sincronizacion/agregados.ts`): las pestañas Paradas y Mermas leen tablas pre-agregadas, acotadas por `--agregados-dias` (30 por defecto), no todo el histórico transaccional. La pestaña **Indicadores** es la excepción — desde `reports-oee.ts` se calcula sobre las órdenes y paradas de la ventana pedida (ver abajo).
 - **Hoja del TRI (Anexo 02), desactivada por defecto:** `--tiempos-tri` vuelca los eventos importados en `registro_tiempo`. No se hace por defecto porque mide otra cosa: el MES cronometra el formulario (RF14) y el sistema anterior sólo guarda la hora declarada del evento y el `created_at` de la fila, así que lo medible es la **latencia hasta el registro** (220,8 min de media, 97,8 de mediana sobre 668 paradas). Contarla como postest del MES convierte el 86,2 % de reducción frente al pretest manual en un «no cumple». El indicador se puebla registrando paradas desde el propio MES.
 - **Lo que sigue sembrado:** `alerta`, `prediccion` y `modelo_version` —es decir, las vistas **Alertas** y **Analítica IA**— no vienen del sistema real porque allí no existen. El plan para sustituirlas por un módulo de IA entrenado con estos datos está en `docs/plan-modulo-ia-analitica.md`.
 
