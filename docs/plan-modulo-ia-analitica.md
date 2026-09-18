@@ -1,8 +1,18 @@
 # Plan — Módulo de IA / analítica real para `/analitica`
 
-> Estado del documento: **propuesta de implementación** (no implementado).
-> Origen: la vista `/analitica` hoy sirve datos sembrados; este plan la reconstruye sobre los
-> datos reales que deja `apps/api/scripts/sincronizar-produccion.ts`.
+> Estado del documento: **histórico**. Las fases F0–F3 y F5 de §9 están **implementadas**
+> desde el commit `0202f02`; el diagnóstico de §1 describe la maqueta que había *antes* y
+> ya no corresponde al código. Se conserva porque §4 (ingeniería de características), §6
+> (métricas) y §10 (riesgos) siguen siendo la referencia metodológica del módulo.
+>
+> **Dos decisiones posteriores anulan partes de este documento:**
+> 1. §5.3 (regresión logística en TypeScript como nivel 2) queda **derogado**: Python es
+>    ahora el único motor de modelado y la cascada tiene dos niveles, no tres.
+>    §5.4 (microservicio Python) deja de ser «fase posterior» y pasa a ser el núcleo.
+>    El contrato vigente está en **`docs/prediccion-python.md`**.
+> 2. §4.1 (target) queda **corregido**: se excluye la rama `PS-05 Paro sin programa`
+>    —de la que cuelga `Refrigerio`, la causa nº 1 del corpus— y el positivo se restringe
+>    a las ramas `PN-*`. Eso bajó la tasa de positivos del 63,1 % al 36,4 %.
 
 ## 1. Diagnóstico: qué es real y qué es inventado hoy
 

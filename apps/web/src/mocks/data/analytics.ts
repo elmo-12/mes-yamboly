@@ -8,17 +8,17 @@ import type {
 } from '@mes/types';
 import { fechaMenos, redondear, rng } from './seed';
 
-/** Analítica IA — spec 08 (modelo v3.2, 2 140 eventos, EP 83,5 %). */
+/** Analítica IA — spec 08 (modelo v1.4 · LightGBM, 1 130 muestras, EP 83,5 %). */
 
 export const analiticaResumen: AnaliticaResumen = {
   modelo: {
-    version: 'v3.2',
-    entrenadoEn: '2026-08-24',
-    eventos: 2140,
-    algoritmo: 'Gradient Boosting (scikit-learn)',
+    version: 'v1.4',
+    entrenadoEn: '2026-09-13',
+    eventos: 1130,
+    algoritmo: 'LightGBM 4.5 (Python)',
     activo: true,
   },
-  kpis: { ep: 83.5, precision: 81, recall: 77, alertas30d: 142 },
+  kpis: { ep: 83.5, precision: 58, recall: 71, alertas30d: 142 },
   insights: [
     {
       id: 'INS-01',
@@ -172,17 +172,17 @@ export const predicciones: Predicciones = { serie: serie(), historico: historico
 export const modelo: Modelo = {
   fasesCrispDm: [
     { id: 'comprension_negocio', orden: 1, nombre: 'Comprensión del negocio', estado: 'completada', descripcion: 'Objetivo: anticipar paradas y mermas para reducir el tiempo perdido en las 9 líneas.', metricas: [{ label: 'Objetivos', valor: '3' }, { label: 'RF cubiertos', valor: 'RF8, RF9' }] },
-    { id: 'comprension_datos', orden: 2, nombre: 'Comprensión de los datos', estado: 'completada', descripcion: 'Órdenes, paradas, mermas y velocidades registradas desde el MES.', metricas: [{ label: 'Registros', valor: '2 140' }, { label: 'Fuentes', valor: '4' }] },
-    { id: 'preparacion', orden: 3, nombre: 'Preparación de los datos', estado: 'completada', descripcion: 'Limpieza, codificación de causas y construcción de ventanas temporales.', metricas: [{ label: 'Features', valor: '14' }, { label: 'Nulos tratados', valor: '2,1 %' }] },
-    { id: 'modelado', orden: 4, nombre: 'Modelado', estado: 'completada', descripcion: 'Gradient Boosting con validación cruzada estratificada de 5 pliegues.', metricas: [{ label: 'Algoritmo', valor: 'Gradient Boosting' }, { label: 'Pliegues', valor: '5' }] },
-    { id: 'evaluacion', orden: 5, nombre: 'Evaluación', estado: 'completada', descripcion: 'Métricas sobre el conjunto de prueba y contraste con el registro real (Anexo 06).', metricas: [{ label: 'AUC', valor: '0,86' }, { label: 'F1', valor: '0,79' }] },
-    { id: 'despliegue', orden: 6, nombre: 'Despliegue', estado: 'en_curso', descripcion: 'Servicio de inferencia en Python conectado al motor de alertas y a n8n.', metricas: [{ label: 'Versión activa', valor: 'v3.2' }, { label: 'Alertas 30 d', valor: '142' }] },
+    { id: 'comprension_datos', orden: 2, nombre: 'Comprensión de los datos', estado: 'completada', descripcion: 'Órdenes, paradas, mermas y velocidades registradas desde el MES.', metricas: [{ label: 'Muestras', valor: '1 130' }, { label: 'Fuentes', valor: '4' }] },
+    { id: 'preparacion', orden: 3, nombre: 'Preparación de los datos', estado: 'completada', descripcion: 'Limpieza, codificación de causas y construcción de ventanas temporales.', metricas: [{ label: 'Features', valor: '41' }, { label: 'Nulos tratados', valor: '2,1 %' }] },
+    { id: 'modelado', orden: 4, nombre: 'Modelado', estado: 'completada', descripcion: 'LightGBM con validación temporal walk-forward de 5 pliegues expansivos (nunca aleatoria).', metricas: [{ label: 'Algoritmo', valor: 'LightGBM' }, { label: 'Pliegues', valor: '5' }] },
+    { id: 'evaluacion', orden: 5, nombre: 'Evaluación', estado: 'completada', descripcion: 'Métricas sobre el conjunto de prueba y contraste con el registro real (Anexo 06).', metricas: [{ label: 'PR-AUC', valor: '0,61' }, { label: 'AUC', valor: '0,74' }] },
+    { id: 'despliegue', orden: 6, nombre: 'Despliegue', estado: 'en_curso', descripcion: 'Servicio de inferencia en Python conectado al motor de alertas y a n8n.', metricas: [{ label: 'Versión activa', valor: 'v1.4' }, { label: 'Alertas 30 d', valor: '142' }] },
   ],
-  metricas: { registros: 2140, features: 14, algoritmo: 'Gradient Boosting (scikit-learn)', auc: 0.86, f1: 0.79 },
+  metricas: { registros: 1130, features: 41, algoritmo: 'LightGBM 4.5 (Python)', auc: 0.74, f1: 0.61 },
   versiones: [
-    { version: 'v3.2', entrenadoEn: '2026-08-24', eventos: 2140, auc: 0.86, f1: 0.79, estado: 'vigente' },
-    { version: 'v3.1', entrenadoEn: '2026-07-27', eventos: 1880, auc: 0.83, f1: 0.75, estado: 'archivada' },
-    { version: 'v3.0', entrenadoEn: '2026-06-29', eventos: 1610, auc: 0.79, f1: 0.71, estado: 'archivada' },
+    { version: 'v1.4', entrenadoEn: '2026-09-13', eventos: 1130, auc: 0.74, f1: 0.61, estado: 'vigente' },
+    { version: 'v1.3', entrenadoEn: '2026-09-06', eventos: 1094, auc: 0.72, f1: 0.59, estado: 'archivada' },
+    { version: 'v1.2', entrenadoEn: '2026-08-30', eventos: 1051, auc: 0.70, f1: 0.57, estado: 'archivada' },
   ],
   variablesEntrada: [
     { id: 'VAR-01', nombre: 'Línea', importancia: 92 },
@@ -197,12 +197,12 @@ export const modelo: Modelo = {
 };
 
 /**
- * Estado por defecto: el modelo v3.2 ya está entrenado con 2 140 eventos, así
+ * Estado por defecto: el modelo v1.4 ya está entrenado con 1 130 muestras, así
  * que hay datos suficientes (coherente con `analiticaResumen`).
  */
 export const estadoDatos: EstadoDatos = {
   suficiente: true,
-  eventos: 2140,
+  eventos: 1130,
   requeridos: 2000,
   progresoPct: 100,
   estimacion: 'Volumen suficiente · el modelo se reentrena cada mes',

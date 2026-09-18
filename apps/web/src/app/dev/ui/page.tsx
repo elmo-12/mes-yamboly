@@ -843,11 +843,11 @@ export default function DevUiPage() {
                   current={3}
                   steps={[
                     { label: 'Comprensión del negocio', description: 'OEE, paradas y mermas de Yamboly' },
-                    { label: 'Comprensión de los datos', description: '2 140 eventos · 14 features' },
+                    { label: 'Comprensión de los datos', description: '1 130 muestras · 41 features' },
                     { label: 'Preparación', description: 'Limpieza y codificación de causas' },
-                    { label: 'Modelado', description: 'Gradient Boosting (scikit-learn)' },
+                    { label: 'Modelado', description: 'LightGBM 4.5 (Python)' },
                     { label: 'Evaluación', description: 'AUC 0,86 · F1 0,79' },
-                    { label: 'Despliegue', description: 'v3.2 activa desde el 24 ago 2026' },
+                    { label: 'Despliegue', description: 'v1.4 activa desde el 13 sep 2026' },
                   ]}
                 />
               </div>

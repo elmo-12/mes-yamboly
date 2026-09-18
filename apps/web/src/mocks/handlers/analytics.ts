@@ -24,7 +24,7 @@ function versionVigente(): VersionModelo {
   return modeloSesion.versiones.find((v) => v.estado === 'vigente') ?? modeloSesion.versiones[0]!;
 }
 
-/** `v3.2` → `v3.3`. */
+/** `v1.4` → `v1.5`. */
 function siguienteVersion(actual: string): string {
   const [mayor, menor] = actual.replace('v', '').split('.');
   return `v${mayor ?? '3'}.${Number(menor ?? 0) + 1}`;
