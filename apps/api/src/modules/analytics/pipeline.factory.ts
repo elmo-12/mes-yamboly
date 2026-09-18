@@ -2,6 +2,7 @@ import type { DataSource } from 'typeorm';
 import {
   Alerta,
   CausaParada,
+  EntrenamientoEjecucion,
   IndicadorDiario,
   Linea,
   Merma,
@@ -14,12 +15,13 @@ import {
   VelocidadEstandar,
 } from '../../database/entities';
 import { DatasetBuilderService } from './dataset';
-import { EntrenamientoService, EvaluacionService } from './modelado';
+import { EntrenamientoContinuoService, EntrenamientoService, EvaluacionService, PythonEntrenamientoClient } from './modelado';
 
 export interface PipelineAnalitica {
   dataset: DatasetBuilderService;
   evaluacion: EvaluacionService;
   entrenamiento: EntrenamientoService;
+  entrenamientoContinuo: EntrenamientoContinuoService;
 }
 
 /**
@@ -28,6 +30,10 @@ export interface PipelineAnalitica {
  * `pnpm --filter @mes/api entrenar` pueden ejecutar exactamente el mismo código
  * que corre dentro de la API — sin duplicar la lógica de entrenamiento en un
  * script aparte, que es como se acaban teniendo dos modelos distintos.
+ *
+ * `entrenamientoContinuo` es el **único** camino de entrenamiento (Python es el
+ * único motor, §F5): `entrenamiento` se conserva sólo por `siguienteVersion()`,
+ * `activar()` e `importancias()`, que `EntrenamientoContinuoService` reutiliza.
  */
 export function crearPipelineAnalitica(dataSource: DataSource): PipelineAnalitica {
   const dataset = new DatasetBuilderService(
@@ -39,16 +45,32 @@ export function crearPipelineAnalitica(dataSource: DataSource): PipelineAnalitic
     dataSource.getRepository(Producto),
     dataSource.getRepository(VelocidadEstandar),
     dataSource.getRepository(MuestraAnalitica),
+    dataSource,
   );
   const evaluacion = new EvaluacionService(
     dataSource.getRepository(Prediccion),
     dataSource.getRepository(IndicadorDiario),
   );
   const entrenamiento = new EntrenamientoService(
-    dataset,
-    evaluacion,
     dataSource.getRepository(ModeloVersion),
     dataSource.getRepository(Alerta),
   );
-  return { dataset, evaluacion, entrenamiento };
+  /*
+   * `useFactory`-equivalente manual: igual que en `AnalyticsModule`, el
+   * constructor de `PythonEntrenamientoClient` toma `url`/`token`/`timeoutMs`
+   * con valor por defecto (`= process.env...`), así que `new` sin argumentos
+   * ya lee `PREDICTION_SERVICE_URL` del entorno del proceso.
+   */
+  const python = new PythonEntrenamientoClient();
+  const entrenamientoContinuo = new EntrenamientoContinuoService(
+    dataSource,
+    dataset,
+    evaluacion,
+    entrenamiento,
+    python,
+    dataSource.getRepository(ModeloVersion),
+    dataSource.getRepository(EntrenamientoEjecucion),
+    dataSource.getRepository(Alerta),
+  );
+  return { dataset, evaluacion, entrenamiento, entrenamientoContinuo };
 }

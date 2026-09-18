@@ -1,7 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { CREDENCIALES, crearApp, login } from './app.factory';
-import { plantarPatron, type PatronPlantado } from './fixtures/analitica.fixture';
 
 /**
  * Módulos de tesis (B2): reportes, alertas, analítica y evidencia.
@@ -407,18 +406,33 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
      * fijas: desde que el módulo entrena sobre `orden_fabricacion`/`parada` los
      * valores dependen del corpus, y clavarlos volvería a atar el test a una
      * maqueta. Lo que se comprueba es que cada endpoint devuelva algo coherente
-     * con lo que hay en la base — y, al final, que el pipeline **descubra** un
-     * patrón plantado a propósito.
+     * con lo que hay en la base.
+     *
+     * `apps/api/test/setup-e2e.ts` deja `PREDICTION_SERVICE_URL` vacía a
+     * propósito (sin Docker, sin `services/prediccion-py`): Python es el único
+     * motor de modelado (F5), así que el intento de bootstrap del seeder
+     * (`ThesisAnalyticsSeeder`) omite el entrenamiento — el orquestador deja
+     * una fila `v1.0` **archivada** con el motivo (`GET /salud` no
+     * respondió), nunca una `vigente`: es el mismo mecanismo con el que
+     * `EntrenamientoContinuoService` archiva cualquier corrida fallida, así
+     * que no hay caso especial que mantener sincronizado en dos sitios.
+     * Estos tests verifican la decisión de arquitectura que eso implica:
+     * ninguna de las 4 pestañas de `/analitica` puede 404 sólo porque
+     * todavía no hay ningún modelo `vigente`. El camino feliz del
+     * orquestador contra un Python real (o un stub) se prueba aparte en
+     * `entrenamiento-continuo.e2e-spec.ts`.
      */
     const esVersion = /^v\d+\.\d+$/;
 
-    it('GET /analitica/resumen describe el modelo entrenado sobre datos reales', async () => {
+    it('GET /analitica/resumen responde 200 con el estado «sin modelo vigente»', async () => {
       const { body } = await get('/analitica/resumen').expect(200);
 
-      expect(body.modelo.version).toMatch(esVersion);
-      expect(body.modelo.activo).toBe(true);
-      expect(body.modelo.eventos).toBeGreaterThan(0);
-      expect(body.modelo.algoritmo).toContain('logística');
+      /* Sin ninguna fila `vigente` el modelo mostrado es el intento
+       * archivado del arranque (o el sentinel «sin-entrenar» si ni eso llegó
+       * a crearse) — nunca un 404, y nunca `activo`. */
+      expect(body.modelo.activo).toBe(false);
+      expect(body.modelo.eventos).toBe(0);
+      expect(typeof body.modelo.algoritmo).toBe('string');
 
       for (const kpi of ['ep', 'precision', 'recall'] as const) {
         expect(body.kpis[kpi]).toBeGreaterThanOrEqual(0);
@@ -482,36 +496,40 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       }
     });
 
-    it('GET /analitica/modelo expone métricas calculadas y fases derivadas', async () => {
+    it('GET /analitica/modelo expone las 6 fases CRISP-DM aunque todavía no haya modelo entrenado', async () => {
       const { body } = await get('/analitica/modelo').expect(200);
       expect(body.fasesCrispDm).toHaveLength(6);
       for (const fase of body.fasesCrispDm) {
         expect(['completada', 'en_curso', 'pendiente']).toContain(fase.estado);
       }
+      /* Sin `services/prediccion-py` no hay ninguna fila `modelo_version`
+       * (§F5): sólo la comprensión del negocio —documentación, no depende de
+       * datos— está «completada»; el resto espera al primer entrenamiento. */
+      const porId = Object.fromEntries(
+        (body.fasesCrispDm as { id: string; estado: string }[]).map((f) => [f.id, f.estado]),
+      );
+      expect(porId.comprension_negocio).toBe('completada');
+      expect(porId.modelado).toBe('pendiente');
+      expect(porId.evaluacion).toBe('pendiente');
 
       const { metricas } = body;
-      expect(metricas.registros).toBeGreaterThan(0);
-      expect(metricas.features).toBeGreaterThan(0);
+      expect(metricas.registros).toBe(0);
+      expect(metricas.features).toBe(0);
       expect(metricas.auc).toBeGreaterThanOrEqual(0);
       expect(metricas.auc).toBeLessThanOrEqual(1);
       expect(metricas.f1).toBeGreaterThanOrEqual(0);
       expect(metricas.f1).toBeLessThanOrEqual(1);
-      /* La matriz de confusión suma exactamente las muestras evaluadas. */
       const evaluadas = metricas.vp + metricas.fp + metricas.vn + metricas.fn;
-      expect(evaluadas).toBeGreaterThan(0);
-      expect(evaluadas).toBeLessThanOrEqual(metricas.registros);
+      expect(evaluadas).toBe(0);
 
-      /* Las variables de entrada son los grupos de features, con su peso real. */
-      expect(body.variablesEntrada.length).toBeGreaterThan(0);
-      expect(body.variablesEntrada[0].importancia).toBe(100);
-      for (const variable of body.variablesEntrada) {
-        expect(variable.importancia).toBeGreaterThanOrEqual(0);
-        expect(variable.importancia).toBeLessThanOrEqual(100);
+      /* El intento de bootstrap deja su propia fila archivada (el mismo
+       * mecanismo que archiva cualquier corrida fallida) — nunca una
+       * `vigente`. */
+      expect(body.versiones.every((v: { estado: string }) => v.estado !== 'vigente')).toBe(true);
+      for (const version of body.versiones as { version: string }[]) {
+        expect(version.version).toMatch(esVersion);
       }
-
-      /* `metricas.registros` es el nº de muestras con el que se entrenó. */
-      const resumen = await get('/analitica/resumen').expect(200);
-      expect(metricas.registros).toBe(resumen.body.modelo.eventos);
+      expect(body.variablesEntrada).toEqual([]);
     });
 
     it('GET /analitica/estado-datos cuenta los eventos productivos reales', async () => {
@@ -529,7 +547,29 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       expect(suficiente.body.suficiente).toBe(true);
     });
 
-    it('GET /analitica/predicciones devuelve la serie y el histórico contrastado', async () => {
+    /**
+     * Decisión de arquitectura (F5, ítem 5): apagar Python no puede romper
+     * ninguna pantalla. Las 4 pestañas responden 200 sin modelo entrenado, y
+     * `recalcular` sirve las 9 líneas vía `cascada:reglas` sin lanzar ninguna
+     * excepción — exactamente lo que promete `docs/prediccion-python.md` §1,
+     * regla 4.
+     */
+    it('arquitectura: con PREDICTION_SERVICE_URL vacía, las 4 pestañas responden 200 y recalcular sirve vía cascada:reglas', async () => {
+      for (const pestana of ['resumen', 'patrones', 'predicciones', 'modelo'] as const) {
+        await get(`/analitica/${pestana}`).expect(200);
+      }
+
+      const { body } = await post('/analitica/predicciones/recalcular').expect(200);
+      const lineas = await get('/lineas').expect(200);
+      const activas = (lineas.body.data as { estado: string }[]).filter((l) => l.estado === 'activo');
+      expect(body.predicciones).toBe(activas.length);
+      expect(body.proveedor).toContain('cascada');
+      expect(body.proveedor).toContain('reglas');
+      /* Con `PREDICTION_SERVICE_URL` vacía la cascada no puede caer en Python. */
+      expect(body.proveedor).not.toContain('python');
+    });
+
+    it('GET /analitica/predicciones devuelve la serie diaria y el histórico de las predicciones vivas', async () => {
       const { body } = await get('/analitica/predicciones').expect(200);
 
       expect(body.serie.length).toBeLessThanOrEqual(30);
@@ -540,44 +580,35 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
         expect(punto.real).toBeGreaterThanOrEqual(0);
       }
 
-      expect(body.historico.length).toBeGreaterThan(0);
+      /* El `recalcular` de la prueba anterior deja predicciones «vivas»; no hay
+       * backtest porque no hay modelo entrenado, así que el histórico sale
+       * enteramente de ese ciclo en vivo. */
       for (const fila of body.historico) {
         expect([true, false, null]).toContain(fila.acierto);
         expect(fila.probabilidad).toBeGreaterThanOrEqual(0);
         expect(fila.probabilidad).toBeLessThanOrEqual(100);
       }
-      expect(body.matrizConfusion).toEqual(
-        expect.objectContaining({ vp: expect.any(Number), fn: expect.any(Number) }),
-      );
+      /* Sin ninguna versión `vigente` no hay matriz de confusión que reportar. */
+      expect(body.matrizConfusion).toBeUndefined();
     });
 
-    it('POST /analitica/predicciones/recalcular puntúa las 9 líneas del turno siguiente', async () => {
-      const { body } = await post('/analitica/predicciones/recalcular').expect(200);
-      const lineas = await get('/lineas').expect(200);
-      const activas = (lineas.body.data as { estado: string }[]).filter((l) => l.estado === 'activo');
-      expect(body.predicciones).toBe(activas.length);
-      expect(body.proveedor).toContain('cascada');
-      /* Con `PREDICTION_SERVICE_URL` vacía la cascada no puede caer en Python. */
-      expect(body.proveedor).not.toContain('python');
-    });
-
-    it('POST /analitica/reentrenar ejecuta el pipeline y deja la versión vigente', async () => {
-      const antes = await get('/analitica/modelo').expect(200);
+    it('POST /analitica/reentrenar no puede entrenar sin Python y lo deja registrado con un motivo claro', async () => {
       const { body } = await post('/analitica/reentrenar').expect(202);
       expect(body.estado).toBe('entrenando');
       expect(body.version).toMatch(esVersion);
-      expect(body.version).not.toBe(antes.body.versiones[0].version);
 
-      const vigente = await esperarVigente(body.version);
-      expect(vigente.versiones[0]).toMatchObject({ version: body.version, estado: 'vigente' });
-      expect(vigente.reentrenamiento).toMatchObject({ estado: 'listo', version: body.version });
+      const final = await esperarReentrenamientoTerminal();
+      expect(final.reentrenamiento).toMatchObject({ estado: 'error', version: body.version });
+      /* El mensaje tiene que señalar de verdad al servicio de predicción, no
+       * un error genérico: es lo que el jefe lee en el toast de la UI. */
+      expect(final.reentrenamiento.mensaje).toMatch(/omitido|Python|predicción/i);
 
-      /* Volver a la versión anterior deja el resto archivado. */
-      const anterior = antes.body.versiones[0].version;
-      const vuelta = await post(`/analitica/modelo/${anterior}/activar`).expect(200);
-      expect(
-        vuelta.body.versiones.find((v: { version: string }) => v.version === anterior).estado,
-      ).toBe('vigente');
+      /* La fila candidata queda archivada con su motivo: nunca «vigente» sin
+       * que Python la haya entrenado de verdad. */
+      const candidata = (final.versiones as { version: string; estado: string }[]).find(
+        (v) => v.version === body.version,
+      );
+      expect(candidata?.estado).toBe('archivada');
     });
 
     it('404 al activar una versión inexistente', async () => {
@@ -592,77 +623,17 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
         .expect(403);
     });
 
-    /** Sondea `/analitica/modelo` hasta que la versión pedida queda vigente. */
-    async function esperarVigente(version: string, limiteMs = 20_000) {
+    /** Sondea `/analitica/modelo` hasta que el reentrenamiento en curso llega a un estado terminal. */
+    async function esperarReentrenamientoTerminal(limiteMs = 20_000) {
       const hasta = Date.now() + limiteMs;
       let ultimo: Record<string, never> | undefined;
       while (Date.now() < hasta) {
         const { body } = await get('/analitica/modelo').expect(200);
         ultimo = body;
-        const encontrada = (body.versiones as { version: string; estado: string }[]).find(
-          (v) => v.version === version,
-        );
-        if (encontrada?.estado === 'vigente') return body;
+        if (body.reentrenamiento && body.reentrenamiento.estado !== 'entrenando') return body;
         await new Promise((r) => setTimeout(r, 200));
       }
-      throw new Error(`La versión ${version} no quedó vigente: ${JSON.stringify(ultimo)}`);
+      throw new Error(`El reentrenamiento no llegó a un estado terminal: ${JSON.stringify(ultimo)}`);
     }
-  });
-
-  /* ---------------------------------------------------------------- */
-  /* Analítica · el pipeline descubre un patrón plantado                */
-  /* ---------------------------------------------------------------- */
-
-  describe('analítica · patrón plantado', () => {
-    /**
-     * Prueba fuerte del pipeline (§8.2 del plan de IA): se siembran 30 días en
-     * los que `LLEN-M2` para **siempre** en turno Noche y **nunca** en Día, se
-     * reentrena y se exige que el modelo haya aprendido esa regularidad. Va al
-     * final del archivo porque altera el corpus del resto de módulos.
-     */
-    let plantado: PatronPlantado;
-
-    beforeAll(async () => {
-      plantado = await plantarPatron(app);
-      const { body } = await post('/analitica/reentrenar').expect(202);
-      const hasta = Date.now() + 30_000;
-      while (Date.now() < hasta) {
-        const modelo = await get('/analitica/modelo').expect(200);
-        const fila = (modelo.body.versiones as { version: string; estado: string }[]).find(
-          (v) => v.version === body.version,
-        );
-        if (fila?.estado === 'vigente') return;
-        await new Promise((r) => setTimeout(r, 200));
-      }
-      throw new Error('El reentrenamiento con el patrón plantado no terminó');
-    });
-
-    it('el feature store crece con los turnos plantados', async () => {
-      const { body } = await get('/analitica/modelo/diagnostico').expect(200);
-      expect(body.perfilDatos.muestras).toBeGreaterThanOrEqual(plantado.turnos);
-      expect(body.muestras).toBe(body.perfilDatos.muestras);
-    });
-
-    it('el modelo aprende que la línea plantada para en turno Noche', async () => {
-      const { body } = await get('/analitica/modelo/diagnostico').expect(200);
-
-      const top = (body.topFeatures as { nombre: string; importancia: number }[])
-        .slice(0, 5)
-        .map((f) => f.nombre);
-      /* `turnoEsNoche` es la variable que separa el patrón plantado. */
-      expect(top).toContain('turnoEsNoche');
-
-      /* Con una señal tan marcada el modelo tiene que superar claramente el azar. */
-      expect(body.auc).toBeGreaterThan(0.6);
-      expect(body.matrizConfusion.vp).toBeGreaterThan(0);
-      expect(body.umbralDecision).toBeGreaterThan(0);
-      expect(body.umbralDecision).toBeLessThan(100);
-    });
-
-    it('la validación es temporal: el corte de prueba va después del de entrenamiento', async () => {
-      const { body } = await get('/analitica/modelo/diagnostico').expect(200);
-      expect(body.validacion).toContain('walk-forward');
-      expect(body.corteEntrenamiento < body.cortePrueba).toBe(true);
-    });
   });
 });

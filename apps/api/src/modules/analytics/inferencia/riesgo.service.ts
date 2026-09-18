@@ -14,6 +14,7 @@ import {
 } from '../../../database/entities';
 import {
   PREDICTION_PROVIDER,
+  type PredictionContext,
   type PredictionProvider,
 } from '../../alerts/prediction';
 import { AlertsEngineService, type SenalLinea } from '../../alerts/alerts-engine.service';
@@ -99,12 +100,13 @@ export class RiesgoService {
 
     const riesgos: RiesgoLinea[] = [];
     const filas: Prediccion[] = [];
+    let nivelPuntuacion = this.proveedor.nombre;
     let alertasCreadas = 0;
 
     for (const linea of lineas) {
       const muestra = muestras.get(linea.id);
       const features = muestra?.features ?? {};
-      const { probabilidad } = await this.proveedor.predict({
+      const ctxPrediccion: PredictionContext = {
         tipo: 'parada_prevista',
         lineaId: linea.id,
         lineaCodigo: linea.codigo,
@@ -115,7 +117,29 @@ export class RiesgoService {
         oeeActual: features.oeeTurnoPrevio ?? 0,
         minutosDesdeCambio: 0,
         features: muestra?.features,
-      });
+      };
+      const resultado = await this.proveedor.predict(ctxPrediccion);
+      /* El nivel que importa es el que puntuó **el riesgo de parada**, no el de
+       * la última llamada del ciclo: el motor de alertas evalúa después
+       * `velocidad_baja` y `oee_bajo`, tipos que Python rechaza con 422 por
+       * contrato, así que `proveedor.nombre` acababa diciendo siempre
+       * «cascada:reglas» aunque las 9 líneas las hubiera puntuado Python. */
+      nivelPuntuacion = this.proveedor.nombre;
+      const { probabilidad } = resultado;
+      /*
+       * Incoherencia D5: este mismo ciclo llama más abajo a `motor.evaluar()`,
+       * que —si dispara `parada_prevista`— vuelve a pedirle una probabilidad al
+       * mismo PREDICTION_PROVIDER, pero con un `PredictionContext` más estrecho
+       * (`AlertsEngineService.evaluar()` no tiene el vector `features`, sólo el
+       * contexto que cabe en `SenalLinea`). Con Python activo eso puede vectorizar
+       * distinto y devolver una probabilidad distinta para la misma línea/turno.
+       * No podemos ampliar `SenalLinea`/`AlertsEngineService` con `features` sin
+       * tocar ese servicio (fuera de los archivos de este bloque), así que en su
+       * lugar dejamos precargada la respuesta ya calculada arriba: si el
+       * proveedor la soporta (la cascada sí, vía `precalcular()`), la reutiliza
+       * en la próxima llamada con el mismo tipo/línea/turno en vez de recalcular.
+       */
+      this.proveedor.precalcular?.(ctxPrediccion, resultado);
       const causa = causas.get(linea.id) ?? causas.get('*');
 
       riesgos.push({
@@ -165,7 +189,7 @@ export class RiesgoService {
 
     this.logger.log(
       `Ciclo ${objetivo.fecha}/${objetivo.turno}: ${filas.length} predicciones · ` +
-        `${alertasCreadas} alerta(s) · ${vencidas} vencida(s) · ${this.proveedor.nombre}`,
+        `${alertasCreadas} alerta(s) · ${vencidas} vencida(s) · ${nivelPuntuacion}`,
     );
     return {
       objetivo,
@@ -173,7 +197,7 @@ export class RiesgoService {
       predicciones: filas.length,
       alertas: alertasCreadas,
       vencidas,
-      proveedor: this.proveedor.nombre,
+      proveedor: nivelPuntuacion,
     };
   }
 

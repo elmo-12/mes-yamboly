@@ -59,7 +59,19 @@ export class AnalyticsController {
   @Roles('jefe', 'investigador')
   @ApiOperation({ summary: 'Encola un reentrenamiento — sólo jefe e investigador' })
   reentrenar(): Promise<ReentrenamientoJob> {
-    return this.analitica.reentrenar();
+    return this.analitica.reentrenar('manual');
+  }
+
+  @Post('reentrenar/continuo')
+  @HttpCode(202)
+  @Roles('jefe', 'investigador')
+  @ApiOperation({
+    summary:
+      'Encola un reentrenamiento contra el orquestador continuo (Python) — sólo jefe e investigador. ' +
+      'Mismo contrato ReentrenamientoJob que /reentrenar: el mensaje final indica si la versión candidata quedó vigente o no.',
+  })
+  reentrenarContinuo(): Promise<ReentrenamientoJob> {
+    return this.analitica.reentrenarContinuo();
   }
 
   @Get('modelo/diagnostico')

@@ -6,7 +6,6 @@ import { AlertsService } from './alerts.service';
 import { AlertsEngineService } from './alerts-engine.service';
 import { AlertsLookupService } from './alerts-lookup.service';
 import {
-  ModeloLocalPredictionProvider,
   PREDICTION_PROVIDER,
   PrediccionCascadaProvider,
   PythonHttpPredictionProvider,
@@ -15,11 +14,11 @@ import {
 
 /**
  * El proveedor de predicciones se resuelve por el token `PREDICTION_PROVIDER`
- * con la cascada de tres niveles: servicio Python (sólo si
- * `PREDICTION_SERVICE_URL` está definida) → modelo local entrenado (si hay una
- * `modelo_version` vigente con pesos) → reglas deterministas. Los tres detrás
- * de la misma interfaz, de modo que el motor de alertas no distingue cuál
- * respondió.
+ * con la cascada de dos niveles (F0: Python es el único motor de modelado
+ * entrenado, se retiró el modelo local en TypeScript): servicio Python (sólo
+ * si `PREDICTION_SERVICE_URL` está definida) → reglas deterministas. Los dos
+ * detrás de la misma interfaz, de modo que el motor de alertas no distingue
+ * cuál respondió.
  */
 @Module({
   imports: [TypeOrmModule.forFeature([Alerta, Umbrales, RegistroEp, ModeloVersion])],
@@ -29,24 +28,16 @@ import {
     AlertsEngineService,
     AlertsLookupService,
     RuleBasedPredictionProvider,
-    ModeloLocalPredictionProvider,
     {
       provide: PREDICTION_PROVIDER,
-      inject: [RuleBasedPredictionProvider, ModeloLocalPredictionProvider],
-      useFactory: (reglas: RuleBasedPredictionProvider, local: ModeloLocalPredictionProvider) =>
+      inject: [RuleBasedPredictionProvider],
+      useFactory: (reglas: RuleBasedPredictionProvider) =>
         new PrediccionCascadaProvider(
           process.env.PREDICTION_SERVICE_URL ? new PythonHttpPredictionProvider(reglas) : null,
-          local,
           reglas,
         ),
     },
   ],
-  exports: [
-    AlertsService,
-    AlertsEngineService,
-    AlertsLookupService,
-    ModeloLocalPredictionProvider,
-    PREDICTION_PROVIDER,
-  ],
+  exports: [AlertsService, AlertsEngineService, AlertsLookupService, PREDICTION_PROVIDER],
 })
 export class AlertsModule {}

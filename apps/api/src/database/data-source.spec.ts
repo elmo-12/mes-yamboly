@@ -27,8 +27,8 @@ describe('opcionesDataSource', () => {
     expect(opcionesDataSource({})).toMatchObject({ type: 'sqlite', database: ':memory:' });
   });
 
-  it('registra las 38 entidades en ambos motores', () => {
-    expect(ENTITIES).toHaveLength(38);
+  it('registra las 39 entidades en ambos motores', () => {
+    expect(ENTITIES).toHaveLength(39);
     expect(opcionesDataSource({ databaseUrl: URL_PG }).entities).toBe(ENTITIES);
     expect(opcionesDataSource({ dbPath: ':memory:' }).entities).toBe(ENTITIES);
   });

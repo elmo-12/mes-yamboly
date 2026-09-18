@@ -54,14 +54,14 @@ export const FASES_DESCRIPCION = [
     id: 'modelado' as const,
     nombre: 'Modelado',
     descripcion:
-      'Regresión logística con regularización L2 entrenada sobre las muestras anticipadas y ponderación inversa de clase.',
+      'LightGBM/HistGB/regresión logística (`services/prediccion-py`) entrenados sobre las muestras anticipadas, con selección del algoritmo ganador por PR-AUC.',
     metricas: null,
   },
   {
     id: 'evaluacion' as const,
     nombre: 'Evaluación',
     descripcion:
-      'Validación temporal walk-forward de 5 pliegues, matriz de confusión, umbral por F1, Brier y lift@top-3.',
+      'Validación temporal walk-forward de 5 pliegues, matriz de confusión, PR-AUC/ROC-AUC, Brier y lift@top-3.',
     metricas: null,
   },
   {

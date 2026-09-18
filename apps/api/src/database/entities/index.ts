@@ -33,6 +33,7 @@ export * from './alerta.entity';
 export * from './umbrales.entity';
 export * from './prediccion.entity';
 export * from './modelo-version.entity';
+export * from './entrenamiento-ejecucion.entity';
 export * from './muestra-analitica.entity';
 export * from './registro-tiempo.entity';
 export * from './evaluacion-calidad.entity';

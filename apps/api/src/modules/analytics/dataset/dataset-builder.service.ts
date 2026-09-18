@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import { calcDesvioVelocidad } from '@mes/shared';
 import type { Turno } from '@mes/types';
 import {
@@ -28,10 +28,38 @@ import {
 /** Minutos mínimos de una parada para que cuente como evento relevante (§4.1). */
 export const UMBRAL_MIN_PARADA = 10;
 
+/**
+ * Prefijo de los tipos de causa que cuentan como parada imprevista real.
+ *
+ * `causa_parada.clasificacion` marca como `imprevista` toda la rama
+ * `PS-05 Paro sin programa`, de la que cuelgan `Refrigerio` —la causa nº 1 del
+ * corpus, 113 eventos y 6 011 min— y `Apoyo a otra línea`: tiempo sin programa
+ * de producción, no averías. Contarlas dejaba el target en el 63 % de los
+ * granos, con lo que el modelo aprendía el horario del almuerzo en vez de las
+ * fallas. El target son las ramas `PN-*` (fallas, demoras e imprevistos), que
+ * es lo único que un supervisor puede prevenir interviniendo la línea.
+ */
+export const PREFIJO_TIPO_IMPREVISTO = 'PN';
+
+/** `true` si el tipo raíz de la parada es una imprevista accionable (rama `PN-*`). */
+export function esImprevistaAccionable(tipo: CausaParada | undefined): boolean {
+  return (
+    tipo?.clasificacion === 'imprevista' && tipo.codigo.startsWith(PREFIJO_TIPO_IMPREVISTO)
+  );
+}
+
 /** Ventana de la regla anti-fuga corta, en milisegundos. */
 const MS_7D = 7 * 86_400_000;
 const MS_30D = 30 * 86_400_000;
 const MIN_TURNO = 720;
+
+/**
+ * Fracción final del corpus reservada a prueba. Debe coincidir con
+ * `FRACCION_PRUEBA` de `evaluacion.service.ts`: el corte que define el target
+ * y el que evalúa el modelo tienen que ser el mismo, o el target vuelve a ver
+ * el futuro.
+ */
+const FRACCION_PRUEBA_TARGET = 0.3;
 
 /** Franja de positivos dentro de la cual la regla «parada individual» es usable (R2). */
 const TASA_POSITIVOS_MIN = 0.15;
@@ -155,12 +183,20 @@ export class DatasetBuilderService {
     @InjectRepository(Producto) private readonly productos: Repository<Producto>,
     @InjectRepository(VelocidadEstandar) private readonly pares: Repository<VelocidadEstandar>,
     @InjectRepository(MuestraAnalitica) private readonly muestras: Repository<MuestraAnalitica>,
+    private readonly dataSource: DataSource,
   ) {}
 
-  /** Reconstruye el feature store completo y lo persiste. */
+  /**
+   * Reconstruye el feature store completo y lo persiste.
+   *
+   * El borrado y la inserción van **en una sola transacción**: antes eran un
+   * `clear()` seguido de un `save()` sueltos, así que durante un segundo la
+   * tabla quedaba vacía —la pestaña Modelo podía mostrar «Muestras: 0»— y, si
+   * el `save()` fallaba a mitad, el feature store se quedaba vacío o a medias y
+   * el entrenamiento siguiente entrenaba sobre un corpus truncado sin avisar.
+   */
   async reconstruir(): Promise<DatasetConstruido> {
     const dataset = await this.construir();
-    await this.muestras.clear();
     const filas = dataset.muestras.map((m) =>
       this.muestras.create({
         id: `MUE-${m.lineaCodigo}-${m.fecha}-${m.turno}-${m.modo}`,
@@ -179,7 +215,11 @@ export class DatasetBuilderService {
         construidaEn: ahoraIso(),
       }),
     );
-    await this.muestras.save(filas, { chunk: 200 });
+    await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(MuestraAnalitica);
+      await repo.createQueryBuilder().delete().execute();
+      await repo.save(filas, { chunk: 200 });
+    });
     this.logger.log(
       `Feature store reconstruido: ${filas.length} filas (${dataset.perfil.muestras} por modo)`,
     );
@@ -286,11 +326,26 @@ export class DatasetBuilderService {
 
   /**
    * Binariza el target (§4.1 y R2). La regla natural — «hubo una parada
-   * imprevista de ≥ 10 min» — sólo se conserva si deja una tasa de positivos
-   * utilizable; con el corpus real deja el 73 %, que haría trivial el problema,
-   * así que se cae a «minutos imprevistos del turno por encima de la mediana»,
-   * la alternativa que el propio plan deja prevista.
+   * imprevista accionable de ≥ 10 min» — sólo se conserva si deja una tasa de
+   * positivos utilizable. Con la rama `PN-*` deja el 36 % sobre el corpus de
+   * 30 días, así que es la que se usa; si algún corpus futuro la sacase de la
+   * franja, se cae a «minutos imprevistos del turno por encima de la mediana
+   * del tramo de entrenamiento», la alternativa que el propio plan prevé.
    */
+  /**
+   * Muestras del tramo de entrenamiento del corte temporal: los días más
+   * antiguos, en la misma proporción que `FRACCION_PRUEBA` de la evaluación.
+   * Cualquier estadístico que defina el target debe salir de aquí, nunca del
+   * corpus completo.
+   */
+  private tramoEntrenamiento(anticipadas: MuestraCalculada[]): MuestraCalculada[] {
+    const dias = [...new Set(anticipadas.map((m) => m.fecha))].sort();
+    if (dias.length < 2) return anticipadas;
+    const corte = Math.max(1, Math.floor(dias.length * (1 - FRACCION_PRUEBA_TARGET)));
+    const hasta = dias[corte - 1]!;
+    return anticipadas.filter((m) => m.fecha <= hasta);
+  }
+
   private aplicarTarget(granos: Grano[], muestras: MuestraCalculada[], perfil: PerfilDatos): void {
     const porClave = new Map(granos.map((g) => [`${g.lineaId}|${g.inicioTurno}`, g]));
     const anticipadas = muestras.filter((m) => m.modo === 'anticipado');
@@ -300,7 +355,11 @@ export class DatasetBuilderService {
     const tasaRegla = anticipadas.length ? positivosRegla / anticipadas.length : 0;
 
     const usarRegla = tasaRegla >= TASA_POSITIVOS_MIN && tasaRegla <= TASA_POSITIVOS_MAX;
-    const corte = mediana(anticipadas.map((m) => m.minutosImprevistos));
+    /* El corte se calcula **sólo con el tramo de entrenamiento** (los días más
+     * antiguos, con la misma fracción que usa la validación temporal). Tomarlo
+     * sobre todas las muestras dejaba que la mediana viese los días que después
+     * actúan como prueba: una fuga silenciosa que inflaba las métricas. */
+    const corte = mediana(this.tramoEntrenamiento(anticipadas).map((m) => m.minutosImprevistos));
 
     for (const m of muestras) {
       const g = porClave.get(`${m.lineaId}|${m.inicioTurno}`);
@@ -388,7 +447,7 @@ export class DatasetBuilderService {
           sinCategorizar += 1;
         }
         if (p.afectaOee) minutosOee += p.duracionMin;
-        if (!p.afectaOee || tipo?.clasificacion !== 'imprevista') continue;
+        if (!p.afectaOee || !esImprevistaAccionable(tipo)) continue;
         minutosImprevistos += p.duracionMin;
         if (p.duracionMin >= UMBRAL_MIN_PARADA) paradasImprevistas += 1;
         minutosPorTipo.set(p.tipoCausaId, (minutosPorTipo.get(p.tipoCausaId) ?? 0) + p.duracionMin);

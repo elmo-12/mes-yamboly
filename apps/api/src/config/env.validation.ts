@@ -16,6 +16,20 @@ export const envSchema = z.object({
   WEB_URL: z.string().optional(),
   PREDICTION_SERVICE_URL: z.string().url().optional().or(z.literal('')),
   PREDICTION_TIMEOUT_MS: z.coerce.number().default(1500),
+  /** Timeout de `POST /entrenar` (bloque B): puede tardar hasta 10 min (§3 del contrato). */
+  PREDICTION_TRAIN_TIMEOUT_MS: z.coerce.number().int().positive().default(600_000),
+  /** Cabecera `X-Internal-Token` que exige Python en las mutaciones de `/modelo/*` cuando está definida. */
+  PREDICCION_TOKEN: z.string().optional(),
+  /**
+   * `'true'`/`'false'` como texto, no boolean: igual que `INFERENCIA_ACTIVA`,
+   * se lee tal cual con `!== 'false'`/`=== 'true'` (ver `inferenciaActiva()` y
+   * `entrenamientoContinuoActivo()`) — `z.coerce.boolean()` convertiría
+   * `"false"` en `true` porque `Boolean("false")` es `true`.
+   */
+  ENTRENAMIENTO_ACTIVO: z.string().optional(),
+  ENTRENAMIENTO_CRON: z.string().default('0 3 * * 1'),
+  /** Ya se leía en `inferencia.scheduler.ts`; aquí sólo se valida el formato. */
+  INFERENCIA_ACTIVA: z.string().optional(),
   SWAGGER_PATH: z.string().default('docs'),
 });
 

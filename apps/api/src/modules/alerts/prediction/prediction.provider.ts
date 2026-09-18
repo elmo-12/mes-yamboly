@@ -41,4 +41,13 @@ export interface PredictionResult {
 export interface PredictionProvider {
   readonly nombre: string;
   predict(ctx: PredictionContext): Promise<PredictionResult>;
+  /**
+   * Opcional: deja precargado el resultado de un `predict()` ya resuelto para
+   * que una llamada posterior con el mismo `tipo`/`lineaId`/`turno` (aunque
+   * traiga menos contexto, p. ej. sin `features`) reutilice esa respuesta en
+   * vez de recalcularla. Sólo `PrediccionCascadaProvider` lo implementa; existe
+   * para que `RiesgoService` y `AlertsEngineService` no puedan puntuar la misma
+   * línea dos veces con resultados distintos dentro del mismo ciclo (§5.2).
+   */
+  precalcular?(ctx: PredictionContext, resultado: PredictionResult): void;
 }

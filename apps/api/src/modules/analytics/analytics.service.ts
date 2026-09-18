@@ -28,8 +28,9 @@ import {
   Parada,
   Prediccion,
   RegistroEp,
+  type DecisionPromocion,
+  type DisparadorEntrenamiento,
 } from '../../database/entities';
-import { ModeloLocalPredictionProvider } from '../alerts/prediction';
 import {
   EVENTOS_DEMO_INSUFICIENTES,
   EVENTOS_REQUERIDOS,
@@ -37,7 +38,12 @@ import {
   FASES_DESCRIPCION,
   RITMO_DIARIO_EVENTOS,
 } from './analytics.constants';
-import { DatosInsuficientesError, EntrenamientoService, importanciaRelativa } from './modelado';
+import {
+  DatosInsuficientesError,
+  EntrenamientoContinuoService,
+  EntrenamientoService,
+  OBJETIVO_PERSISTIDO,
+} from './modelado';
 import { RiesgoService } from './inferencia';
 import { PatronesService } from './patrones';
 
@@ -79,16 +85,25 @@ export class AnalyticsService implements OnModuleDestroy {
     private readonly patronesService: PatronesService,
     private readonly riesgo: RiesgoService,
     private readonly entrenamiento: EntrenamientoService,
-    private readonly modeloLocal: ModeloLocalPredictionProvider,
+    private readonly entrenamientoContinuo: EntrenamientoContinuoService,
   ) {}
 
   /* ---------------------------------------------------------------- */
   /* 08.A — Resumen                                                    */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * `vigente` puede ser `null`: sin `services/prediccion-py` disponible (o sin
+   * corpus suficiente) el arranque no siembra ningún `modelo_version` (§F5).
+   * Ese estado ya lo distingue el frontend por su cuenta vía
+   * `/analitica/estado-datos` (08.E, `DatosInsuficientes.tsx`) — pero el
+   * backend no debe 404 las 4 pestañas sólo porque todavía no hay modelo: el
+   * resto de la pantalla (riesgo por línea vía cascada, insights, alertas
+   * activas) sigue funcionando sin él.
+   */
   async resumen(): Promise<AnaliticaResumen> {
-    const vigente = await this.vigente();
-    const anterior = await this.anterior(vigente.version);
+    const vigente = await this.vigenteOpcional();
+    const anterior = vigente ? await this.anterior(vigente.version) : null;
     const activas = await this.alertas.find({ where: { estado: 'activa' }, order: { generadaEn: 'DESC' } });
 
     const prediccionesActivas: PrediccionActiva[] = activas.map((a) => ({
@@ -108,21 +123,29 @@ export class AnalyticsService implements OnModuleDestroy {
     ]);
 
     return {
-      modelo: {
-        version: vigente.version,
-        entrenadoEn: vigente.entrenadoEn,
-        eventos: vigente.eventos,
-        algoritmo: vigente.algoritmo,
-        activo: vigente.estado === 'vigente',
-      },
-      variablesModelo: vigente.features,
+      modelo: vigente
+        ? {
+            version: vigente.version,
+            entrenadoEn: vigente.entrenadoEn,
+            eventos: vigente.eventos,
+            algoritmo: vigente.algoritmo,
+            activo: vigente.estado === 'vigente',
+          }
+        : {
+            version: 'sin-entrenar',
+            entrenadoEn: '',
+            eventos: 0,
+            algoritmo: 'Sin modelo entrenado',
+            activo: false,
+          },
+      variablesModelo: vigente?.features ?? 0,
       kpis: {
         ep: await this.epActual(),
-        precision: vigente.precision,
-        recall: vigente.recall,
+        precision: vigente?.precision ?? 0,
+        recall: vigente?.recall ?? 0,
         alertas30d,
-        precisionDelta: anterior ? redondear(vigente.precision - anterior.precision) : undefined,
-        recallDelta: anterior ? redondear(vigente.recall - anterior.recall) : undefined,
+        precisionDelta: anterior && vigente ? redondear(vigente.precision - anterior.precision) : undefined,
+        recallDelta: anterior && vigente ? redondear(vigente.recall - anterior.recall) : undefined,
         alertas30dDelta: anterior ? alertas30d - anterior.alertas30d : undefined,
       },
       insights,
@@ -184,10 +207,35 @@ export class AnalyticsService implements OnModuleDestroy {
   /* ---------------------------------------------------------------- */
 
   async modelo(): Promise<Modelo> {
-    const filas = await this.versiones.find({ order: { orden: 'ASC' } });
+    const filas = await this.versiones.find({ where: { objetivo: OBJETIVO_PERSISTIDO }, order: { orden: 'ASC' } });
     const vigente = filas.find((v) => v.estado === 'vigente') ?? filas[0];
-    if (!vigente) throw new NoEncontradoException('Modelo predictivo');
     const entrenando = filas.some((v) => v.estado === 'entrenando');
+
+    /*
+     * Sin ninguna fila de `modelo_version` (arranque sin `services/prediccion-py`
+     * disponible, o sin corpus suficiente, §F5): la pestaña Modelo es la ÚNICA
+     * que el frontend sigue consultando aunque `estado-datos` diga «insuficiente»
+     * (muestra la metodología CRISP-DM como documentación), así que no puede
+     * 404 — responde con las 6 fases pendientes y sin versiones.
+     */
+    if (!vigente) {
+      const fasesCrispDm: FaseCrispDm[] = FASES_DESCRIPCION.map((fase, i) => ({
+        id: fase.id,
+        orden: i + 1,
+        nombre: fase.nombre,
+        estado: fase.id === 'comprension_negocio' ? 'completada' : 'pendiente',
+        descripcion: fase.descripcion,
+        metricas: fase.metricas ?? [],
+      }));
+      return {
+        fasesCrispDm,
+        metricas: { registros: 0, features: 0, algoritmo: 'Sin modelo entrenado', auc: 0, f1: 0, vp: 0, fp: 0, vn: 0, fn: 0 },
+        versiones: [],
+        variablesEntrada: [],
+        reentrenamiento: this.job ?? undefined,
+      };
+    }
+
     const perfil = vigente.perfilDatos;
     const muestras = await this.muestras.count({ where: { modo: 'anticipado' } });
     const vivas = await this.predicciones.count({ where: { origen: 'vivo' } });
@@ -219,7 +267,16 @@ export class AnalyticsService implements OnModuleDestroy {
         ],
       },
       modelado: {
-        estado: vigente.coeficientes ? 'completada' : entrenando ? 'en_curso' : 'pendiente',
+        /* `coeficientes` es del motor TS heredado; el motor real (bloque B)
+         * es Python, que no guarda pesos en Postgres — sólo el artefacto y su
+         * hash. Sin este `||` la fase se quedaría «pendiente» para siempre en
+         * cuanto la primera versión `python-gbm` quedara vigente. */
+        estado:
+          vigente.coeficientes || (vigente.proveedor === 'python-gbm' && vigente.artefactoUri)
+            ? 'completada'
+            : entrenando
+              ? 'en_curso'
+              : 'pendiente',
         metricas: [
           { label: 'Algoritmo', valor: vigente.algoritmo.replace(/\s*\(.*\)$/, '') },
           { label: 'Positivos', valor: perfil ? `${this.decimal(perfil.tasaPositivos * 100)} %` : '—' },
@@ -305,15 +362,17 @@ export class AnalyticsService implements OnModuleDestroy {
       umbralDecision: vigente.umbralDecision,
       corteEntrenamiento: vigente.corteEntrenamiento,
       cortePrueba: vigente.cortePrueba,
-      lambdaL2: vigente.coeficientes?.lambdaL2 ?? null,
-      /* Coeficientes más influyentes por nombre crudo de feature: es lo que
-       * permite comprobar que el pipeline descubrió un patrón concreto. */
-      topFeatures: vigente.coeficientes
-        ? importanciaRelativa({
-            ...vigente.coeficientes,
-            nombres: vigente.coeficientes.nombres,
-          }).slice(0, 8)
-        : [],
+      /*
+       * Python es el único motor de modelado (F5): ya no hay coeficientes de
+       * regresión logística que reponderar en Nest. `topFeatures` sale de
+       * `importancias`, que Python ya devuelve agrupadas y ordenadas en la
+       * propia respuesta de `POST /entrenar` (§3 del contrato).
+       */
+      topFeatures: (vigente.importancias ?? [])
+        .slice()
+        .sort((a, b) => b.importancia - a.importancia)
+        .slice(0, 8)
+        .map((v) => ({ nombre: v.nombre, importancia: v.importancia })),
       perfilDatos: vigente.perfilDatos,
     };
   }
@@ -396,40 +455,51 @@ export class AnalyticsService implements OnModuleDestroy {
   /* ---------------------------------------------------------------- */
 
   /**
-   * Lanza el pipeline completo y responde 202 de inmediato: reconstruir el
-   * feature store, validar, entrenar y rehacer el backtest tarda menos de dos
-   * segundos con este volumen, pero el contrato con la UI es asíncrono y el
-   * sondeo de `useModelo()` no cambia.
+   * Encola un reentrenamiento contra el orquestador continuo
+   * (`EntrenamientoContinuoService`) y responde 202 de inmediato: el
+   * entrenamiento en sí corre contra `services/prediccion-py` (hasta 600 s),
+   * así que la respuesta no puede esperarlo. El contrato con la UI sigue
+   * siendo `ReentrenamientoJob`: el sondeo de `useModelo()` no cambia, aunque
+   * ahora el `mensaje` puede terminar diciendo que la versión candidata **no**
+   * quedó vigente (`v2.4 archivada: no mejora a v2.1…`).
+   *
+   * Python es el único motor desde este bloque: tanto `/analitica/reentrenar`
+   * como `/analitica/reentrenar/continuo` llaman a este mismo método — el
+   * segundo existe porque el plan lo pide explícito, no porque haga algo
+   * distinto.
    */
-  async reentrenar(): Promise<ReentrenamientoJob> {
+  async reentrenar(disparador: DisparadorEntrenamiento = 'manual'): Promise<ReentrenamientoJob> {
     const enCurso = await this.versiones.findOne({ where: { estado: 'entrenando' } });
     if (enCurso) throw new ConflictoException('Ya hay un reentrenamiento en curso');
 
+    /* Sólo para etiquetar el job de inmediato: la versión real la fija el
+     * orquestador bajo el lock, un instante después. Si algo se cuela entre
+     * medio (muy improbable, el lock lo impide para la corrida real) el
+     * peor caso es una etiqueta de versión que no coincide exactamente con
+     * la persistida — cosmético, no afecta qué queda vigente. */
     const version = await this.entrenamiento.siguienteVersion();
-    const eventos = await this.muestras.count({ where: { modo: 'anticipado' } });
-    await this.versiones.save(
-      this.versiones.create({
-        version,
-        entrenadoEn: hoyIso(),
-        eventos,
-        estado: 'entrenando',
-        algoritmo: 'Regresión logística L2 (TypeScript)',
-        orden: -1,
-      }),
-    );
-
-    this.job = {
+    const job: ReentrenamientoJob = {
       id: `RET-${version.replace(/\./g, '')}`,
       estado: 'entrenando',
       version,
       iniciadoEn: ahoraIso(),
-      mensaje: 'Reconstruyendo el feature store y reentrenando el modelo',
+      mensaje: 'Reconstruyendo el feature store y entrenando contra el servicio de predicción',
     };
+    this.job = job;
 
     /* No se espera aquí: la respuesta 202 sale de inmediato y el pipeline
      * sigue en segundo plano (lo recoge `onModuleDestroy` al apagar). */
-    this.enVuelo = this.ejecutarReentrenamiento(version);
-    return this.job;
+    this.enVuelo = this.ejecutarReentrenamientoContinuo(disparador, job);
+    return job;
+  }
+
+  /**
+   * `POST /analitica/reentrenar/continuo`: mismo motor y mismo contrato que
+   * `reentrenar()` — existe como ruta explícita porque el plan la pide así,
+   * no porque dispare un pipeline distinto (Python es el único motor).
+   */
+  async reentrenarContinuo(): Promise<ReentrenamientoJob> {
+    return this.reentrenar('manual');
   }
 
   /**
@@ -442,47 +512,44 @@ export class AnalyticsService implements OnModuleDestroy {
   }
 
   /** Corre fuera del ciclo de petición: la respuesta ya salió con 202. */
-  private async ejecutarReentrenamiento(version: string): Promise<void> {
+  private async ejecutarReentrenamientoContinuo(
+    disparador: DisparadorEntrenamiento,
+    jobInicial: ReentrenamientoJob,
+  ): Promise<void> {
     try {
-      const resultado = await this.entrenamiento.entrenar(version);
-      this.modeloLocal.invalidar();
+      const ejecucion = await this.entrenamientoContinuo.ejecutar(disparador);
+      const promovida: DecisionPromocion[] = ['promovido', 'sin_incumbente'];
+      const cabecera =
+        ejecucion.estado === 'completado'
+          ? `${ejecucion.version} ${ejecucion.decision && promovida.includes(ejecucion.decision) ? 'vigente' : 'archivada'}`
+          : ejecucion.estado === 'omitido'
+            ? `${ejecucion.version} omitido`
+            : `${ejecucion.version} con error`;
+      const detalle = ejecucion.motivo ?? ejecucion.error ?? 'sin más detalle';
       this.job = {
-        id: `RET-${version.replace(/\./g, '')}`,
-        estado: 'listo',
-        version,
-        iniciadoEn: this.job?.iniciadoEn ?? ahoraIso(),
-        mensaje:
-          `${version} vigente · ${this.miles(resultado.muestras)} muestras · ` +
-          `AUC ${this.decimal(resultado.auc, 2)} · F1 ${this.decimal(resultado.f1, 2)}`,
+        id: jobInicial.id,
+        estado: ejecucion.estado === 'completado' ? 'listo' : 'error',
+        version: ejecucion.version,
+        iniciadoEn: jobInicial.iniciadoEn,
+        mensaje: `${cabecera}: ${detalle}`,
       };
-      this.logger.log(this.job.mensaje);
+      if (ejecucion.estado === 'error') this.logger.error(this.job.mensaje);
+      else this.logger.log(this.job.mensaje);
     } catch (error: unknown) {
       const mensaje =
-        error instanceof DatosInsuficientesError
-          ? error.message
-          : `Fallo al reentrenar: ${(error as Error).message}`;
-      await this.versiones
-        .update({ version }, { estado: 'archivada', error: mensaje })
-        .catch(() => undefined);
-      this.job = {
-        id: `RET-${version.replace(/\./g, '')}`,
-        estado: 'error',
-        version,
-        iniciadoEn: this.job?.iniciadoEn ?? ahoraIso(),
-        mensaje,
-      };
+        error instanceof DatosInsuficientesError ? error.message : `Fallo al reentrenar: ${(error as Error).message}`;
+      this.job = { ...jobInicial, estado: 'error', mensaje };
       this.logger.error(mensaje);
     }
   }
 
   async activar(version: string): Promise<Modelo> {
-    const objetivo = await this.versiones.findOne({ where: { version } });
+    const objetivo = await this.versiones.findOne({ where: { version, objetivo: OBJETIVO_PERSISTIDO } });
     if (!objetivo) throw new NoEncontradoException('Versión del modelo');
     if (objetivo.estado === 'entrenando') {
       throw new ConflictoException('La versión aún se está entrenando');
     }
-    await this.entrenamiento.activar(version);
-    this.modeloLocal.invalidar();
+    await this.entrenamientoContinuo.activarManualmente(version);
     return this.modelo();
   }
 
@@ -491,17 +558,28 @@ export class AnalyticsService implements OnModuleDestroy {
   /* ---------------------------------------------------------------- */
 
   private async vigente(): Promise<ModeloVersion> {
-    const vigente = await this.versiones.findOne({ where: { estado: 'vigente' } });
+    const encontrada = await this.vigenteOpcional();
+    if (!encontrada) throw new NoEncontradoException('Modelo predictivo');
+    return encontrada;
+  }
+
+  /** `null`, no 404: usarlo donde «todavía no hay modelo» es un estado válido, no un error. */
+  private async vigenteOpcional(): Promise<ModeloVersion | null> {
+    const vigente = await this.versiones.findOne({ where: { estado: 'vigente', objetivo: OBJETIVO_PERSISTIDO } });
     if (vigente) return vigente;
-    const cualquiera = await this.versiones.findOne({ where: {}, order: { orden: 'ASC' } });
-    if (!cualquiera) throw new NoEncontradoException('Modelo predictivo');
-    return cualquiera;
+    return this.versiones.findOne({
+      where: { objetivo: OBJETIVO_PERSISTIDO },
+      order: { orden: 'ASC' },
+    });
   }
 
   /** Versión archivada más reciente, para los deltas de los KPI del Resumen. */
   private async anterior(version: string): Promise<ModeloVersion | null> {
-    const filas = await this.versiones.find({ where: { estado: 'archivada' }, order: { orden: 'ASC' } });
-    return filas.find((f) => f.version !== version && f.coeficientes !== null) ?? null;
+    const filas = await this.versiones.find({
+      where: { estado: 'archivada', objetivo: OBJETIVO_PERSISTIDO },
+      order: { orden: 'ASC' },
+    });
+    return filas.find((f) => f.version !== version && (f.coeficientes !== null || f.proveedor === 'python-gbm')) ?? null;
   }
 
   private async epActual(): Promise<number> {

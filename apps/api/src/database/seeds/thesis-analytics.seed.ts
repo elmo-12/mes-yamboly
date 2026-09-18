@@ -1,7 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
 import { crearPipelineAnalitica } from '../../modules/analytics/pipeline.factory';
-import { DatosInsuficientesError } from '../../modules/analytics/modelado';
 import { ModeloVersion, OrdenFabricacion, Parada } from '../entities';
 import type { Seeder } from './seeder.interface';
 
@@ -9,18 +8,22 @@ import type { Seeder } from './seeder.interface';
 const MIN_ORDENES = 30;
 const MIN_PARADAS = 50;
 
-/** Primera versión entrenada con datos reales; la maqueta numeraba en v3.2. */
-const VERSION_INICIAL = 'v1.0';
-
 /**
  * Analítica (spec 08). Este seeder **ya no inventa** un modelo v3.2 con 2 140
- * eventos ni 24 predicciones con `rng(707)`: arranca el pipeline real sobre las
- * órdenes, paradas y mermas que haya en la base.
+ * eventos ni 24 predicciones con `rng(707)`: arranca el orquestador real
+ * (`EntrenamientoContinuoService`, el único camino de producción — Python es
+ * el único motor de modelado, F5) sobre las órdenes, paradas y mermas que
+ * haya en la base.
  *
- * Si no hay corpus suficiente no siembra nada, a propósito: cero filas en
- * `modelo_version` y `prediccion` hacen que `/analitica` caiga en el estado
- * «datos insuficientes», que es el diseño 08.E y una descripción honesta de la
- * situación — mucho mejor que una maqueta que parece un modelo entrenado.
+ * No siembra ningún modelo, a propósito, en dos casos:
+ *  - Sin corpus suficiente: cero filas en `modelo_version` y `prediccion`
+ *    hacen que `/analitica` caiga en el estado «datos insuficientes», que es
+ *    el diseño 08.E y una descripción honesta de la situación — mucho mejor
+ *    que una maqueta que parece un modelo entrenado.
+ *  - Sin `services/prediccion-py` disponible: el orquestador no tiene con qué
+ *    entrenar (Python es el único motor) y se niega a inventar un modelo,
+ *    exactamente igual que cuando no hay corpus. Se registra con un log claro
+ *    para que quede evidencia de por qué el arranque no dejó un modelo vigente.
  */
 export class ThesisAnalyticsSeeder implements Seeder {
   readonly name = 'analítica (bootstrap del pipeline IA)';
@@ -38,20 +41,24 @@ export class ThesisAnalyticsSeeder implements Seeder {
       return;
     }
 
-    const { entrenamiento } = crearPipelineAnalitica(dataSource);
-    try {
-      const resultado = await entrenamiento.entrenar(VERSION_INICIAL);
-      this.logger.log(
-        `${resultado.version} · ${resultado.muestras} muestras · ${resultado.features} features · ` +
-          `AUC ${resultado.auc} · F1 ${resultado.f1} · lift@3 ${resultado.liftTop3}`,
+    const { entrenamientoContinuo } = crearPipelineAnalitica(dataSource);
+    const ejecucion = await entrenamientoContinuo.ejecutar('arranque');
+
+    if (ejecucion.estado === 'omitido') {
+      this.logger.warn(
+        `No se pudo entrenar en el arranque: ${ejecucion.motivo ?? ejecucion.error ?? 'servicio de predicción no disponible'} ` +
+          '— no se siembra ningún modelo, la UI caerá en «datos insuficientes» hasta el primer reentrenamiento manual',
       );
-    } catch (error: unknown) {
-      if (error instanceof DatosInsuficientesError) {
-        this.logger.warn(`No se pudo entrenar: ${error.message}`);
-        await dataSource.getRepository(ModeloVersion).delete({ version: VERSION_INICIAL });
-        return;
-      }
-      throw error;
+      return;
     }
+
+    if (ejecucion.estado === 'error') {
+      this.logger.warn(`No se pudo entrenar en el arranque: ${ejecucion.motivo ?? ejecucion.error ?? 'sin más detalle'}`);
+      return;
+    }
+
+    this.logger.log(
+      `${ejecucion.version} · ${ejecucion.muestras} muestras · decisión: ${ejecucion.decision ?? 'sin decisión'} · ${ejecucion.motivo ?? ''}`,
+    );
   }
 }

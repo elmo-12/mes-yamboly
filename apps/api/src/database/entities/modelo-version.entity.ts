@@ -2,8 +2,18 @@ import { Column, Entity, PrimaryColumn } from 'typeorm';
 
 export type EstadoModelo = 'vigente' | 'archivada' | 'entrenando';
 
-/** Objetivo que predice la versión (§6.4 del plan de IA). */
-export type ObjetivoModelo = 'parada_imprevista' | 'merma_sobre_estandar';
+/**
+ * Objetivo que predice la versión (§6.4 del plan de IA, §5 del contrato Python).
+ * `parada_imprevista` y `merma_sobre_estandar` son binarios; `minutos_imprevistos`
+ * es regresión; `causa_dominante` es multiclase. Sólo `parada_imprevista` se
+ * persiste en esta tabla (`OBJETIVO_PERSISTIDO`): es el único que consume
+ * `/predict`.
+ */
+export type ObjetivoModelo =
+  | 'parada_imprevista'
+  | 'merma_sobre_estandar'
+  | 'minutos_imprevistos'
+  | 'causa_dominante';
 
 /** Nivel de la cascada que produjo los pesos (§5.2 del plan de IA). */
 export type ProveedorModelo = 'local-logistica' | 'python-gbm';
@@ -73,7 +83,12 @@ export class ModeloVersion {
   @Column('integer', { default: 0 })
   alertas30d!: number;
 
-  @Column('text', { default: 'Gradient Boosting (scikit-learn)' })
+  /**
+   * `pendiente` hasta el primer entrenamiento real: el default anterior
+   * (`Gradient Boosting (scikit-learn)`) venía de la maqueta y mentía sobre lo
+   * que corría de verdad (regresión logística en TS) antes de este bloque.
+   */
+  @Column('text', { default: 'pendiente' })
   algoritmo!: string;
 
   @Column('text', { default: 'archivada' })
@@ -155,4 +170,62 @@ export class ModeloVersion {
   /** Mensaje del fallo cuando `estado = 'entrenando'` acabó en error. */
   @Column('text', { nullable: true })
   error!: string | null;
+
+  /* --- Aditivas · orquestador de entrenamiento continuo (bloque B) --- */
+
+  /** PR-AUC (0–1): métrica primaria del walk-forward (clases desbalanceadas). */
+  @Column('double precision', { nullable: true })
+  prAuc!: number | null;
+
+  /** MAE del objetivo de regresión (`minutos_imprevistos`); `null` para los demás. */
+  @Column('double precision', { nullable: true })
+  mae!: number | null;
+
+  @Column('double precision', { nullable: true })
+  rmse!: number | null;
+
+  @Column('double precision', { nullable: true })
+  r2!: number | null;
+
+  /** F1-macro del objetivo multiclase (`causa_dominante`); `null` para los demás. */
+  @Column('double precision', { nullable: true })
+  f1Macro!: number | null;
+
+  @Column('double precision', { nullable: true })
+  accuracy!: number | null;
+
+  /** Hiperparámetros que devolvió Python para el algoritmo ganador. */
+  @Column('simple-json', { nullable: true })
+  hiperparametros!: Record<string, unknown> | null;
+
+  /** URI del `.joblib` en el volumen de Python (no lo sirve Nest, sólo lo referencia). */
+  @Column('text', { nullable: true })
+  artefactoUri!: string | null;
+
+  @Column('text', { nullable: true })
+  artefactoSha256!: string | null;
+
+  /** SHA-256 del snapshot de `muestra_analitica` con el que se entrenó esta versión. */
+  @Column('text', { nullable: true })
+  snapshotSha256!: string | null;
+
+  /** Notas de calibración (Platt) que devuelve Python; texto libre, sin parsear. */
+  @Column('text', { nullable: true })
+  calibracion!: string | null;
+
+  /** `true` si esta corrida desbancó al campeón anterior; `false` si el incumbente ganó. */
+  @Column('boolean', { nullable: true })
+  promovida!: boolean | null;
+
+  /** Motivo legible de la decisión champion/challenger (se repite en `ReentrenamientoJob.mensaje`). */
+  @Column('text', { nullable: true })
+  razonPromocion!: string | null;
+
+  /** Cuándo arrancó el entrenamiento (no cuándo se guardó la fila): ancla del huérfano de 2 h. */
+  @Column('text', { nullable: true })
+  iniciadoEn!: string | null;
+
+  /** Cuándo Python reevaluó al campeón anterior sobre este mismo snapshot. */
+  @Column('text', { nullable: true })
+  reevaluadoEn!: string | null;
 }
