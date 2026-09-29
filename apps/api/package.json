@@ -15,6 +15,7 @@
     "sincronizar": "ts-node -r tsconfig-paths/register scripts/sincronizar-produccion.ts",
     "simular": "ts-node -r tsconfig-paths/register scripts/simular-sensores.ts",
     "entrenar": "ts-node -r tsconfig-paths/register scripts/entrenar-modelo.ts",
+    "exportar:demo": "ts-node -r tsconfig-paths/register scripts/exportar-demo-sqlite.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {

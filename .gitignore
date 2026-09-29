@@ -31,3 +31,6 @@ __pycache__/
 *.egg-info/
 # artefactos de modelo: viven en el volumen de Docker, nunca en el repo
 services/prediccion-py/modelos/
+
+# Recorte de datos reales para la imagen de Docker (`pnpm --filter @mes/api exportar:demo`)
+docker/semilla/*.sqlite

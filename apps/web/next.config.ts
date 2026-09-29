@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import type { NextConfig } from 'next';
 
 /**
@@ -13,6 +14,13 @@ const nextConfig: NextConfig = {
   /* Permite levantar dos servidores de desarrollo sobre el mismo checkout sin
      que se pisen el directorio de build (`NEXT_DIST_DIR=.next-qa next dev`). */
   distDir: process.env.NEXT_DIST_DIR || '.next',
+
+  /* La imagen de Docker (`Dockerfile` en la raíz) construye con
+     `NEXT_OUTPUT=standalone`: un `server.js` autónomo con sólo las dependencias
+     que usa. La raíz del trazado es el monorepo para incluir `packages/*`. */
+  ...(process.env.NEXT_OUTPUT === 'standalone'
+    ? { output: 'standalone' as const, outputFileTracingRoot: resolve(__dirname, '../..') }
+    : {}),
 
   /**
    * El frontend habla con la API a través del propio servidor de Next

@@ -50,6 +50,26 @@ cd node_modules/.pnpm/sqlite3*/node_modules/sqlite3 && npm run install
 pnpm --filter @mes/api seed     # Postgres: vacía las tablas y resiembra · SQLite: borra el archivo y resiembra
 ```
 
+## Ejecución desde Docker Desktop (imagen única)
+El `Dockerfile` de la raíz empaqueta web + API + servicio Python de predicción en **un solo contenedor** con SQLite. Sólo se publica el puerto 3000: Next reenvía `/api/v1/*` a la API interna y la API es la única que habla con Python.
+
+**Base inicial.** Si antes del build existe `docker/semilla/mes.sqlite`, el primer arranque parte de ella y entrena el modelo de Analítica IA con esos datos. Si no existe, la API siembra los datos de demostración (con ellos no llega a las 200 muestras mínimas, así que Analítica IA queda en «datos insuficientes»). El recorte se genera desde PostgreSQL con los datos sincronizados y está en `.gitignore`:
+```bash
+pnpm --filter @mes/api exportar:demo                     # desde 2026-07-22 ≈ 400 muestras
+pnpm --filter @mes/api exportar:demo -- --desde=2026-06-01 --url=postgres://…
+```
+Copia catálogos, usuarios y tablas completas, y de producción sólo las órdenes de la ventana con sus paradas, mermas, velocidades y bitácora. No copia el modelo, las predicciones ni las alertas: el contenedor las regenera (el ciclo de inferencia corre cada 15 min). **La imagen publicada incluye esos datos reales** (órdenes y nombres de usuarios).
+
+**Usar la imagen publicada** (`ghcr.io/elmo-12/mes-yamboly`, amd64 + arm64, ≈190 MB comprimida):
+```bash
+docker run -d --name mes-yamboly -p 3000:3000 -v mes_datos:/app/api/data ghcr.io/elmo-12/mes-yamboly:latest
+```
+Abrir http://localhost:3000 y entrar con cualquier usuario de la tabla de credenciales (contraseña `Yamboly2026`). Si el paquete es privado, antes hace falta `docker login ghcr.io`.
+
+**Compilar desde cero y publicar:** `docker build -t mes-yamboly:local .`. La guía completa (instalación, Docker Desktop, volúmenes, build multi-arquitectura, publicación en ghcr.io y problemas frecuentes) está en [`docs/docker.md`](docs/docker.md).
+
+Variables opcionales del contenedor: `JWT_SECRET` (trae uno de demostración; cámbialo fuera de una demo) y `DATABASE_URL` (PostgreSQL en vez de SQLite). El reentrenamiento semanal (`ENTRENAMIENTO_ACTIVO=true`, lunes 03:00) ya viene activado.
+
 ## Base de datos (PostgreSQL en Docker)
 La API es **multi-motor**: `apps/api/src/database/data-source.ts` elige el driver con una sola regla — si `DATABASE_URL` está definida usa **PostgreSQL**, si no cae a **SQLite**. Los e2e fuerzan `DATABASE_URL=''` + `DB_PATH=':memory:'`, así que siguen corriendo en SQLite en memoria sin Docker.
 
