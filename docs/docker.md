@@ -7,6 +7,7 @@ Se publica para `linux/amd64` y `linux/arm64`, así que funciona igual en Mac Ap
 | Etiqueta | Contenido |
 |---|---|
 | `latest` | Último build publicado |
+| `1.2.1` | Corrige el entrenamiento de `causa_dominante` con pocas causas en la semilla |
 | `1.2.0` | Órdenes SAP, sensores IoT, correcciones de QA; semilla con personas y productos anonimizados |
 | `1.1.0` | Imagen aligerada (≈190 MB comprimida por arquitectura) |
 
@@ -146,7 +147,7 @@ gh auth token | docker login ghcr.io -u elmo-12 --password-stdin
 ```bash
 docker buildx create --name mes-builder --use 2>/dev/null || docker buildx use mes-builder
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ghcr.io/elmo-12/mes-yamboly:1.2.0 \
+  -t ghcr.io/elmo-12/mes-yamboly:1.2.1 \
   -t ghcr.io/elmo-12/mes-yamboly:latest \
   --push .
 ```

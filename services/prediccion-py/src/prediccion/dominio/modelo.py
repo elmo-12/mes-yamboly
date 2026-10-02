@@ -101,7 +101,11 @@ def candidatos_multiclase(semilla: int) -> list[Candidato]:
                 n_jobs=1,
                 verbosity=-1,
                 min_child_samples=5,
-                objective="multiclass",
+                # Sin `objective` explícito a propósito: LGBMClassifier elige
+                # solo `multiclass` con >2 clases y `binary` con 2. Forzar
+                # "multiclass" rompe un pliegue walk-forward que solo vio 2
+                # clases ("Number of classes should be specified and greater
+                # than 1 for multiclass training").
                 importance_type="gain",
             ),
         ),
