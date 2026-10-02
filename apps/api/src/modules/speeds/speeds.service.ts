@@ -3,15 +3,17 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { Paginated, RegistroVelocidadListItem } from '@mes/types';
-import { calcDesvioVelocidad } from '@mes/shared';
+import { ahoraPlanta, calcDesvioVelocidad } from '@mes/shared';
 import type { AuthUser } from '../../common/decorators/current-user';
 import { TRI_REGISTRO_EVENT, type TriRegistroEvent } from '../../common/events/tri.event';
 import { ValidationException } from '../../common/exceptions/business.exception';
+import { assertCapturaEnOrden } from '../../common/auth/acceso-orden';
+import { insertarConIdSecuencial } from '../../common/utils/ids';
 import { enriquecerVelocidad } from '../../common/mappers/enrich';
 import { LookupsService } from '../../common/mappers/lookups.service';
 import { AuditService } from '../../common/services/audit.service';
 import { paginate } from '../../common/utils/paginate';
-import { ahoraIso, toList } from '../../common/utils/query';
+import { toList } from '../../common/utils/query';
 import { RegistroVelocidad } from '../../database/entities';
 import { OrdersService } from '../orders/orders.service';
 import type { CreateVelocidadDto, VelocidadQueryDto } from './dto/velocidad.dto';
@@ -49,12 +51,13 @@ export class SpeedsService {
    * recurre al par vigente. Nunca se toma del producto: ya no la tiene.
    */
   async crear(dto: CreateVelocidadDto, usuario: AuthUser): Promise<RegistroVelocidadListItem> {
-    const orden = await this.orders.buscar(dto.ordenId);
     const lookups = await this.lookups.load();
     /* Las validaciones de negocio se adelantan a las FKs: 422 en vez de 500. */
     if (!lookups.lineas.has(dto.lineaId)) {
       throw new ValidationException({ lineaId: 'La línea seleccionada no existe' });
     }
+    const orden = await this.orders.buscar(dto.ordenId);
+    assertCapturaEnOrden(orden, usuario, dto.lineaId);
     if (!lookups.usuarios.has(dto.responsableId)) {
       throw new ValidationException({ responsableId: 'El responsable indicado no existe' });
     }
@@ -62,21 +65,21 @@ export class SpeedsService {
       orden.velocidadEstandar ||
       (LookupsService.parActivo(lookups, orden.productoId, orden.lineaId)?.velocidadUnidMin ?? 0);
 
-    const registradaEn = ahoraIso();
-    const total = await this.velocidades.count();
+    /* Hora de planta (America/Lima) explícita, igual que las órdenes. */
+    const registradaEn = ahoraPlanta();
     const registro = this.velocidades.create({
-      id: `VEL-${orden.id.slice(4)}-N${total + 1}`,
+      id: '',
       ordenId: orden.id,
       lineaId: dto.lineaId,
       registradaEn,
       velocidadReal: dto.velocidadReal,
       velocidadEstandar,
       desvioPct: calcDesvioVelocidad(dto.velocidadReal, velocidadEstandar),
-      motivo: dto.motivo ?? null,
+      motivo: dto.motivo || null,
       responsableId: dto.responsableId,
       tiempoRegistroSeg: dto.tiempoRegistroSeg ?? 0,
     });
-    await this.velocidades.save(registro);
+    await insertarConIdSecuencial(this.velocidades, registro, (n) => `VEL-${orden.id.slice(4)}-N${n}`);
 
     await this.audit.registrar({
       ordenId: orden.id,

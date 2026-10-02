@@ -109,7 +109,11 @@ export function useCrearInvitacion() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CrearInvitacionInput) => evidenceApi.crearInvitacion(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.evidence.tsp() }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.evidence.tsp() });
+      /* El detalle del KPI TSP del resumen cuenta las invitaciones emitidas. */
+      void queryClient.invalidateQueries({ queryKey: queryKeys.evidence.resumen() });
+    },
   });
 }
 
@@ -144,8 +148,13 @@ export function useActualizarCfs() {
   });
 }
 
+/** El archivo queda en el historial de exportaciones (`/reportes/exportaciones`). */
 export function useExportarEvidencia() {
-  return useMutation({ mutationFn: (input: ExportEvidenciaInput) => evidenceApi.exportar(input) });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ExportEvidenciaInput) => evidenceApi.exportar(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.reports.exportaciones() }),
+  });
 }
 
 export function useEncuesta(token: string | undefined) {

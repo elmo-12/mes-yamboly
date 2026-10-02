@@ -13,7 +13,7 @@ import type {
   ResumenTCI,
   TipoRegistroTci,
 } from '@mes/types';
-import { NoEncontradoException } from '../../common/exceptions';
+import { NoEncontradoException, ValidationException } from '../../common/exceptions';
 import { LookupsService, type Lookups } from '../../common/mappers';
 import { ahoraIso, hoyIso, paginate } from '../../common/utils';
 import {
@@ -83,6 +83,12 @@ export class EvidenceValidationService {
     const tipos = dto.tipos?.length ? dto.tipos : [...TIPOS_REGISTRO_TCI];
     const desde = dto.desde ?? (await this.primerDiaPostest());
     const hasta = dto.hasta ?? hoyIso();
+    if (desde > hasta) {
+      throw new ValidationException(
+        { hasta: 'La fecha inicial no puede ser posterior a la final' },
+        'El rango de fechas está invertido',
+      );
+    }
     const validadoEn = ahoraIso();
 
     const [tolerancias, lookups] = await Promise.all([this.tolerancias(), this.lookups.load()]);
@@ -396,7 +402,11 @@ export class EvidenceValidationService {
     const todas = await this.calidad.find({ order: { n: 'ASC' } });
     const registros = todas.map((f) => this.aEvaluacion(f));
 
-    const tipos = query.tipo ? (Array.isArray(query.tipo) ? query.tipo : [query.tipo]) : [];
+    /* Repetible (`tipo=a&tipo=b`) o separado por comas (`tipo=a,b`). */
+    const tipos = (query.tipo ? (Array.isArray(query.tipo) ? query.tipo : [query.tipo]) : [])
+      .flatMap((t) => String(t).split(','))
+      .map((t) => t.trim())
+      .filter(Boolean);
     const filtrados = registros.filter((r) => {
       if (tipos.length > 0 && !tipos.includes(r.tipoRegistro)) return false;
       if (query.resultado === 'valido' && !r.valido) return false;
@@ -418,14 +428,41 @@ export class EvidenceValidationService {
     const fila = await this.calidad.findOne({ where: { id } });
     if (!fila) throw new NoEncontradoException('Evaluación de calidad');
 
-    const overrides: Partial<Record<ClaveCriterioTci, boolean>> = { ...(fila.overrides ?? {}) };
+    /* Sólo se pueden forzar los criterios que evalúa el tipo del registro, y
+       sólo con un booleano (o `null` para devolverlo a la regla). */
+    const aplicables = CRITERIOS_POR_TIPO[fila.tipoRegistro];
+    const errores: Record<string, string> = {};
+    for (const [clave, valor] of Object.entries(dto.overrides ?? {})) {
+      if (!aplicables.includes(clave as ClaveCriterioTci)) {
+        errores[`overrides.${clave}`] = `El criterio «${clave}» no aplica a un registro de ${fila.tipoRegistro} (${aplicables.join(', ')})`;
+      } else if (valor !== null && valor !== undefined && typeof valor !== 'boolean') {
+        errores[`overrides.${clave}`] = 'Debe ser verdadero, falso o null';
+      }
+    }
+    if (Object.keys(errores).length > 0) {
+      throw new ValidationException(errores, 'Los criterios a forzar no son válidos');
+    }
+
+    /* Claves heredadas que ya no aplican se limpian. */
+    const overrides: Partial<Record<ClaveCriterioTci, boolean>> = Object.fromEntries(
+      Object.entries(fila.overrides ?? {}).filter(
+        ([clave, valor]) => aplicables.includes(clave as ClaveCriterioTci) && typeof valor === 'boolean',
+      ),
+    );
     for (const [clave, valor] of Object.entries(dto.overrides ?? {})) {
       /* `null` devuelve el criterio al resultado de la regla. */
       if (valor === null || valor === undefined) delete overrides[clave as ClaveCriterioTci];
       else overrides[clave as ClaveCriterioTci] = valor;
     }
+    const observacion = (dto.observacion ?? fila.observacion ?? '').trim();
+    if (Object.keys(overrides).length > 0 && observacion.length === 0) {
+      throw new ValidationException(
+        { observacion: 'Justifica la revisión manual: la observación es obligatoria' },
+        'Falta la justificación del override',
+      );
+    }
     fila.overrides = Object.keys(overrides).length > 0 ? overrides : null;
-    if (dto.observacion !== undefined) fila.observacion = dto.observacion;
+    if (dto.observacion !== undefined) fila.observacion = dto.observacion.trim();
     fila.valido = esValido(aplicarOverrides(fila.criterios, fila.overrides));
     await this.calidad.save(fila);
 

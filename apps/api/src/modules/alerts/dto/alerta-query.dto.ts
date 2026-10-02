@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, Matches } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
 import { ESTADOS_ALERTA, SEVERIDADES_ALERTA, TIPOS_ALERTA } from '@mes/types';
 import type { EstadoAlerta, SeveridadAlerta, TipoAlerta } from '@mes/types';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
@@ -37,4 +38,13 @@ export class AlertaQueryDto extends PaginationDto {
   @IsOptional()
   @Matches(FECHA, { message: 'hasta debe tener formato YYYY-MM-DD' })
   hasta?: string;
+
+  @ApiPropertyOptional({
+    description:
+      '`true`: solo las que esperan el resultado real (atendidas o vencidas sin acierto), paginadas en el servidor',
+  })
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  pendientes?: boolean;
 }

@@ -36,19 +36,25 @@ type Respuesta = 'si' | 'no';
  * Anexo 06 (KPI EP) en lote.
  */
 export function ConfirmarLoteModal({ open, onOpenChange }: ConfirmarLoteModalProps) {
-  const { data, isPending, isError } = useAlertas({ pageSize: 100 });
+  /* Filtrado en el API (`pendientes=true`): antes se traían las 100 primeras
+   * alertas de la bandeja y se filtraba en cliente. Se confirman de 100 en 100. */
+  const { data, isPending, isError } = useAlertas({ pageSize: 100, pendientes: true });
   const confirmarLote = useConfirmarLote();
   const [respuestas, setRespuestas] = React.useState<Record<string, Respuesta>>({});
+  /* El doble clic llega antes de que `isPending` deshabilite el botón. */
+  const enviando = React.useRef(false);
 
   const pendientes: Alerta[] = React.useMemo(
     () => (data?.data ?? []).filter(esperaConfirmacion),
     [data],
   );
+  const totalPendientes = data?.meta.total ?? pendientes.length;
 
   const respondidas = pendientes.filter((a) => respuestas[a.id]).length;
   const faltan = pendientes.length - respondidas;
 
   const guardar = async () => {
+    if (enviando.current) return;
     const confirmaciones = pendientes
       .filter((a) => respuestas[a.id])
       .map((a) => ({ alertaId: a.id, ocurrio: respuestas[a.id] === 'si' }));
@@ -58,9 +64,12 @@ export function ConfirmarLoteModal({ open, onOpenChange }: ConfirmarLoteModalPro
       return;
     }
 
+    enviando.current = true;
     try {
       const resultado = await confirmarLote.mutateAsync({ confirmaciones });
-      toast.success(`${confirmaciones.length} confirmaciones guardadas`, {
+      toast.success(confirmaciones.length === 1
+          ? '1 confirmación guardada'
+          : `${confirmaciones.length} confirmaciones guardadas`, {
         description: `EP acumulada recalculada: ${formatPct(resultado.ep)} · registradas en el Anexo 06.`,
       });
       setRespuestas({});
@@ -69,6 +78,8 @@ export function ConfirmarLoteModal({ open, onOpenChange }: ConfirmarLoteModalPro
       toast.error('No se pudieron guardar las confirmaciones', {
         description: error instanceof Error ? error.message : 'Reintenta en unos segundos.',
       });
+    } finally {
+      enviando.current = false;
     }
   };
 
@@ -180,6 +191,9 @@ export function ConfirmarLoteModal({ open, onOpenChange }: ConfirmarLoteModalPro
                   ? `Faltan ${faltan} de ${pendientes.length} confirmaciones. `
                   : `Las ${pendientes.length} confirmaciones están marcadas. `}
                 Al guardar se registran en el Anexo 06 y se recalcula la EP acumulada del modelo.
+                {totalPendientes > pendientes.length
+                  ? ` Se muestran ${pendientes.length} de ${totalPendientes}; las demás aparecerán al guardar estas.`
+                  : ''}
               </p>
             </>
           )}

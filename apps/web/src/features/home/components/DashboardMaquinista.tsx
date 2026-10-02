@@ -24,7 +24,7 @@ import { MisUltimosRegistros } from './MisUltimosRegistros';
  */
 export function DashboardMaquinista({ user }: { user: User }) {
   const router = useRouter();
-  const resumen = useResumenMaquinista(user.lineaId ?? undefined);
+  const resumen = useResumenMaquinista(user.lineaId ?? undefined, user.id);
   const linea = resumen.linea;
 
   if (resumen.isPending) return <HomeSkeleton variante="maquinista" />;

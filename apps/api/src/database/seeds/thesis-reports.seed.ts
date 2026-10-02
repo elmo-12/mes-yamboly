@@ -283,7 +283,7 @@ export class ThesisReportsSeeder implements Seeder {
       repo.create({ id: 'EXP-004', nombre: 'Órdenes y paradas · agosto 2026', datasets: ['ordenes', 'paradas'], formato: 'xlsx', solicitadoEn: iso(fechaMenos(0), '09:12'), solicitadoPor: 'Carlos Mendoza', estado: 'listo', tamano: '2,4 MB', url: '/api/v1/reportes/exportaciones/EXP-004/descargar' }),
       repo.create({ id: 'EXP-003', nombre: 'Indicadores OEE · semana 34', datasets: ['indicadores'], formato: 'pdf', solicitadoEn: iso(fechaMenos(1), '16:44'), solicitadoPor: 'Ana Ríos', estado: 'listo', tamano: '860 KB', url: '/api/v1/reportes/exportaciones/EXP-003/descargar' }),
       repo.create({ id: 'EXP-002', nombre: 'Mermas por causa · agosto 2026', datasets: ['mermas'], formato: 'csv', solicitadoEn: iso(fechaMenos(2), '11:02'), solicitadoPor: 'María Torres', estado: 'listo', tamano: '412 KB', url: '/api/v1/reportes/exportaciones/EXP-002/descargar' }),
-      repo.create({ id: 'EXP-001', nombre: 'Evidencia TRI/TCI para SPSS', datasets: ['evidencia'], formato: 'csv', solicitadoEn: iso(fechaMenos(3), '08:30'), solicitadoPor: 'Investigador Tesis', estado: 'generando' }),
+      repo.create({ id: 'EXP-001', nombre: 'Evidencia TRI/TCI para SPSS', datasets: ['evidencia'], formato: 'xlsx', solicitadoEn: iso(fechaMenos(3), '08:30'), solicitadoPor: 'Investigador Tesis', estado: 'listo', tamano: '96 KB', url: '/api/v1/reportes/exportaciones/EXP-001/descargar' }),
     ]);
   }
 }

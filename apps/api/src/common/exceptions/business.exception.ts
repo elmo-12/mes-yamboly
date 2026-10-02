@@ -23,7 +23,10 @@ export class BusinessRuleException extends HttpException {
 
 /** 404 homogéneo: «Orden de fabricación no encontrada». */
 export class NoEncontradoException extends HttpException {
-  constructor(recurso: string) {
-    super({ code: 'NOT_FOUND', message: `${recurso} no encontrado` }, HttpStatus.NOT_FOUND);
+  constructor(recurso: string, femenino = false) {
+    super(
+      { code: 'NOT_FOUND', message: `${recurso} no encontrad${femenino ? 'a' : 'o'}` },
+      HttpStatus.NOT_FOUND,
+    );
   }
 }

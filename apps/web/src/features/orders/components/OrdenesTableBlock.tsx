@@ -118,6 +118,8 @@ export function OrdenesTableBlock({
 
   const totalPaginas = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const sinResultados = !cargando && !error && filas.length === 0;
+  /* `?page=999`: hay órdenes, pero no en esa página (no es «sin resultados»). */
+  const paginaFueraDeRango = sinResultados && total > 0 && filtros.page > totalPaginas;
 
   /* Resumen de filtros activos para el no-results (Figma 2156:6905). */
   const etiquetasFiltro = [
@@ -144,7 +146,11 @@ export function OrdenesTableBlock({
 
   const descripcion = seleccion.length
     ? `${seleccion.length} seleccionadas · ${formatNumber(total)} en el filtro`
-    : sinResultados && etiquetasFiltro.length > 0
+    : error
+      ? 'No se pudo cargar el listado'
+      : paginaFueraDeRango
+        ? `La página ${filtros.page} no existe · ${formatNumber(total)} órdenes en ${totalPaginas} páginas`
+        : sinResultados && etiquetasFiltro.length > 0
       ? `0 resultados · filtros activos: ${etiquetasFiltro.join(' · ')}`
       : `${PAGE_SIZE} por página · ${formatNumber(total)} total`;
 
@@ -187,6 +193,18 @@ export function OrdenesTableBlock({
           action={
             <Button variant="secondary" icon={<Icon name="arrow-path" />} onClick={onReintentar}>
               Reintentar
+            </Button>
+          }
+        />
+      ) : paginaFueraDeRango ? (
+        <EmptyState
+          variant="no-results"
+          icon={<Icon name="search" size={40} />}
+          title={`La página ${filtros.page} no existe`}
+          description={`El filtro tiene ${formatNumber(total)} órdenes repartidas en ${totalPaginas} páginas.`}
+          action={
+            <Button variant="secondary" onClick={() => onChange({ page: 1 })}>
+              Ir a la primera página
             </Button>
           }
         />

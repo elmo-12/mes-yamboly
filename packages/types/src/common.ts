@@ -59,7 +59,8 @@ export type Periodo = (typeof PERIODOS)[number];
 
 export const paginationQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(200).default(25),
+  /* Mismo tope que `PaginationDto` de la API (más de 100 → 422). */
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 
 export const dateRangeSchema = z.object({
@@ -188,3 +189,21 @@ export interface Delta {
   /** Texto de referencia: `vs ayer`, `vs pretest`, `vs periodo anterior`. */
   referencia: string;
 }
+
+/* ------------------------------------------------------------------ */
+/* Límites de captura                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Tope de `tiempoRegistroSeg` (KPI TRI) que aceptan las mutaciones de captura
+ * (paradas, mermas, velocidades, detecciones, inicio/fin de orden). Un registro
+ * de planta que tarda más de una hora no mide el tiempo de registro sino un
+ * formulario olvidado abierto: se rechaza (422) para no sesgar el TRI.
+ */
+export const TIEMPO_REGISTRO_MAX_SEG = 3600;
+
+/**
+ * Tolerancia hacia el futuro de las horas de captura (`inicio`/`fin`), para
+ * absorber relojes de tablet ligeramente adelantados.
+ */
+export const TOLERANCIA_FUTURO_MIN = 5;

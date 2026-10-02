@@ -2,7 +2,15 @@
 
 import * as React from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { ESTADOS_ORDEN, PERIODOS, TURNOS } from '@mes/types';
 import type { EstadoOrden, OrdenListQuery, Periodo, Turno } from '@mes/types';
+
+const SORTS = ['fecha', 'codigo', 'oee', 'producido'] as const;
+
+/** Descarta de la URL los valores que la API rechazaría (422 → tabla en error). */
+function soloValidos<T extends string>(valores: string[], permitidos: readonly T[]): T[] {
+  return valores.filter((v): v is T => (permitidos as readonly string[]).includes(v));
+}
 
 /** Tarjeta de resumen activa (spec 05.A). Solo una a la vez. */
 export const RESUMENES = ['todas', 'por_validar', 'con_paradas', 'con_mermas'] as const;
@@ -53,16 +61,20 @@ export function useOrdenesFiltros() {
   const filtros = React.useMemo<OrdenesFiltros>(() => {
     const resumen = params.get('resumen');
     const dir = params.get('dir');
+    const periodo = params.get('periodo');
+    const sort = params.get('sort');
     return {
-      periodo: (params.get('periodo') as Periodo | null) ?? VACIO.periodo,
+      periodo: (PERIODOS as readonly string[]).includes(periodo ?? '')
+        ? (periodo as Periodo)
+        : VACIO.periodo,
       linea: lista(params.get('linea')),
-      turno: lista(params.get('turno')) as Turno[],
-      estado: lista(params.get('estado')) as EstadoOrden[],
+      turno: soloValidos<Turno>(lista(params.get('turno')), TURNOS),
+      estado: soloValidos<EstadoOrden>(lista(params.get('estado')), ESTADOS_ORDEN),
       resumen: (RESUMENES as readonly string[]).includes(resumen ?? '')
         ? (resumen as ResumenOrdenes)
         : 'todas',
       search: params.get('search') ?? '',
-      sort: params.get('sort') ?? VACIO.sort,
+      sort: (SORTS as readonly string[]).includes(sort ?? '') ? (sort as string) : VACIO.sort,
       dir: dir === 'asc' ? 'asc' : 'desc',
       page: Math.max(1, Number(params.get('page') ?? 1) || 1),
     };

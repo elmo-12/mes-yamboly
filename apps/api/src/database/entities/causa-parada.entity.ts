@@ -46,6 +46,13 @@ export class CausaParada {
   @Column('text', { nullable: true })
   codigoLegado!: string | null;
 
+  /**
+   * Control de concurrencia optimista: sube en cada edición; el cliente
+   * reenvía la versión que leyó y la API responde 409 si otro la cambió.
+   */
+  @Column('integer', { default: 1 })
+  version!: number;
+
   /** FK real sobre `parentId` — no se carga (los servicios usan la columna escalar). */
   @Index()
   @ManyToOne(() => CausaParada, { onDelete: 'RESTRICT', nullable: true })

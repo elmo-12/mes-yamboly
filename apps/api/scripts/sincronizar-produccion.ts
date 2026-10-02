@@ -16,6 +16,13 @@
  *   paradas                                    → parada
  *   calidads                                   → merma
  *   rendimientos                               → registro_velocidad
+ *   orden_fabricacion_dbs (pendientes y las     → orden_sap
+ *   ejecutadas en la ventana)
+ *
+ * Las órdenes SAP **pendientes** (sin ejecución, `Produccion`, desde ayer) se
+ * leen con el mismo lector que usa la API (`src/modules/ordenes-sap`) y quedan
+ * listas para el wizard «Iniciar orden»; las cabeceras SAP de las órdenes
+ * ejecutadas que se sincronizan se guardan ya **consumidas** (`ordenId`).
  *
  * Los catálogos (líneas, productos, causas) son el maestro real que ya vive en
  * el MES; sólo se dan de alta las entradas que el origen usa y el maestro aún no
@@ -52,6 +59,7 @@ import {
   DeteccionIoT,
   Merma,
   OrdenFabricacion,
+  OrdenSap,
   Parada,
   Producto,
   RegistroVelocidad,
@@ -517,9 +525,13 @@ async function main(): Promise<void> {
     const ordenesOrigen = await origen.ordenes(desde, hasta);
     registrarProgreso('órdenes extraídas', ordenesOrigen.length, inicio);
 
+    inicio = Date.now();
+    const sapPendientes = await origen.ordenesSapPendientes();
+    registrarProgreso('órdenes SAP pendientes extraídas', sapPendientes.length, inicio);
+
     const codigosFaltantes = [
       ...new Set(
-        ordenesOrigen
+        [...ordenesOrigen, ...sapPendientes]
           .map((o) => o.codigoProducto)
           .filter((c): c is string => Boolean(c) && !mapeador.producto(c)),
       ),
@@ -532,6 +544,9 @@ async function main(): Promise<void> {
     registrarProgreso('productos faltantes mapeados', productosOrigen.length, inicio);
 
     const ordenes: Record<string, unknown>[] = [];
+    /* Fila SAP → primera orden del MES que la ejecutó (una fila puede tener
+     * varias jornadas de ejecución; la cabecera se enlaza con la primera). */
+    const ordenPorSap = new Map<number, string>();
     const contexto = new Map<
       number,
       { id: string; lineaId: string; maquinistaId: string; velocidadEstandar: number }
@@ -541,6 +556,7 @@ async function main(): Promise<void> {
       const mapeada = mapeador.orden(fila);
       if (!mapeada) continue;
       ordenes.push(mapeada.orden);
+      if (!ordenPorSap.has(fila.sapId)) ordenPorSap.set(fila.sapId, mapeada.orden.id as string);
       contexto.set(fila.ofId, {
         id: mapeada.orden.id as string,
         lineaId: mapeada.orden.lineaId as string,
@@ -622,6 +638,32 @@ async function main(): Promise<void> {
     registrarProgreso('velocidades mapeadas', `${velocidades.length}/${velocidadesOrigen.length}`, inicio);
 
     const ahora = ahoraIso();
+
+    /* Órdenes SAP: las ejecutadas en la ventana, ya consumidas, y las pendientes. */
+    inicio = Date.now();
+    const ordenesSap: Record<string, unknown>[] = [];
+    const sapVistas = new Set<number>();
+    for (const fila of ordenesOrigen) {
+      const ordenId = ordenPorSap.get(fila.sapId);
+      if (!ordenId || sapVistas.has(fila.sapId)) continue;
+      sapVistas.add(fila.sapId);
+      const mapeada = mapeador.ordenSap({ ...fila, numero: fila.codigo }, ordenId, ahora);
+      if (mapeada) ordenesSap.push(mapeada);
+    }
+    const consumidasSap = ordenesSap.length;
+    for (const fila of sapPendientes) {
+      if (sapVistas.has(fila.sapId)) continue;
+      sapVistas.add(fila.sapId);
+      const mapeada = mapeador.ordenSap(fila, null, ahora);
+      if (mapeada) ordenesSap.push(mapeada);
+    }
+    const pendientesSap = ordenesSap.length - consumidasSap;
+    registrarProgreso(
+      'órdenes SAP mapeadas',
+      `${consumidasSap} consumidas · ${pendientesSap}/${sapPendientes.length} pendientes`,
+      inicio,
+    );
+
     inicio = Date.now();
     for (const orden of ordenes) {
       const id = orden.id as string;
@@ -659,6 +701,10 @@ async function main(): Promise<void> {
          * parada sugerida de hace semanas. El origen real, además, reporta los
          * sensores desconectados en las 9 líneas. */
         for (const [nombre, entidad] of [
+          /* `orden_sap` se reconstruye entera desde el origen: también las filas
+           * de demostración (`SAPD-…`) y las que consumieron órdenes que esta
+           * carga reemplaza. */
+          ['orden_sap', OrdenSap],
           ['audit_event', AuditEvent],
           ['registro_velocidad', RegistroVelocidad],
           ['merma', Merma],
@@ -679,6 +725,7 @@ async function main(): Promise<void> {
           ['causa_parada', CausaParada, altas.causasParadaNuevas],
           ['causa_merma', CausaMerma, altas.causasMermaNuevas],
           ['orden_fabricacion', OrdenFabricacion, ordenes],
+          ['orden_sap', OrdenSap, ordenesSap],
           ['parada', Parada, paradas],
           ['merma', Merma, mermas],
           ['registro_velocidad', RegistroVelocidad, velocidades],
@@ -714,6 +761,7 @@ async function main(): Promise<void> {
         ['paradas', paradas.length],
         ['mermas', mermas.length],
         ['lecturas de velocidad', velocidades.length],
+        ['órdenes SAP', `${pendientesSap} pendientes · ${consumidasSap} consumidas`],
       ]),
     );
 
@@ -782,6 +830,7 @@ async function main(): Promise<void> {
           paradas: { leidas: paradasOrigen.length, mapeadas: paradas.length },
           mermas: { leidas: mermasOrigen.length, mapeadas: mermas.length },
           velocidades: { leidas: velocidadesOrigen.length, mapeadas: velocidades.length },
+          ordenesSap: { pendientesLeidas: sapPendientes.length, pendientes: pendientesSap, consumidas: consumidasSap },
         },
         incidencias,
         altas: {

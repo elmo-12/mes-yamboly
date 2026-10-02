@@ -15,12 +15,12 @@ import {
   toast,
 } from '@mes/ui';
 import { calcDesvioVelocidad, formatNumber, formatSpeed } from '@mes/shared';
-import { createVelocidadSchema } from '@mes/types';
+import { createVelocidadSchema, puedeCapturar } from '@mes/types';
 import { useCausasParada } from '@/features/catalogs/hooks';
 import { useCrearVelocidad } from '@/features/speeds/hooks';
 import { useSession } from '@/hooks/use-session';
 import { etiquetaCausa, todasLasEspecificas } from '../causas';
-import type { ContextoLinea } from '../tipos';
+import { horaActual, normalizarDecimal, numeroDesdeDecimal, type ContextoLinea } from '../tipos';
 import { formatTriCorto, useTriTimer } from '../use-tri-timer';
 import { ContextoCaptura } from './ContextoCaptura';
 import { ApiClientError } from '@/services/api/client';
@@ -44,6 +44,8 @@ export function VelocidadDrawer({ contexto, abierto, onOpenChange }: VelocidadDr
   const [texto, setTexto] = React.useState('');
   const [motivo, setMotivo] = React.useState('');
   const [error, setError] = React.useState<string>();
+  /* Bloquea el doble envío (antes el segundo clic daba un 500 en pantalla). */
+  const enviandoRef = React.useRef(false);
   const tri = useTriTimer(abierto);
   const { user } = useSession();
   const { data: arbol } = useCausasParada(contexto.lineaId);
@@ -55,12 +57,18 @@ export function VelocidadDrawer({ contexto, abierto, onOpenChange }: VelocidadDr
   /* Solo al abrir: el refresco de 5 s no debe pisar lo que escribe el operario. */
   React.useEffect(() => {
     if (!abierto) return;
-    setTexto(velocidadRef.current > 0 ? String(velocidadRef.current) : '');
+    setTexto(velocidadRef.current > 0 ? String(velocidadRef.current).replace('.', ',') : '');
     setMotivo('');
     setError(undefined);
   }, [abierto]);
 
-  const real = Number(texto.replace(',', '.')) || 0;
+  const real = numeroDesdeDecimal(texto);
+  const permitido = puedeCapturar(user, 'velocidad', contexto.lineaId);
+  const bloqueo = !contexto.ordenId
+    ? 'Esta línea no tiene una orden en curso: inicia una orden para registrar la velocidad.'
+    : !permitido
+      ? 'Tu rol no permite registrar la velocidad de esta línea.'
+      : null;
   /* Estándar congelado en la orden en curso (u/min), nunca el del producto. */
   const estandar = contexto.velocidadEstandar;
   const desvio = calcDesvioVelocidad(real, estandar);
@@ -69,6 +77,7 @@ export function VelocidadDrawer({ contexto, abierto, onOpenChange }: VelocidadDr
   const motivos = React.useMemo(() => todasLasEspecificas(arbol?.data ?? []), [arbol]);
 
   const guardar = async () => {
+    if (bloqueo || enviandoRef.current) return;
     const parsed = createVelocidadSchema.safeParse({
       ordenId: contexto.ordenId ?? '',
       lineaId: contexto.lineaId,
@@ -81,6 +90,7 @@ export function VelocidadDrawer({ contexto, abierto, onOpenChange }: VelocidadDr
       setError(parsed.error.issues[0]?.message ?? 'Revisa los datos');
       return;
     }
+    enviandoRef.current = true;
     const segundos = tri.detener();
     try {
       await crear.mutateAsync({ ...parsed.data, tiempoRegistroSeg: segundos });
@@ -94,6 +104,8 @@ export function VelocidadDrawer({ contexto, abierto, onOpenChange }: VelocidadDr
           : undefined;
       if (detalle) setError(detalle);
       toast.error(detalle ?? mensajeDeError(e, 'No se pudo registrar la velocidad'));
+    } finally {
+      enviandoRef.current = false;
     }
   };
 
@@ -112,6 +124,7 @@ export function VelocidadDrawer({ contexto, abierto, onOpenChange }: VelocidadDr
               variant="primary"
               icon={<Icon name="save" size={20} />}
               loading={crear.isPending}
+              disabled={Boolean(bloqueo) || crear.isPending}
               onClick={() => void guardar()}
             >
               Guardar
@@ -125,9 +138,14 @@ export function VelocidadDrawer({ contexto, abierto, onOpenChange }: VelocidadDr
               contexto.etiqueta,
               contexto.ordenCodigo ?? 'Sin orden activa',
               `Turno ${contexto.turnoLabel}`,
-              new Date().toTimeString().slice(0, 5),
+              horaActual(),
             ]}
           />
+          {bloqueo && (
+            <p className="rounded-md bg-warning-subtle px-3 py-2 text-body-sm text-warning-text">
+              {bloqueo}
+            </p>
+          )}
 
           <FieldShell
             label="Velocidad real"
@@ -148,7 +166,8 @@ export function VelocidadDrawer({ contexto, abierto, onOpenChange }: VelocidadDr
                 className="min-w-0 flex-1 bg-transparent text-h1 tabular text-text-primary outline-none placeholder:text-text-disabled"
                 value={texto}
                 onChange={(e) => {
-                  setTexto(e.target.value.replace(/[^0-9,]/g, ''));
+                  /* Acepta `.` y `,`: antes `118.5` se convertía en 1185 u/min. */
+                  setTexto((anterior) => normalizarDecimal(e.target.value, anterior));
                   setError(undefined);
                 }}
               />

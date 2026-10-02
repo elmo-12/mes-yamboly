@@ -175,11 +175,17 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       expect(body).toMatchObject({
         activas: 6,
         atendidasHoy: 9,
-        pendientesConfirmar: 4,
-        vencidas: 2,
+        /* Ninguna alerta del seed trae `acierto` (QA M5): 9 atendidas + 9 vencidas. */
+        pendientesConfirmar: 18,
+        vencidas: 9,
+        epConfirmadas: 0,
       });
       /* Las alertas del seed son operativas: no generan filas del Anexo 06. */
       expect(body.epAcumulada).toBe(0);
+      const { body: lista } = await get('/alertas?pageSize=100').expect(200);
+      const filas = lista.data as Array<{ estado: string; acierto: boolean | null }>;
+      expect(filas.filter((a) => a.estado === 'confirmada')).toHaveLength(0);
+      expect(filas.filter((a) => a.acierto !== null)).toHaveLength(0);
     });
 
     it('atender y luego confirmar una alerta mueve el KPI EP', async () => {
@@ -338,25 +344,24 @@ describe('tesis · reports · alerts · analytics · evidence (e2e)', () => {
       expect(body.kpis.find((k: { id: string }) => k.id === 'oee').valor).toBe(75.6);
     });
 
-    it('GET /reportes/paradas devuelve Pareto acumulado y donut de 612 min', async () => {
-      const { body } = await get('/reportes/paradas').expect(200);
-      expect(body.kpis.map((k: { valor: number }) => k.valor)).toEqual([48, 612, 12.8, 4.3]);
-      expect(body.pareto[0]).toMatchObject({ causaCodigo: 'PN-02', minutos: 179 });
-      expect(body.pareto.at(-1).acumuladoPct).toBe(100);
-      expect(body.donut.map((d: { valor: number }) => d.valor)).toEqual([211, 171, 230]);
-      expect(body.detallePorCausa).toHaveLength(5);
+    /* Paradas y Mermas se calculan sobre las tablas base filtradas por ventana
+     * (C1); las cifras exactas se contrastan con SQL en `reportes-alertas.e2e-spec.ts`. */
+    it('GET /reportes/paradas devuelve Pareto acumulado y donut coherentes con los KPI', async () => {
+      const { body } = await get('/reportes/paradas?periodo=mes').expect(200);
+      const minutos = body.kpis.find((k: { id: string }) => k.id === 'minutos').valor;
+      expect(body.pareto.reduce((a: number, p: { minutos: number }) => a + p.minutos, 0)).toBe(minutos);
+      if (body.pareto.length) expect(body.pareto.at(-1).acumuladoPct).toBe(100);
+      expect(body.donut.reduce((a: number, d: { valor: number }) => a + d.valor, 0)).toBe(minutos);
     });
 
-    it('GET /reportes/mermas suma 412 kg entre líneas y causas', async () => {
-      const { body } = await get('/reportes/mermas').expect(200);
-      expect(body.kpis[0]).toMatchObject({ valor: 412, unidad: 'kg' });
-      const totalLineas = body.apiladasPorLinea.reduce(
-        (a: number, l: { total: number }) => a + l.total,
-        0,
-      );
-      expect(totalLineas).toBe(412);
-      expect(body.heatmap).toHaveLength(10);
-      expect(body.tabla.reduce((a: number, t: { kg: number }) => a + t.kg, 0)).toBe(412);
+    it('GET /reportes/mermas reparte el total entre líneas y causas', async () => {
+      const { body } = await get('/reportes/mermas?periodo=mes').expect(200);
+      const total = body.kpis[0];
+      expect(total).toMatchObject({ id: 'merma_total', unidad: 'kg' });
+      const totalLineas = body.apiladasPorLinea.reduce((a: number, l: { total: number }) => a + l.total, 0);
+      expect(totalLineas).toBeCloseTo(total.valor, 0);
+      expect(body.tabla.reduce((a: number, t: { kg: number }) => a + t.kg, 0)).toBeCloseTo(total.valor, 0);
+      expect(body.heatmap).toHaveLength(body.tabla.length * 2);
     });
 
     it('POST /reportes/exportar encola el trabajo y lo deja descargable', async () => {

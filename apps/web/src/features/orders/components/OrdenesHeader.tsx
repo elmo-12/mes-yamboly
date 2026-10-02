@@ -4,7 +4,8 @@ import * as React from 'react';
 import { Button, Icon, toast } from '@mes/ui';
 import { AppPageHeader } from '@/components/AppPageHeader';
 import { formatNumber, formatRelative } from '@mes/shared';
-import type { OrdenesResumen } from '@mes/types';
+import { puedeIniciarOrden, type OrdenesResumen } from '@mes/types';
+import { useSession } from '@/hooks/use-session';
 import { NuevaOrdenModal } from './NuevaOrdenModal';
 
 export interface OrdenesHeaderProps {
@@ -18,9 +19,15 @@ export interface OrdenesHeaderProps {
  */
 export function OrdenesHeader({ resumen }: OrdenesHeaderProps) {
   const [nueva, setNueva] = React.useState(false);
+  const { user } = useSession();
+  const puedeCrear = puedeIniciarOrden(user);
 
   const subtitulo = resumen
-    ? `Fuente única de producción · ${formatNumber(resumen.todas)} órdenes · Última sincronización ${desde(resumen.ultimaSincronizacion)}`
+    ? `Fuente única de producción · ${formatNumber(resumen.todas)} órdenes · ${
+        resumen.ultimaSincronizacion
+          ? `Última sincronización con SAP ${desde(resumen.ultimaSincronizacion)}`
+          : 'Sin sincronizar con SAP'
+      }`
     : 'Fuente única de producción · listado, filtros y detalle de cada OF';
 
   const exportar = React.useCallback(() => {
@@ -40,13 +47,15 @@ export function OrdenesHeader({ resumen }: OrdenesHeaderProps) {
             <Button variant="secondary" icon={<Icon name="file-xls" />} onClick={exportar}>
               Exportar
             </Button>
-            <Button variant="primary" icon={<Icon name="plus" />} onClick={() => setNueva(true)}>
-              Nueva orden
-            </Button>
+            {puedeCrear && (
+              <Button variant="primary" icon={<Icon name="plus" />} onClick={() => setNueva(true)}>
+                Nueva orden
+              </Button>
+            )}
           </div>
         }
       />
-      <NuevaOrdenModal open={nueva} onOpenChange={setNueva} />
+      {puedeCrear && <NuevaOrdenModal open={nueva} onOpenChange={setNueva} />}
     </>
   );
 }

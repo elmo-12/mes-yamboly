@@ -1,5 +1,6 @@
 import { HttpResponse, delay } from 'msw';
 import type { ApiError, Paginated } from '@mes/types';
+import { TIEMPO_REGISTRO_MAX_SEG } from '@mes/types';
 
 /** Prefijo con comodín para que los handlers respondan tanto a URL absolutas como relativas. */
 export const API = '*/api/v1';
@@ -115,4 +116,25 @@ export function ahoraIso(): string {
 
 export function hoyIso(): string {
   return ahoraIso().slice(0, 10);
+}
+
+/**
+ * 422 en `tiempoRegistroSeg` si supera {@link TIEMPO_REGISTRO_MAX_SEG} o no es
+ * un entero ≥ 0 (espejo del DTO de captura de la API). `null` = válido.
+ */
+export function errorTiempoRegistro(body: Record<string, unknown>): Response | null {
+  const bruto = body.tiempoRegistroSeg;
+  if (bruto === undefined || bruto === null || bruto === '') return null;
+  const valor = Number(bruto);
+  if (!Number.isInteger(valor) || valor < 0) {
+    return errores.validacion({
+      tiempoRegistroSeg: 'El tiempo de registro debe ser un número entero de segundos',
+    });
+  }
+  if (valor > TIEMPO_REGISTRO_MAX_SEG) {
+    return errores.validacion({
+      tiempoRegistroSeg: `El tiempo de registro no puede superar ${TIEMPO_REGISTRO_MAX_SEG} s`,
+    });
+  }
+  return null;
 }

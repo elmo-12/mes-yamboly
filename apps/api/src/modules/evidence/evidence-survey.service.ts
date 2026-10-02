@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import type { EncuestaPublica } from '@mes/types';
 import { ConflictoException, NoEncontradoException } from '../../common/exceptions';
 import { hoyIso, redondear } from '../../common/utils';
 import { EncuestaRespuesta, EncuestaSesion } from '../../database/entities';
 import { ITEMS_TSP } from '../../database/seeds/thesis-evidence.seed';
 import type { EncuestaRespuestaDto } from './dto/evidence.dto';
+import { respuestasValidas } from './evidence.rules';
+import { ColaSerial } from './cola-serial';
 
 const TITULO = 'Encuesta de satisfacción · MES Yamboly';
 const DESCRIPCION =
@@ -15,9 +17,12 @@ const DESCRIPCION =
 /** Encuesta pública del Anexo 04: cada token sirve para una sola respuesta. */
 @Injectable()
 export class EvidenceSurveyService {
+  private readonly cola = new ColaSerial();
+
   constructor(
     @InjectRepository(EncuestaSesion) private readonly sesiones: Repository<EncuestaSesion>,
     @InjectRepository(EncuestaRespuesta) private readonly respuestas: Repository<EncuestaRespuesta>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async obtener(token: string): Promise<EncuestaPublica> {
@@ -31,7 +36,14 @@ export class EvidenceSurveyService {
     };
   }
 
-  async responder(
+  responder(
+    token: string,
+    dto: EncuestaRespuestaDto,
+  ): Promise<{ recibido: boolean; respuestas: number; pctAcuerdo: number }> {
+    return this.cola.ejecutar(() => this.responderEnCola(token, dto));
+  }
+
+  private async responderEnCola(
     token: string,
     dto: EncuestaRespuestaDto,
   ): Promise<{ recibido: boolean; respuestas: number; pctAcuerdo: number }> {
@@ -40,24 +52,30 @@ export class EvidenceSurveyService {
       throw new ConflictoException('Este enlace de encuesta ya fue utilizado');
     }
 
-    await this.respuestas.save(
-      this.respuestas.create({
+    /* Marca y guarda en una transacción con un UPDATE condicional: de dos
+       envíos simultáneos sólo uno cambia `respondida`; el otro recibe 409 (no
+       un 500 por clave duplicada). */
+    await this.dataSource.transaction(async (manager) => {
+      const marcado = await manager
+        .getRepository(EncuestaSesion)
+        .update({ token, respondida: false }, { respondida: true, respondidaEn: hoyIso() });
+      if (!marcado.affected) {
+        throw new ConflictoException('Este enlace de encuesta ya fue utilizado');
+      }
+      await manager.getRepository(EncuestaRespuesta).insert({
         id: `TSP-${token}`,
         token,
         respuestas: dto.respuestas,
         comentario: dto.comentario ?? null,
         fecha: hoyIso(),
-      }),
-    );
-    sesion.respondida = true;
-    sesion.respondidaEn = hoyIso();
-    await this.sesiones.save(sesion);
+      });
+    });
 
     const filas = await this.respuestas.find();
     let deAcuerdo = 0;
     let total = 0;
     for (const fila of filas) {
-      for (const valor of fila.respuestas) {
+      for (const valor of respuestasValidas(fila.respuestas).flat()) {
         total += 1;
         if (valor >= 4) deAcuerdo += 1;
       }

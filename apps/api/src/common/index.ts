@@ -9,3 +9,4 @@ export * from './dto/api-error.dto';
 export * from './mappers';
 export * from './events';
 export * from './services';
+export * from './auth';

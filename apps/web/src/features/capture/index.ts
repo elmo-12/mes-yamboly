@@ -1,5 +1,13 @@
 export { useTriTimer, formatTri, formatTriCorto, type TriTimer } from './use-tri-timer';
-export { contextoDeLinea, horaActual, isoDesdeHora, type ContextoLinea } from './tipos';
+export {
+  ahoraLimaIso,
+  contextoDeLinea,
+  horaActual,
+  isoConHora,
+  isoDesdeHora,
+  msDesdeIsoLima,
+  type ContextoLinea,
+} from './tipos';
 export { ParadaWizard } from './components/ParadaWizard';
 export { FinalizarParadaModal } from './components/FinalizarParadaModal';
 export { MermaWizard } from './components/MermaWizard';

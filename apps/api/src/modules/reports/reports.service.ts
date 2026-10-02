@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import type {
   ComparativaTurno,
-  Delta,
   DetalleCausaMerma,
   DetalleCausaParada,
   DonutSegmento,
@@ -17,24 +16,34 @@ import type {
   ParetoParada,
   Periodo,
   TendenciaOeePunto,
+  TipoMermaCodigo,
   Turno,
 } from '@mes/types';
 import { TURNO_LABEL, TURNOS } from '@mes/types';
 import {
+  CausaMerma,
+  CausaParada,
   IndicadorDiario,
-  IndicadorKpi,
   Linea,
-  MermaAgregada,
-  MermaCausa,
+  Merma,
   OrdenFabricacion,
   Parada,
   ParadaAgregada,
-  ParadaCategoria,
+  Producto,
 } from '../../database/entities';
+import type { CategoriaParada } from '../../database/entities/parada-agregada.entity';
 import { META_OEE } from '@mes/shared';
-import { diaOperativo } from '../../common/utils';
+import { ValidationException } from '../../common/exceptions';
+import { diaOperativo, sumarDiasLocal } from '../../common/utils';
 import { agregarVentana, nuevoAcumulado, oeeDe, type AgregadoVentana } from './reports-oee';
-import { etiquetaFecha, redondear, toList } from './reports.util';
+import {
+  erroresDeRango,
+  etiquetaFecha,
+  redondear,
+  restarAnio,
+  sumarDias,
+  toList,
+} from './reports.util';
 import type { PeriodoReporte, ReporteQueryDto } from './dto/reporte-query.dto';
 
 /** Días que abarca cada periodo del selector de Reportes. */
@@ -65,17 +74,46 @@ interface Ventana {
   dias: number;
 }
 
+/** Coste con el que se valoriza la merma (S/ por kg); mismo valor que la sincronización. */
+const COSTO_MERMA_SOL_KG = Number(process.env.COSTO_MERMA_SOL_KG) || 9.5;
+
+const ETIQUETA_CATEGORIA: Record<CategoriaParada, string> = {
+  rutinarias: 'Rutinarias',
+  imprevistas: 'Imprevistas',
+  fallas: 'Fallas',
+};
+
+/** Categoría del donut según el tipo raíz de la causa (mismo criterio que la sincronización). */
+function categoriaDeTipo(tipo: CausaParada | undefined): CategoriaParada {
+  if (!tipo) return 'imprevistas';
+  if (tipo.clasificacion === 'programada') return 'rutinarias';
+  return /falla/i.test(tipo.nombre) ? 'fallas' : 'imprevistas';
+}
+
+/** Filtros comunes de Paradas y Mermas: ventana, líneas y turnos. */
+interface FiltroHechos {
+  desde: string;
+  hasta: string;
+  lineaIds: string[];
+  turnos: Turno[];
+}
+
+function lineaTop(mapa: Map<string, number>, codigo: (id: string) => string): string {
+  const top = [...mapa.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  return top ? codigo(top) : '—';
+}
+
 @Injectable()
 export class ReportsService {
   constructor(
-    @InjectRepository(IndicadorKpi) private readonly kpis: Repository<IndicadorKpi>,
     @InjectRepository(IndicadorDiario) private readonly diarios: Repository<IndicadorDiario>,
     @InjectRepository(ParadaAgregada) private readonly paradas: Repository<ParadaAgregada>,
-    @InjectRepository(ParadaCategoria) private readonly categorias: Repository<ParadaCategoria>,
-    @InjectRepository(MermaAgregada) private readonly mermasLinea: Repository<MermaAgregada>,
-    @InjectRepository(MermaCausa) private readonly mermasCausa: Repository<MermaCausa>,
     @InjectRepository(OrdenFabricacion) private readonly ordenes: Repository<OrdenFabricacion>,
     @InjectRepository(Parada) private readonly paradasCrudas: Repository<Parada>,
+    @InjectRepository(Merma) private readonly mermasCrudas: Repository<Merma>,
+    @InjectRepository(CausaParada) private readonly causasParada: Repository<CausaParada>,
+    @InjectRepository(CausaMerma) private readonly causasMerma: Repository<CausaMerma>,
+    @InjectRepository(Producto) private readonly productos: Repository<Producto>,
     @InjectRepository(Linea) private readonly catalogoLineas: Repository<Linea>,
   ) {}
 
@@ -101,7 +139,7 @@ export class ReportsService {
       hasta: ventana.hasta,
       ...opciones,
     });
-    const previa = this.ventanaPrevia(ventana);
+    const previa = this.ventanaComparacion(ventana, query.comparar);
     const anterior = agregarVentana(ordenes, paradas, { ...previa, ...opciones });
 
     return {
@@ -115,14 +153,16 @@ export class ReportsService {
     };
   }
 
-  /** Ventana inmediatamente anterior, de la misma longitud, para los deltas. */
-  private ventanaPrevia(ventana: Ventana): { desde: string; hasta: string } {
-    const dia = (iso: string, delta: number): string => {
-      const d = new Date(`${iso}T00:00:00Z`);
-      d.setUTCDate(d.getUTCDate() + delta);
-      return d.toISOString().slice(0, 10);
-    };
-    return { desde: dia(ventana.desde, -ventana.dias), hasta: dia(ventana.desde, -1) };
+  /**
+   * Ventana con la que se calculan los deltas: la inmediatamente anterior de
+   * la misma longitud o, con `comparar=anio_anterior`, el mismo rango un año
+   * antes (antes se usaba siempre la anterior aunque la etiqueta dijera «año»).
+   */
+  private ventanaComparacion(ventana: Ventana, comparar?: string): { desde: string; hasta: string } {
+    if (comparar === 'anio_anterior') {
+      return { desde: restarAnio(ventana.desde), hasta: restarAnio(ventana.hasta) };
+    }
+    return { desde: sumarDias(ventana.desde, -ventana.dias), hasta: sumarDias(ventana.desde, -1) };
   }
 
   /** Sólo se publican las líneas que tuvieron órdenes dentro de la ventana. */
@@ -170,7 +210,8 @@ export class ReportsService {
     comparar: string,
   ): KpiValor[] {
     const detalle = oeeDe(actual.total);
-    const previo = anterior.total.ordenes > 0 ? oeeDe(anterior.total) : null;
+    const sinDatos = actual.total.ordenes === 0;
+    const previo = !sinDatos && anterior.total.ordenes > 0 ? oeeDe(anterior.total) : null;
     const referencia = comparar === 'anio_anterior' ? 'vs año anterior' : 'vs periodo anterior';
     const kpi = (id: string, label: string, valor: number, previoValor?: number, meta?: number): KpiValor => ({
       id,
@@ -178,6 +219,7 @@ export class ReportsService {
       valor,
       unidad: '%',
       meta,
+      ...(sinDatos ? { sinDatos: true } : {}),
       delta:
         previoValor === undefined
           ? undefined
@@ -204,50 +246,176 @@ export class ReportsService {
   }
 
   /* ---------------------------------------------------------------- */
+  /* Hechos base de Paradas y Mermas (C1)                              */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * Antes Paradas y Mermas se leían de tablas pre-agregadas (`parada_agregada`,
+   * `merma_*`, `indicador_kpi`): una foto sin periodo, así que el informe —y las
+   * tarjetas «Paradas no programadas» y «Merma del día» del Inicio— mostraba el
+   * histórico entero fuera cual fuera el periodo, la línea o el turno elegidos.
+   * Ahora se calcula sobre `parada`/`merma` filtrando por el día operativo de su
+   * orden (`orden.fecha`), la línea y el turno de la orden.
+   */
+  private async contexto(query: ReporteQueryDto) {
+    const ventana = await this.resolverVentana(query);
+    const filtro: FiltroHechos = {
+      desde: ventana.desde,
+      hasta: ventana.hasta,
+      lineaIds: toList(query.lineaId),
+      turnos: toList(query.turno) as Turno[],
+    };
+    const [ordenes, lineas] = await Promise.all([this.ordenes.find(), this.catalogoLineas.find()]);
+    const ordenPorId = new Map(ordenes.map((o) => [o.id, o]));
+    const lineaPorId = new Map(lineas.map((l) => [l.id, l]));
+    const codigoLinea = (id: string) => lineaPorId.get(id)?.codigo ?? id;
+    const comparacion = { ...filtro, ...this.ventanaComparacion(ventana, query.comparar) };
+    return { ventana, filtro, comparacion, ordenes, ordenPorId, lineaPorId, codigoLinea };
+  }
+
+  /** `true` si el hecho (por su orden) cae en la ventana y en los filtros. */
+  private static dentro(
+    orden: OrdenFabricacion | undefined,
+    lineaId: string,
+    filtro: FiltroHechos,
+  ): orden is OrdenFabricacion {
+    if (!orden) return false;
+    if (orden.fecha < filtro.desde || orden.fecha > filtro.hasta) return false;
+    if (filtro.lineaIds.length > 0 && !filtro.lineaIds.includes(lineaId)) return false;
+    if (filtro.turnos.length > 0 && !filtro.turnos.includes(orden.turno)) return false;
+    return true;
+  }
+
+  /* ---------------------------------------------------------------- */
   /* 06.B — Paradas                                                    */
   /* ---------------------------------------------------------------- */
 
   async paradasResumen(query: ReporteQueryDto): Promise<ParadasResumen> {
-    const ventana = await this.resolverVentana(query);
-    const filas = await this.paradas.find({ order: { minutos: 'DESC' } });
-    const totalMinutos = filas.reduce((a, f) => a + f.minutos, 0);
+    const ctx = await this.contexto(query);
+    const [todas, causas] = await Promise.all([this.paradasCrudas.find(), this.causasParada.find()]);
+    const causaPorId = new Map(causas.map((c) => [c.id, c]));
+    /* La clasificación sale del tipo raíz (`tipoCausaId`); si falta, de la causa. */
+    const clasificacionDe = (p: Parada) =>
+      (causaPorId.get(p.tipoCausaId) ?? causaPorId.get(p.causaId))?.clasificacion ?? 'imprevista';
+    const filtrar = (filtro: FiltroHechos) =>
+      todas.filter(
+        (p) =>
+          ReportsService.dentro(ctx.ordenPorId.get(p.ordenId), p.lineaId, filtro) &&
+          (!query.clasificacion || clasificacionDe(p) === query.clasificacion),
+      );
+    const actuales = filtrar(ctx.filtro);
+    const previas = filtrar(ctx.comparacion);
+
+    interface Acum {
+      causa: CausaParada | undefined;
+      causaId: string;
+      cantidad: number;
+      minutos: number;
+      porLinea: Map<string, number>;
+      porFecha: Map<string, number>;
+    }
+    const porCausa = new Map<string, Acum>();
+    const porCategoria: Record<CategoriaParada, number> = { rutinarias: 0, imprevistas: 0, fallas: 0 };
+    for (const p of actuales) {
+      const orden = ctx.ordenPorId.get(p.ordenId)!;
+      let a = porCausa.get(p.causaId);
+      if (!a) {
+        a = {
+          causa: causaPorId.get(p.causaId),
+          causaId: p.causaId,
+          cantidad: 0,
+          minutos: 0,
+          porLinea: new Map(),
+          porFecha: new Map(),
+        };
+        porCausa.set(p.causaId, a);
+      }
+      a.cantidad += 1;
+      a.minutos += p.duracionMin;
+      a.porLinea.set(p.lineaId, (a.porLinea.get(p.lineaId) ?? 0) + p.duracionMin);
+      a.porFecha.set(orden.fecha, (a.porFecha.get(orden.fecha) ?? 0) + p.duracionMin);
+      porCategoria[categoriaDeTipo(causaPorId.get(p.tipoCausaId))] += p.duracionMin;
+    }
+
+    const filas = [...porCausa.values()].sort((a, b) => b.minutos - a.minutos);
+    const totalMinutos = filas.reduce((t, f) => t + f.minutos, 0);
+    /* Sparkline: los últimos 7 días de la ventana. */
+    const ultimos7 = Array.from({ length: Math.min(7, ctx.ventana.dias) }, (_, i) =>
+      sumarDias(ctx.ventana.hasta, i - Math.min(7, ctx.ventana.dias) + 1),
+    );
 
     let acumulado = 0;
     const pareto: ParetoParada[] = filas.map((f) => {
       acumulado += f.minutos;
       return {
-        causaCodigo: f.causaCodigo,
-        causaNombre: f.causaNombre,
+        causaCodigo: f.causa?.codigo ?? f.causaId,
+        causaNombre: f.causa?.nombre ?? 'Causa desconocida',
         minutos: f.minutos,
         acumuladoPct: totalMinutos > 0 ? redondear((acumulado / totalMinutos) * 100) : 0,
       };
     });
 
-    const categorias = await this.categorias.find({ order: { orden: 'ASC' } });
-    const totalDonut = categorias.reduce((a, c) => a + c.minutos, 0);
-    const donut: DonutSegmento[] = categorias.map((c) => ({
-      clave: c.clave,
-      label: c.label,
-      valor: c.minutos,
-      pct: totalDonut > 0 ? redondear((c.minutos / totalDonut) * 100) : 0,
+    const donut: DonutSegmento[] = (Object.keys(porCategoria) as CategoriaParada[]).map((clave) => ({
+      clave,
+      label: ETIQUETA_CATEGORIA[clave],
+      valor: porCategoria[clave],
+      pct: totalMinutos > 0 ? redondear((porCategoria[clave] / totalMinutos) * 100) : 0,
     }));
 
     const detallePorCausa: DetalleCausaParada[] = filas.map((f) => ({
       causaId: f.causaId,
-      causaCodigo: f.causaCodigo,
-      causaNombre: f.causaNombre,
+      causaCodigo: f.causa?.codigo ?? f.causaId,
+      causaNombre: f.causa?.nombre ?? 'Causa desconocida',
       cantidad: f.cantidad,
       minutos: f.minutos,
       pct: totalMinutos > 0 ? redondear((f.minutos / totalMinutos) * 100) : 0,
-      lineaMasAfectada: f.lineaMasAfectada,
-      tendencia: f.tendencia,
+      lineaMasAfectada: lineaTop(f.porLinea, (id) => {
+        const l = ctx.lineaPorId.get(id);
+        return l ? `${l.codigo} ${l.nombre}` : id;
+      }),
+      tendencia: ultimos7.map((d) => f.porFecha.get(d) ?? 0),
     }));
 
+    /* % tiempo = minutos de parada / tiempo planificado de las mismas órdenes. */
+    const agregado = agregarVentana(ctx.ordenes, [], {
+      desde: ctx.filtro.desde,
+      hasta: ctx.filtro.hasta,
+      lineaIds: ctx.filtro.lineaIds,
+      turnos: ctx.filtro.turnos,
+    });
+    const planificado = agregado.total.tiempoPlanificadoMin;
+    const minutosPrevios = previas.reduce((t, p) => t + p.duracionMin, 0);
+    const hayPrevio = this.hayOrdenes(ctx.ordenes, ctx.comparacion);
+    const sinDatos = actuales.length === 0 && agregado.total.ordenes === 0;
+    const referencia = query.comparar === 'anio_anterior' ? 'vs año anterior' : 'vs periodo anterior';
+    const kpi = (
+      id: string,
+      label: string,
+      valor: number,
+      unidad: string,
+      previo?: number,
+    ): KpiValor => ({
+      id,
+      label,
+      valor,
+      unidad,
+      ...(sinDatos ? { sinDatos: true } : {}),
+      delta:
+        previo === undefined || !hayPrevio || sinDatos
+          ? undefined
+          : { valor: redondear(valor - previo), unidad, favorableSiSube: false, referencia },
+    });
+
     return {
-      periodo: ventana.periodo,
-      desde: ventana.desde,
-      hasta: ventana.hasta,
-      kpis: await this.kpisDe('paradas', query.comparar),
+      periodo: ctx.ventana.periodo,
+      desde: ctx.ventana.desde,
+      hasta: ctx.ventana.hasta,
+      kpis: [
+        kpi('paradas', 'Paradas', actuales.length, '', previas.length),
+        kpi('minutos', 'Minutos', totalMinutos, 'min', minutosPrevios),
+        kpi('mttr', 'MTTR', actuales.length ? redondear(totalMinutos / actuales.length) : 0, 'min'),
+        kpi('pct_tiempo', '% tiempo', planificado > 0 ? redondear((totalMinutos / planificado) * 100) : 0, '%'),
+      ],
       pareto,
       donut,
       detallePorCausa,
@@ -259,86 +427,137 @@ export class ReportsService {
   /* ---------------------------------------------------------------- */
 
   async mermasResumen(query: ReporteQueryDto): Promise<MermasResumen> {
-    const ventana = await this.resolverVentana(query);
-    const lineaIds = toList(query.lineaId);
+    const ctx = await this.contexto(query);
+    const [todas, causas, productos] = await Promise.all([
+      this.mermasCrudas.find(),
+      this.causasMerma.find(),
+      this.productos.find(),
+    ]);
+    const causaPorId = new Map(causas.map((c) => [c.id, c]));
+    const pesoPorProducto = new Map(productos.map((p) => [p.id, p.pesoKg ?? 0]));
+    const filtrar = (filtro: FiltroHechos) =>
+      todas.filter((m) => ReportsService.dentro(ctx.ordenPorId.get(m.ordenId), m.lineaId, filtro));
+    const actuales = filtrar(ctx.filtro);
+    const previas = filtrar(ctx.comparacion);
 
-    const filasLinea = await this.mermasLinea.find({ order: { orden: 'ASC' } });
-    const seleccionadas = lineaIds.length
-      ? filasLinea.filter((l) => lineaIds.includes(l.lineaId))
-      : filasLinea;
-    const apiladasPorLinea: MermaApiladaLinea[] = seleccionadas.map((l) => ({
-      lineaId: l.lineaId,
-      lineaCodigo: l.lineaCodigo,
-      lineaNombre: l.lineaNombre,
-      MP: l.mp,
-      EP: l.ep,
-      PT: l.pt,
-      total: redondear(l.mp + l.ep + l.pt),
-    }));
+    const porLinea = new Map<string, Record<TipoMermaCodigo, number>>();
+    interface Acum {
+      causaId: string;
+      causa: CausaMerma | undefined;
+      kg: number;
+      porTipo: Record<TipoMermaCodigo, number>;
+      porLinea: Map<string, number>;
+      porTurno: Map<Turno, number>;
+    }
+    const porCausa = new Map<string, Acum>();
+    let baldes = 0;
+    for (const m of actuales) {
+      const orden = ctx.ordenPorId.get(m.ordenId)!;
+      if (m.enviarPasteurizacion) baldes += 1;
+      const tipos = porLinea.get(m.lineaId) ?? { MP: 0, EP: 0, PT: 0 };
+      tipos[m.tipo] += m.cantidadKg;
+      porLinea.set(m.lineaId, tipos);
+      let a = porCausa.get(m.causaId);
+      if (!a) {
+        a = {
+          causaId: m.causaId,
+          causa: causaPorId.get(m.causaId),
+          kg: 0,
+          porTipo: { MP: 0, EP: 0, PT: 0 },
+          porLinea: new Map(),
+          porTurno: new Map(),
+        };
+        porCausa.set(m.causaId, a);
+      }
+      a.kg += m.cantidadKg;
+      a.porTipo[m.tipo] += m.cantidadKg;
+      a.porLinea.set(m.lineaId, (a.porLinea.get(m.lineaId) ?? 0) + m.cantidadKg);
+      a.porTurno.set(orden.turno, (a.porTurno.get(orden.turno) ?? 0) + m.cantidadKg);
+    }
 
-    const filasCausa = await this.mermasCausa.find({ order: { orden: 'ASC' } });
-    const heatmap: HeatmapCelda[] = filasCausa.flatMap((c) =>
-      TURNOS.map((turno, i) => ({
-        fila: c.causaCodigo,
-        filaLabel: `${c.causaCodigo} ${c.causaNombre}`,
+    const apiladasPorLinea: MermaApiladaLinea[] = [...porLinea.entries()]
+      .map(([lineaId, kg]) => {
+        const linea = ctx.lineaPorId.get(lineaId);
+        return {
+          lineaId,
+          lineaCodigo: linea?.codigo ?? lineaId,
+          lineaNombre: linea?.nombre ?? lineaId,
+          MP: redondear(kg.MP, 2),
+          EP: redondear(kg.EP, 2),
+          PT: redondear(kg.PT, 2),
+          total: redondear(kg.MP + kg.EP + kg.PT, 2),
+        };
+      })
+      .sort((a, b) => a.lineaCodigo.localeCompare(b.lineaCodigo));
+
+    const filas = [...porCausa.values()].sort((a, b) => b.kg - a.kg);
+    const totalKg = filas.reduce((t, f) => t + f.kg, 0);
+    const heatmap: HeatmapCelda[] = filas.flatMap((f) =>
+      TURNOS.map((turno) => ({
+        fila: f.causa?.codigo ?? f.causaId,
+        filaLabel: `${f.causa?.codigo ?? f.causaId} ${f.causa?.nombre ?? ''}`.trim(),
         columna: turno,
         columnaLabel: TURNO_LABEL[turno],
-        valor: c.kgPorTurno[i] ?? 0,
+        valor: redondear(f.porTurno.get(turno) ?? 0, 2),
       })),
     );
+    const tabla: DetalleCausaMerma[] = filas.map((f) => ({
+      causaId: f.causaId,
+      causaCodigo: f.causa?.codigo ?? f.causaId,
+      causaNombre: f.causa?.nombre ?? 'Causa desconocida',
+      kg: redondear(f.kg, 2),
+      pct: totalKg > 0 ? redondear((f.kg / totalKg) * 100) : 0,
+      tipoPredominante: (Object.entries(f.porTipo) as [TipoMermaCodigo, number][]).sort(
+        (x, y) => y[1] - x[1],
+      )[0]![0],
+      lineaMasAfectada: lineaTop(f.porLinea, ctx.codigoLinea),
+    }));
 
-    const totalKg = filasCausa.reduce((a, c) => a + c.kgPorTurno.reduce((x, y) => x + y, 0), 0);
-    const tabla: DetalleCausaMerma[] = filasCausa.map((c) => {
-      const kg = c.kgPorTurno.reduce((a, b) => a + b, 0);
-      return {
-        causaId: c.causaId,
-        causaCodigo: c.causaCodigo,
-        causaNombre: c.causaNombre,
-        kg,
-        pct: totalKg > 0 ? redondear((kg / totalKg) * 100) : 0,
-        tipoPredominante: c.tipoPredominante,
-        lineaMasAfectada: c.lineaMasAfectada,
-      };
+    /* % sobre producción = kg de merma / kg producidos por las mismas órdenes. */
+    const kgProducidos = ctx.ordenes
+      .filter((o) => ReportsService.dentro(o, o.lineaId, ctx.filtro))
+      .reduce((t, o) => t + o.producido * (pesoPorProducto.get(o.productoId) ?? 0), 0);
+    const kgPrevios = previas.reduce((t, m) => t + m.cantidadKg, 0);
+    const hayPrevio = this.hayOrdenes(ctx.ordenes, ctx.comparacion);
+    const sinDatos =
+      actuales.length === 0 && !this.hayOrdenes(ctx.ordenes, ctx.filtro);
+    const referencia = query.comparar === 'anio_anterior' ? 'vs año anterior' : 'vs periodo anterior';
+    const kpi = (id: string, label: string, valor: number, unidad: string, previo?: number): KpiValor => ({
+      id,
+      label,
+      valor,
+      unidad,
+      ...(sinDatos ? { sinDatos: true } : {}),
+      delta:
+        previo === undefined || !hayPrevio || sinDatos
+          ? undefined
+          : { valor: redondear(valor - previo), unidad, favorableSiSube: false, referencia },
     });
 
     return {
-      periodo: ventana.periodo,
-      desde: ventana.desde,
-      hasta: ventana.hasta,
-      kpis: await this.kpisDe('mermas', query.comparar),
+      periodo: ctx.ventana.periodo,
+      desde: ctx.ventana.desde,
+      hasta: ctx.ventana.hasta,
+      kpis: [
+        kpi('merma_total', 'Merma total', redondear(totalKg), 'kg', redondear(kgPrevios)),
+        kpi(
+          'merma_pct',
+          '% sobre producción',
+          kgProducidos > 0 ? redondear((totalKg / kgProducidos) * 100) : 0,
+          '%',
+        ),
+        kpi('merma_costo', 'Costo estimado', Math.round(totalKg * COSTO_MERMA_SOL_KG), 'S/'),
+        kpi('baldes', 'Baldes a pasteurizar', baldes, ''),
+      ],
       apiladasPorLinea,
       heatmap,
       tabla,
     };
   }
 
-  /* ---------------------------------------------------------------- */
-  /* Helpers                                                           */
-  /* ---------------------------------------------------------------- */
-
-  private async kpisDe(ambito: IndicadorKpi['ambito'], comparar: string): Promise<KpiValor[]> {
-    const filas = await this.kpis.find({ where: { ambito }, order: { orden: 'ASC' } });
-    const anio = comparar === 'anio_anterior';
-    return filas.map((f) => {
-      const valorDelta = anio ? f.deltaAnioValor : f.deltaValor;
-      const delta: Delta | undefined =
-        valorDelta === null || valorDelta === undefined
-          ? undefined
-          : {
-              valor: valorDelta,
-              unidad: f.deltaUnidad ?? f.unidad,
-              favorableSiSube: f.deltaFavorableSiSube,
-              referencia: anio ? 'vs año anterior' : 'vs periodo anterior',
-            };
-      return {
-        id: f.clave,
-        label: f.label,
-        valor: f.valor,
-        unidad: f.unidad,
-        meta: f.meta ?? undefined,
-        delta,
-      };
-    });
+  /** ¿Hay órdenes en la ventana y filtros? Distingue «0 paradas» de «sin datos». */
+  private hayOrdenes(ordenes: OrdenFabricacion[], filtro: FiltroHechos): boolean {
+    return ordenes.some((o) => ReportsService.dentro(o, o.lineaId, filtro));
   }
 
   /**
@@ -353,23 +572,47 @@ export class ReportsService {
     return diaOperativo(filas.map((f) => ({ fecha: f.fecha, estado: 'agregado' })));
   }
 
+  /** Turno desconocido o línea inexistente → 422 (antes, 200 con `sinDatos`). */
+  private async validarFiltros(query: ReporteQueryDto): Promise<void> {
+    const errores: Record<string, string> = {};
+    const turnos = toList(query.turno);
+    if (turnos.some((t) => !(TURNOS as readonly string[]).includes(t))) {
+      errores.turno = `turno no reconocido; usa ${TURNOS.join(', ')}`;
+    }
+    const lineaIds = [...new Set(toList(query.lineaId))];
+    if (lineaIds.length) {
+      const existentes = await this.catalogoLineas.count({ where: { id: In(lineaIds) } });
+      if (existentes !== lineaIds.length) errores.lineaId = 'La línea seleccionada no existe';
+    }
+    if (Object.keys(errores).length) throw new ValidationException(errores);
+  }
+
+  /**
+   * Ventana del informe. Con `periodo=personalizado` exige `desde` y `hasta`
+   * reales y en orden (422 si no: antes `2026-02-30` daba 500 y un rango
+   * invertido devolvía ceros como si fueran datos, M7).
+   */
   private async resolverVentana(query: ReporteQueryDto): Promise<Ventana> {
+    await this.validarFiltros(query);
     const periodo = PERIODO_CANONICO[query.periodo] ?? 'semana';
     const esCustom = periodo === 'personalizado';
-    if (esCustom && query.desde && query.hasta) {
-      const dias = Math.max(
-        1,
-        Math.round((new Date(query.hasta).getTime() - new Date(query.desde).getTime()) / 86400000) + 1,
-      );
+    if (esCustom && (query.desde || query.hasta)) {
+      if (!query.desde || !query.hasta) {
+        throw new ValidationException({
+          [query.desde ? 'hasta' : 'desde']: 'Indica las dos fechas del rango personalizado',
+        });
+      }
+      const errores = erroresDeRango(query.desde, query.hasta);
+      if (Object.keys(errores).length) throw new ValidationException(errores);
+      const dias =
+        Math.round(
+          (Date.parse(`${query.hasta}T00:00:00Z`) - Date.parse(`${query.desde}T00:00:00Z`)) / 86_400_000,
+        ) + 1;
       return { periodo, desde: query.desde, hasta: query.hasta, dias };
     }
     const dias = DIAS_POR_PERIODO[query.periodo] ?? 7;
-    const hasta = new Date(`${await this.anclaVentana()}T00:00:00`);
-    const desde = new Date(hasta);
-    desde.setDate(desde.getDate() - (dias - 1));
-    const fmt = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return { periodo, desde: fmt(desde), hasta: fmt(hasta), dias };
+    const hasta = await this.anclaVentana();
+    return { periodo, desde: sumarDiasLocal(hasta, -(dias - 1)), hasta, dias };
   }
 
   /** Utilizado por Analítica para el heatmap causa × turno. */

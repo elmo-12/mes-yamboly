@@ -14,11 +14,15 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { TIPOS_MERMA, type TipoMermaCodigo } from '@mes/types';
+import { TIEMPO_REGISTRO_MAX_SEG, TIPOS_MERMA, type TipoMermaCodigo } from '@mes/types';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 const BOOLEANO = ({ value }: { value: unknown }): unknown =>
   value === 'true' ? true : value === 'false' ? false : value;
+
+/** Recorta espacios: un texto solo de espacios cuenta como vacío. */
+const RECORTAR = ({ value }: { value: unknown }): unknown =>
+  typeof value === 'string' ? value.trim() : value;
 
 export class CreateMermaDto {
   @ApiProperty({ example: 'ORD-0815' })
@@ -37,14 +41,20 @@ export class CreateMermaDto {
 
   @ApiProperty({ example: 3.2, minimum: 0.01, maximum: 500 })
   @Type(() => Number)
-  @IsNumber({}, { message: 'La cantidad debe ser numérica' })
+  @IsNumber(
+    { allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 },
+    { message: 'La cantidad debe ser numérica (máximo 2 decimales)' },
+  )
   @IsPositive({ message: 'La cantidad debe ser mayor que 0' })
-  @Max(500, { message: 'Cantidad fuera de rango' })
+  @Min(0.01, { message: 'La cantidad mínima es 0,01 kg' })
+  @Max(500, { message: 'Cantidad fuera de rango (máximo 500 kg)' })
   cantidadKg!: number;
 
-  @ApiProperty({ example: 'Vainilla' })
+  @ApiProperty({ example: 'Vainilla', description: 'Nombre del sabor del catálogo' })
+  @Transform(RECORTAR)
   @IsString()
   @IsNotEmpty({ message: 'Selecciona un sabor' })
+  @MaxLength(80, { message: 'Máximo 80 caracteres' })
   sabor!: string;
 
   @ApiPropertyOptional({
@@ -75,6 +85,7 @@ export class CreateMermaDto {
     description: 'Obligatorio si la causa tiene `requiereSolicitud`',
   })
   @IsOptional()
+  @Transform(RECORTAR)
   @IsString()
   @MaxLength(50, { message: 'Máximo 50 caracteres' })
   numeroSolicitud?: string;
@@ -82,7 +93,7 @@ export class CreateMermaDto {
   @ApiPropertyOptional({ example: '/api/v1/evidencias/EV-20260911-a1b2c3d4.jpg' })
   @IsOptional()
   @IsString()
-  @MaxLength(200)
+  @MaxLength(200, { message: 'Máximo 200 caracteres' })
   evidenciaUrl?: string;
 
   @ApiProperty({ example: 'USR-02' })
@@ -90,9 +101,11 @@ export class CreateMermaDto {
   @IsNotEmpty({ message: 'Selecciona un responsable' })
   responsableId!: string;
 
-  @ApiPropertyOptional({ example: 'BLD-2026-0417' })
+  @ApiPropertyOptional({ example: 'BLD-2026-0417', maxLength: 50 })
   @IsOptional()
+  @Transform(RECORTAR)
   @IsString()
+  @MaxLength(50, { message: 'Máximo 50 caracteres' })
   codigoBalde?: string;
 
   @ApiPropertyOptional({ default: false })
@@ -106,15 +119,23 @@ export class CreateMermaDto {
     description: 'Obligatoria si la causa tiene `requiereComentario`',
   })
   @IsOptional()
+  @Transform(RECORTAR)
   @IsString()
   @MaxLength(300, { message: 'Máximo 300 caracteres' })
   observacion?: string;
 
-  @ApiPropertyOptional({ default: 0, description: 'Segundos de registro — KPI TRI' })
+  @ApiPropertyOptional({
+    default: 0,
+    maximum: TIEMPO_REGISTRO_MAX_SEG,
+    description: 'Segundos de registro — KPI TRI',
+  })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
+  @IsInt({ message: 'El tiempo de registro debe ser un número entero de segundos' })
+  @Min(0, { message: 'El tiempo de registro no puede ser negativo' })
+  @Max(TIEMPO_REGISTRO_MAX_SEG, {
+    message: `El tiempo de registro no puede superar ${TIEMPO_REGISTRO_MAX_SEG} s`,
+  })
   tiempoRegistroSeg?: number;
 }
 

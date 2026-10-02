@@ -19,6 +19,7 @@ import { umbralesSchema } from '@mes/types';
 import type { UmbralesInput } from '@mes/types';
 import { formatDateTime } from '@mes/shared';
 import { useGuardarUmbrales, useUmbrales } from '@/features/alerts/hooks';
+import { esConflictoVersion, TOAST_CONFLICTO_VERSION } from '@/features/catalogs/errores';
 import { ApiClientError } from '@/services/api/client';
 
 /**
@@ -48,6 +49,7 @@ export function UmbralesTab() {
           tciToleranciaMin: data.tciToleranciaMin,
           tciToleranciaPct: data.tciToleranciaPct,
           tciToleranciaDiasSap: data.tciToleranciaDiasSap,
+          version: data.version,
         }
       : undefined,
   });
@@ -64,16 +66,22 @@ export function UmbralesTab() {
         tciToleranciaMin: guardados.tciToleranciaMin,
         tciToleranciaPct: guardados.tciToleranciaPct,
         tciToleranciaDiasSap: guardados.tciToleranciaDiasSap,
+        version: guardados.version,
       });
       toast.success('Umbrales actualizados', {
         description:
           'Las alertas se reevalúan en el próximo ciclo y las tolerancias del TCI, en la siguiente validación.',
       });
     } catch (err) {
+      if (esConflictoVersion(err)) {
+        toast.error(TOAST_CONFLICTO_VERSION.titulo, { description: TOAST_CONFLICTO_VERSION.descripcion });
+        void refetch();
+        return;
+      }
       const prohibido = err instanceof ApiClientError && err.statusCode === 403;
       toast.error(prohibido ? 'No tienes permiso para cambiar los umbrales' : 'No se pudieron guardar los umbrales', {
         description: prohibido
-          ? 'Solo el Jefe de producción puede modificar los umbrales de alerta.'
+          ? 'Solo jefatura y supervisión pueden modificar los umbrales de alerta.'
           : err instanceof Error
             ? err.message
             : 'Inténtalo de nuevo.',
@@ -189,7 +197,7 @@ export function UmbralesTab() {
               label: (
                 <Etiqueta
                   titulo="Notificar por n8n / WhatsApp"
-                  apoyo="Envía la alerta al supervisor de la línea y a jefatura"
+                  apoyo="Próximamente: el envío a n8n aún no está integrado, el valor se guarda pero no tiene efecto"
                 />
               ),
               value: (
@@ -197,10 +205,13 @@ export function UmbralesTab() {
                   control={control}
                   name="notificarN8n"
                   render={({ field }) => (
+                    /* M8: sin consumidor en la API ni en /tv; se deshabilita en vez
+                       de prometer un comportamiento que no existe. */
                     <Switch
+                      disabled
                       checked={field.value ?? false}
                       onCheckedChange={field.onChange}
-                      label={field.value ? 'Activado' : 'Desactivado'}
+                      label={field.value ? 'Activado · próximamente' : 'Desactivado · próximamente'}
                     />
                   )}
                 />
@@ -210,7 +221,7 @@ export function UmbralesTab() {
               label: (
                 <Etiqueta
                   titulo="Mostrar en Modo TV"
-                  apoyo="Las alertas activas aparecen en la pantalla de planta"
+                  apoyo="Próximamente: el Modo TV aún no consulta este ajuste y siempre muestra el riesgo"
                 />
               ),
               value: (
@@ -218,10 +229,13 @@ export function UmbralesTab() {
                   control={control}
                   name="mostrarTv"
                   render={({ field }) => (
+                    /* M8: sin consumidor en la API ni en /tv; se deshabilita en vez
+                       de prometer un comportamiento que no existe. */
                     <Switch
+                      disabled
                       checked={field.value ?? false}
                       onCheckedChange={field.onChange}
-                      label={field.value ? 'Activado' : 'Desactivado'}
+                      label={field.value ? 'Activado · próximamente' : 'Desactivado · próximamente'}
                     />
                   )}
                 />

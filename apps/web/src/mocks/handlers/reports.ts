@@ -1,13 +1,15 @@
 import { http, HttpResponse } from 'msw';
 import * as XLSX from 'xlsx';
 import type {
+  DatasetExport,
   ExportJob,
   IndicadoresResumen,
+  KpiValor,
   MermasResumen,
   ParadasResumen,
   Periodo,
 } from '@mes/types';
-import { DATASET_EXPORT_LABEL } from '@mes/types';
+import { DATASETS_EXPORT, DATASET_EXPORT_LABEL, FORMATOS_EXPORT, esFechaCalendario } from '@mes/types';
 import { rangoPeriodo } from '@mes/shared';
 import {
   HOY,
@@ -25,7 +27,8 @@ import {
   tendenciaOee,
 } from '../data';
 import { getStore, nextId } from '../store';
-import { API, ahoraIso, listaQuery, preludio } from './_utils';
+import { API, ahoraIso, errores, listaQuery, preludio } from './_utils';
+import { usuarioDesdeToken } from './auth';
 
 function rango(url: URL): { periodo: Periodo; desde: string; hasta: string } {
   const periodo = (url.searchParams.get('periodo') as Periodo | null) ?? 'semana';
@@ -36,12 +39,45 @@ function rango(url: URL): { periodo: Periodo; desde: string; hasta: string } {
   return { periodo, ...r };
 }
 
+/**
+ * `true` si la ventana (periodo, líneas y turnos) no tiene ninguna orden en el
+ * store. La API marca entonces cada KPI con `sinDatos` (valor 0 sin delta) para
+ * que la UI muestre «Sin datos» en vez de un 0 % que parezca una medición.
+ */
+function ventanaSinDatos(url: URL): boolean {
+  const { desde, hasta } = rango(url);
+  const lineaIds = listaQuery(url, 'lineaId');
+  const turnos = listaQuery(url, 'turno');
+  return !getStore().ordenes.some(
+    (o) =>
+      o.fecha >= desde &&
+      o.fecha <= hasta &&
+      (lineaIds.length === 0 || lineaIds.includes(o.lineaId)) &&
+      (turnos.length === 0 || turnos.includes(o.turno))
+  );
+}
+
+/** KPI de una ventana vacía: valor 0, sin delta y con `sinDatos`. */
+function kpisSinDatos(kpis: readonly KpiValor[]): KpiValor[] {
+  return kpis.map(({ delta: _delta, ...k }) => ({ ...k, valor: 0, sinDatos: true }));
+}
+
 export const reportsHandlers = [
   http.get(`${API}/reportes/indicadores`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
     const url = new URL(request.url);
     const lineaIds = listaQuery(url, 'lineaId');
+    if (ventanaSinDatos(url)) {
+      const vacio: IndicadoresResumen = {
+        ...rango(url),
+        kpis: kpisSinDatos(indicadoresKpis),
+        tendenciaOee: [],
+        oeePorLinea: [],
+        comparativaTurno: [],
+      };
+      return HttpResponse.json(vacio);
+    }
     const data: IndicadoresResumen = {
       ...rango(url),
       kpis: indicadoresKpis,
@@ -56,6 +92,17 @@ export const reportsHandlers = [
     const simulado = await preludio(request);
     if (simulado) return simulado;
     const url = new URL(request.url);
+    /* `clasificacion` (programada/imprevista) no se replica: los datos de reportes son fijos. */
+    if (ventanaSinDatos(url)) {
+      const vacio: ParadasResumen = {
+        ...rango(url),
+        kpis: kpisSinDatos(paradasKpis),
+        pareto: [],
+        donut: [],
+        detallePorCausa: [],
+      };
+      return HttpResponse.json(vacio);
+    }
     const data: ParadasResumen = {
       ...rango(url),
       kpis: paradasKpis,
@@ -71,6 +118,16 @@ export const reportsHandlers = [
     if (simulado) return simulado;
     const url = new URL(request.url);
     const lineaIds = listaQuery(url, 'lineaId');
+    if (ventanaSinDatos(url)) {
+      const vacio: MermasResumen = {
+        ...rango(url),
+        kpis: kpisSinDatos(mermasKpis),
+        apiladasPorLinea: [],
+        heatmap: [],
+        tabla: [],
+      };
+      return HttpResponse.json(vacio);
+    }
     const data: MermasResumen = {
       ...rango(url),
       kpis: mermasKpis,
@@ -94,7 +151,25 @@ export const reportsHandlers = [
     const simulado = await preludio(request);
     if (simulado) return simulado;
     const body = (await request.json()) as Record<string, unknown>;
-    const datasets = (body.datasets as ExportJob['datasets'] | undefined) ?? ['ordenes'];
+    /* Espejo de `exportRequestSchema` / `ExportRequestDto` (422 por campo). */
+    const detalles: Record<string, string> = {};
+    const lista = Array.isArray(body.datasets) ? (body.datasets as string[]) : [];
+    if (lista.length === 0) detalles.datasets = 'Selecciona al menos un dataset';
+    else if (lista.some((d) => !DATASETS_EXPORT.includes(d as DatasetExport))) {
+      detalles.datasets = 'Conjunto de datos desconocido';
+    } else if (new Set(lista).size !== lista.length) detalles.datasets = 'Hay conjuntos repetidos';
+    if (body.formato !== undefined && !FORMATOS_EXPORT.includes(body.formato as ExportJob['formato'])) {
+      detalles.formato = 'Formato no soportado';
+    }
+    const desde = typeof body.desde === 'string' ? body.desde : '';
+    const hasta = typeof body.hasta === 'string' ? body.hasta : '';
+    if (!esFechaCalendario(desde)) detalles.desde = 'Fecha inválida';
+    if (!esFechaCalendario(hasta)) detalles.hasta = 'Fecha inválida';
+    else if (!detalles.desde && desde > hasta) {
+      detalles.hasta = 'La fecha final debe ser igual o posterior a la inicial';
+    }
+    if (Object.keys(detalles).length > 0) return errores.validacion(detalles);
+    const datasets = lista as ExportJob['datasets'];
     const formato = (body.formato as ExportJob['formato'] | undefined) ?? 'xlsx';
     const job: ExportJob = {
       id: nextId('EXP'),
@@ -102,7 +177,7 @@ export const reportsHandlers = [
       datasets,
       formato,
       solicitadoEn: ahoraIso(),
-      solicitadoPor: 'Carlos Mendoza',
+      solicitadoPor: usuarioDesdeToken(request)?.nombre ?? 'Carlos Mendoza',
       estado: 'generando',
     };
     getStore().exportaciones.unshift(job);

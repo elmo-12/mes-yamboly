@@ -20,9 +20,10 @@ import {
   Timeline,
   type TimelineEvent,
 } from '@mes/ui';
-import type { LineaEstado, TimelineEvento, TipoEventoTimeline } from '@mes/types';
+import { puedeCapturar, type LineaEstado, type TimelineEvento, type TipoEventoTimeline } from '@mes/types';
 import { formatNumber } from '@mes/shared';
 import { useOrden } from '@/features/orders/hooks';
+import { useSession } from '@/hooks/use-session';
 import { useLineaTimeline } from '../hooks';
 import { badgeLinea } from './linea-view';
 
@@ -68,6 +69,7 @@ export function LineaDrawer({
     abierto && linea ? linea.lineaId : undefined,
   );
   const { data: orden } = useOrden(abierto && linea?.orden ? linea.orden.id : undefined);
+  const { user } = useSession();
   const eventos = timeline?.eventos ?? [];
 
   if (!linea) return null;
@@ -99,9 +101,12 @@ export function LineaDrawer({
                 Ver historial
               </Button>
             )}
-            <Button variant="primary" onClick={onRegistrarParada}>
-              Registrar parada
-            </Button>
+            {/* Solo con orden en curso y para quien puede registrar paradas en la línea. */}
+            {linea.estado !== 'sin_orden' && puedeCapturar(user, 'parada', linea.lineaId) && (
+              <Button variant="primary" onClick={onRegistrarParada}>
+                Registrar parada
+              </Button>
+            )}
           </>
         }
       >

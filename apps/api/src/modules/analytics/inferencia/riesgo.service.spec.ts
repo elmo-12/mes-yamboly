@@ -45,7 +45,15 @@ describe('RiesgoService — coherencia de la probabilidad entre predict() y eval
       ]),
     };
     const paradas = { find: jest.fn().mockResolvedValue([]) };
-    const ordenes = { find: jest.fn().mockResolvedValue([]) };
+    /* `lineasConHistorial()`: solo se puntúan líneas con al menos una orden (M6). */
+    const qb = {
+      select: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([{ lineaId: 'LIN-1' }]),
+    };
+    const ordenes = {
+      find: jest.fn().mockResolvedValue([]),
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
+    };
     const causas = { find: jest.fn().mockResolvedValue([]) };
     const predicciones = {
       create: jest.fn((x: unknown) => x),

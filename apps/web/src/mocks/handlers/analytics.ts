@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { Modelo, ReentrenamientoJob, VersionModelo } from '@mes/types';
+import { ROLES_GESTIONAR_MODELO, ROLES_VER_ANALITICA } from '@mes/types';
 import {
   analiticaResumen,
   estadoDatos,
@@ -10,6 +11,7 @@ import {
 } from '../data';
 import { epActual, getStore, nextId } from '../store';
 import { API, ahoraIso, errores, preludio } from './_utils';
+import { exigeRoles } from './auth';
 
 /**
  * Copia mutable del modelo para la sesión: activar una versión y reentrenar
@@ -34,6 +36,8 @@ export const analyticsHandlers = [
   http.get(`${API}/analitica/resumen`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const { respuesta } = exigeRoles(request, ROLES_VER_ANALITICA);
+    if (respuesta) return respuesta;
     const store = getStore();
     const vigente = versionVigente();
     return HttpResponse.json({
@@ -45,7 +49,12 @@ export const analyticsHandlers = [
         eventos: vigente.eventos,
       },
       /* EP se recalcula con las confirmaciones de la sesión. */
-      kpis: { ...analiticaResumen.kpis, ep: epActual() },
+      kpis: {
+        ...analiticaResumen.kpis,
+        ep: epActual(),
+        /* Con 0 la EP aún no se ha medido: la UI muestra «—». */
+        epConfirmadas: store.registrosEp.length,
+      },
       prediccionesActivas: store.alertas
         .filter((a) => a.estado === 'activa')
         .map((a) => ({
@@ -63,18 +72,24 @@ export const analyticsHandlers = [
   http.get(`${API}/analitica/patrones`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const { respuesta } = exigeRoles(request, ROLES_VER_ANALITICA);
+    if (respuesta) return respuesta;
     return HttpResponse.json(patrones);
   }),
 
   http.get(`${API}/analitica/predicciones`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const { respuesta } = exigeRoles(request, ROLES_VER_ANALITICA);
+    if (respuesta) return respuesta;
     return HttpResponse.json(predicciones);
   }),
 
   http.get(`${API}/analitica/modelo`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const { respuesta } = exigeRoles(request, ROLES_VER_ANALITICA);
+    if (respuesta) return respuesta;
     return HttpResponse.json({
       ...modeloSesion,
       reentrenamiento: reentrenamiento ?? undefined,
@@ -84,6 +99,8 @@ export const analyticsHandlers = [
   http.get(`${API}/analitica/estado-datos`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const { respuesta } = exigeRoles(request, ROLES_VER_ANALITICA);
+    if (respuesta) return respuesta;
     const url = new URL(request.url);
     return HttpResponse.json(
       url.searchParams.get('estado') === 'insuficiente' ? estadoDatosInsuficiente : estadoDatos,
@@ -93,6 +110,8 @@ export const analyticsHandlers = [
   http.post(`${API}/analitica/reentrenar`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const { respuesta } = exigeRoles(request, ROLES_GESTIONAR_MODELO);
+    if (respuesta) return respuesta;
     const anterior = versionVigente();
     const version = siguienteVersion(anterior.version);
     const job: ReentrenamientoJob = {
@@ -124,6 +143,8 @@ export const analyticsHandlers = [
   http.post(`${API}/analitica/modelo/:version/activar`, async ({ request, params }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const { respuesta } = exigeRoles(request, ROLES_GESTIONAR_MODELO);
+    if (respuesta) return respuesta;
     const version = String(params.version);
     if (!modeloSesion.versiones.some((v) => v.version === version)) {
       return errores.noEncontrado('Versión del modelo');

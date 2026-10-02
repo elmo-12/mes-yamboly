@@ -24,6 +24,9 @@ import type {
   TipoMermaCodigo,
   TipoProcesoLinea,
   TurnoDef,
+  UpdateCausaMermaInput,
+  UpdateCausaParadaInput,
+  UpdateLineaInput,
   UpdateProductoInput,
   UpdateVelocidadEstandarInput,
   User,
@@ -35,6 +38,13 @@ import { api } from '@/services/api/client';
 
 interface Lista<T> {
   data: T[];
+}
+
+/** Copia de `objeto` sin `campos` (los inmutables que el formulario arrastra). */
+function sinCampos<T extends object>(objeto: T, campos: readonly string[]): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(objeto).filter(([clave]) => !campos.includes(clave)),
+  ) as Partial<T>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -98,16 +108,17 @@ export const catalogsApi = {
   /** La línea es la máquina física: `GET /lineas` es el mantenedor de las 9. */
   lineas: (filtros: LineaFiltros = {}) => api.get<Lista<LineaListItem>>('/lineas', { ...filtros }),
   crearLinea: (input: LineaInput) => api.post<Linea>('/lineas', input),
-  actualizarLinea: (id: string, input: Partial<LineaInput>) =>
-    api.patch<Linea>(`/lineas/${id}`, input),
+  /** El código es inmutable (define el id): nunca se envía en la edición. */
+  actualizarLinea: (id: string, input: UpdateLineaInput & { codigo?: string }) =>
+    api.patch<Linea>(`/lineas/${id}`, sinCampos(input, ['codigo'])),
   bajaLinea: (id: string) => api.del<BajaLogicaResponse>(`/lineas/${id}`),
 
   /* ---------------------------- Productos --------------------------- */
   productos: (filtros: ProductoFiltros = {}) =>
     api.get<Lista<Producto>>('/productos', { ...filtros }),
   crearProducto: (input: ProductoInput) => api.post<Producto>('/productos', input),
-  actualizarProducto: (id: string, input: UpdateProductoInput) =>
-    api.patch<Producto>(`/productos/${id}`, input),
+  actualizarProducto: (id: string, input: UpdateProductoInput & { codigo?: string }) =>
+    api.patch<Producto>(`/productos/${id}`, sinCampos(input, ['codigo'])),
   bajaProducto: (id: string) => api.del<BajaLogicaResponse>(`/productos/${id}`),
 
   /* ----------------------- Velocidades estándar --------------------- */
@@ -126,8 +137,9 @@ export const catalogsApi = {
   causasParadaPlano: (filtros: CausaParadaFiltros = {}) =>
     api.get<Lista<CausaParada>>('/causas-parada', { formato: 'plano', ...filtros }),
   crearCausaParada: (input: CausaParadaInput) => api.post<CausaParada>('/causas-parada', input),
-  actualizarCausaParada: (id: string, input: Partial<CausaParadaInput>) =>
-    api.patch<CausaParada>(`/causas-parada/${id}`, input),
+  /** Código, nivel y padre son inmutables: no se envían en la edición. */
+  actualizarCausaParada: (id: string, input: UpdateCausaParadaInput & Partial<CausaParadaInput>) =>
+    api.patch<CausaParada>(`/causas-parada/${id}`, sinCampos(input, ['codigo', 'nivel', 'parentId'])),
   bajaCausaParada: (id: string) =>
     api.del<BajaCausaParadaResponse>(`/causas-parada/${id}`),
 
@@ -137,8 +149,8 @@ export const catalogsApi = {
   causasMermaPlano: (filtros: CausaMermaFiltros = {}) =>
     api.get<Lista<CausaMerma>>('/causas-merma', { formato: 'plano', ...filtros }),
   crearCausaMerma: (input: CausaMermaInput) => api.post<CausaMerma>('/causas-merma', input),
-  actualizarCausaMerma: (id: string, input: Partial<CausaMermaInput>) =>
-    api.patch<CausaMerma>(`/causas-merma/${id}`, input),
+  actualizarCausaMerma: (id: string, input: UpdateCausaMermaInput & Partial<CausaMermaInput>) =>
+    api.patch<CausaMerma>(`/causas-merma/${id}`, sinCampos(input, ['codigo', 'nivel', 'parentId'])),
   bajaCausaMerma: (id: string) => api.del<BajaLogicaResponse>(`/causas-merma/${id}`),
 
   /* ----------------------------- Usuarios --------------------------- */
@@ -156,9 +168,13 @@ export const catalogsApi = {
   restablecerPassword: (id: string, { password }: RestablecerPasswordInput) =>
     api.post<User>(`/usuarios/${id}/restablecer-password`, { password }),
 
-  /** Personas para los selectores de captura (responsable, maquinista, supervisor). */
+  /**
+   * Personas para los selectores de captura (responsable, maquinista, supervisor).
+   * Siempre sólo activas: sin el filtro explícito, al jefe la API le devuelve
+   * también los inactivos (M2).
+   */
   personas: (rol?: Role[], lineaId?: string) =>
-    api.get<Lista<User>>('/usuarios', { rol, lineaId }),
+    api.get<Lista<User>>('/usuarios', { rol, lineaId, activo: true }),
   /** Cuadrilla del turno (paso "Equipo" de la orden). */
   colaboradores: () => api.get<Lista<Colaborador>>('/colaboradores'),
 };

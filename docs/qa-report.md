@@ -1,5 +1,9 @@
 # QA — MES Yamboly
 
+> **Ronda más reciente:** [QA 2-oct-2026 · robustez sobre `feat/ordenes-sap`](./qa-2026-10-02.md) (auth, órdenes/SAP,
+> captura, catálogos, alertas/analítica, evidencia, reportes, tiempo real/IoT y web). Resuelve el pendiente #1 de la
+> fase 3 (`GET /evidencia/*` sin `@Roles`) y el hallazgo de la fase 2 «`Merma` no persiste `evidenciaUrl`».
+
 ## QA fase 3 · Evidencia real y validación TCI (4-sep-2026, noche)
 
 Fecha: 2026-09-04 (noche) · Rama `feat/evidencia-real` (commit `188874e`, sobre `feat/ajustes-configuracion`) ·

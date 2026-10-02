@@ -7,22 +7,34 @@ import {
   IsOptional,
   IsString,
   Matches,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 import { ROLES, type Role } from '@mes/types';
+
+const RECORTAR = ({ value }: { value: unknown }): unknown =>
+  typeof value === 'string' ? value.trim() : value;
+
+/** El correo se guarda siempre en minúsculas: el login ya lo compara normalizado. */
+const CORREO = ({ value }: { value: unknown }): unknown =>
+  typeof value === 'string' ? value.trim().toLowerCase() : value;
 
 const BOOLEANO = ({ value }: { value: unknown }): unknown =>
   value === 'true' ? true : value === 'false' ? false : value;
 
 /** Campos comunes al alta y a la edición de usuario (sin contraseña). */
 export class UsuarioBaseDto {
-  @ApiProperty({ example: 'Ana Quispe' })
+  @ApiProperty({ example: 'Ana Quispe', maxLength: 120 })
+  @Transform(RECORTAR)
   @IsString()
   @MinLength(3, { message: 'El nombre es obligatorio' })
+  @MaxLength(120, { message: 'Máximo 120 caracteres' })
   nombre!: string;
 
-  @ApiProperty({ example: 'ana.quispe@yamboly.lat' })
+  @ApiProperty({ example: 'ana.quispe@yamboly.lat', maxLength: 120 })
+  @Transform(CORREO)
   @IsEmail({}, { message: 'Correo inválido' })
+  @MaxLength(120, { message: 'Máximo 120 caracteres' })
   email!: string;
 
   @ApiProperty({ example: '45871203', description: '8 dígitos' })
@@ -34,14 +46,21 @@ export class UsuarioBaseDto {
   @IsIn(ROLES, { message: 'Selecciona un rol' })
   rol!: Role;
 
-  @ApiProperty({ example: 'Maquinista de línea' })
+  @ApiProperty({ example: 'Maquinista de línea', maxLength: 80 })
+  @Transform(RECORTAR)
   @IsString()
   @MinLength(2, { message: 'El cargo es obligatorio' })
+  @MaxLength(80, { message: 'Máximo 80 caracteres' })
   cargo!: string;
 
-  @ApiPropertyOptional({ example: 'LIN-LLEN-M2', nullable: true })
+  @ApiPropertyOptional({
+    example: 'LIN-LLEN-M2',
+    nullable: true,
+    description: 'Obligatoria para el rol maquinista (422 si falta o no existe)',
+  })
   @IsOptional()
   @IsString()
+  @MaxLength(40)
   lineaId?: string | null;
 }
 
@@ -89,7 +108,10 @@ export class UsuarioQueryDto {
   @IsString()
   lineaId?: string;
 
-  @ApiPropertyOptional({ description: '`true` sólo activos, `false` sólo inactivos' })
+  @ApiPropertyOptional({
+    description:
+      '`true` sólo activos, `false` sólo inactivos. Sin el parámetro: el jefe recibe todos y el resto de roles solo los activos (selectores).',
+  })
   @IsOptional()
   @Transform(BOOLEANO)
   @IsBoolean()

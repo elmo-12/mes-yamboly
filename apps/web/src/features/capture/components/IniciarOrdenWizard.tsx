@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { Controller, useForm } from 'react-hook-form';
+import { useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Button,
@@ -16,25 +17,35 @@ import {
   TimerChip,
   toast,
 } from '@mes/ui';
-import { createOrdenSchema, type CreateOrdenInput } from '@mes/types';
-import { formatDurationMin, formatNumber, formatSpeed, turnoPorHora } from '@mes/shared';
+import {
+  TIEMPO_REGISTRO_MAX_SEG,
+  createOrdenSchema,
+  type CreateOrdenInput,
+  type OrdenSapListItem,
+} from '@mes/types';
+import { formatDurationMin, formatNumber, formatSpeed } from '@mes/shared';
 import {
   useColaboradores,
   useLineas,
   usePersonas,
-  useProductos,
   useTurnos,
-  useVelocidadesEstandar,
 } from '@/features/catalogs/hooks';
-import { useCrearOrden, useOrdenes } from '@/features/orders/hooks';
+import {
+  SelectorOrdenSap,
+  formatFechaSap,
+  formatPlanificadoSap,
+} from '@/features/orders/components/SelectorOrdenSap';
+import { useCrearOrden } from '@/features/orders/hooks';
 import { useSession } from '@/hooks/use-session';
+import { ApiClientError } from '@/services/api/client';
 import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
+import { queryKeys } from '@/services/api/query-keys';
 import { formatTriCorto, useTriTimer } from '../use-tri-timer';
 
-const PASOS = [{ label: 'Datos' }, { label: 'Equipo' }, { label: 'Confirmar' }] as const;
+const PASOS = [{ label: 'Orden SAP' }, { label: 'Equipo' }, { label: 'Confirmar' }] as const;
 
 const CAMPOS_PASO: Record<number, (keyof CreateOrdenInput)[]> = {
-  0: ['lineaId', 'productoId', 'codigo', 'turno', 'lote', 'vencimiento', 'planificado'],
+  0: ['ordenSapId', 'lote', 'vencimiento'],
   1: ['maquinistaId', 'supervisorId', 'operarios'],
 };
 
@@ -46,30 +57,59 @@ function pasoDelCampo(campo: string): number {
   return 0;
 }
 
-/** `OF-2026-0815` → `OF-2026-0816`. */
-function siguienteCodigo(ultimo: string | undefined): string {
-  const anio = new Date().getFullYear();
-  if (!ultimo) return `OF-${anio}-0001`;
-  const partes = ultimo.split('-');
-  const correlativo = Number(partes[2] ?? '0') + 1;
-  return `OF-${partes[1] ?? anio}-${String(correlativo).padStart(4, '0')}`;
-}
-
 function loteSugerido(): string {
   const hoy = new Date();
   const yy = String(hoy.getFullYear()).slice(2);
   return `L-${yy}${String(hoy.getMonth() + 1).padStart(2, '0')}${String(hoy.getDate()).padStart(2, '0')}-01`;
 }
 
-/** Turno sugerido por la hora de planta: `D` 06:00–18:00 · `N` 18:00–06:00. */
-function turnoSugerido(): CreateOrdenInput['turno'] {
-  return turnoPorHora(new Date().getHours());
-}
-
-function vencimientoSugerido(meses = 18): string {
+/** Vencimiento sugerido (vida útil 18 meses); lo comparten el wizard y /ordenes. */
+export function vencimientoSugerido(meses = 18): string {
   const f = new Date();
   f.setMonth(f.getMonth() + meses);
   return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`;
+}
+
+function valoresIniciales(): CreateOrdenInput {
+  return {
+    ordenSapId: '',
+    lote: loteSugerido(),
+    vencimiento: vencimientoSugerido(),
+    maquinistaId: '',
+    supervisorId: '',
+    operarios: 1,
+    colaboradorIds: [],
+    tiempoRegistroSeg: 0,
+  };
+}
+
+/**
+ * Pista del planificado: duración estimada y avisos de plan anómalo (sin
+ * velocidad: bloquea; 0 cajas o plan antiguo: sólo avisa).
+ */
+function avisoPlan(
+  orden: OrdenSapListItem,
+  minutosEstimados: number,
+  velocidadTexto: string | undefined,
+): string {
+  if (orden.velocidadEstandar == null) {
+    return 'Sin velocidad estándar en la línea ni en SAP: no podrá iniciarse';
+  }
+  const avisos: string[] = [];
+  if (orden.planificadoCajas <= 0) avisos.push('Atención: la orden SAP planifica 0 cajas');
+  const dias = diasDesde(orden.fecha);
+  if (dias > DIAS_PLAN_ANTIGUO) avisos.push(`Atención: plan SAP de hace ${dias} días`);
+  if (minutosEstimados > 0) {
+    avisos.push(`≈ ${formatDurationMin(minutosEstimados)} a velocidad estándar (${velocidadTexto})`);
+  }
+  return avisos.join(' · ');
+}
+
+/** `380 u/min · par producto × línea` o `120 u/min · de la orden SAP`. */
+function velocidadDeSap(orden: OrdenSapListItem | null): string | undefined {
+  if (!orden || orden.velocidadEstandar == null) return undefined;
+  const fuente = orden.velocidadFuente === 'par' ? 'par producto × línea' : 'de la orden SAP';
+  return `${formatSpeed(orden.velocidadEstandar, 1)} · ${fuente}`;
 }
 
 export interface IniciarOrdenWizardProps {
@@ -77,117 +117,152 @@ export interface IniciarOrdenWizardProps {
   onOpenChange: (abierto: boolean) => void;
   /** Línea preseleccionada cuando se abre desde una Line card sin orden. */
   lineaId?: string;
+  /** Título del modal (`Nueva orden de fabricación` en /ordenes). */
+  titulo?: string;
+  /**
+   * Cronómetro TRI (Anexo 02). El alta desde /ordenes no es un registro de
+   * planta: no mide ni crea fila de postest.
+   */
+  medirTri?: boolean;
+}
+
+/** Días tras los que un plan SAP pendiente se considera antiguo (aviso, no bloqueo). */
+const DIAS_PLAN_ANTIGUO = 2;
+
+function diasDesde(fecha: string): number {
+  const d = new Date(`${fecha}T00:00:00`);
+  return Math.floor((Date.now() - d.getTime()) / 86_400_000);
 }
 
 /**
- * `Orden / Iniciar · P1 Datos · P2 Equipo · P3 Confirmar`
+ * `Orden / Iniciar · P1 Orden SAP · P2 Equipo · P3 Confirmar`
  * (Figma 2163:12873 / 2163:16326). Modal 640 con chip TRI.
+ *
+ * Como en el sistema legado, la orden nace de una **orden SAP pendiente** de la
+ * línea: línea, producto, turno, número de OF y planificado los fija SAP (el
+ * servidor los deriva de la fila); aquí sólo se completan lote, vencimiento y
+ * equipo.
  */
-export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOrdenWizardProps) {
+export function IniciarOrdenWizard({
+  abierto,
+  onOpenChange,
+  lineaId,
+  titulo = 'Iniciar orden de fabricación',
+  medirTri = true,
+}: IniciarOrdenWizardProps) {
   const [paso, setPaso] = React.useState(0);
-  const tri = useTriTimer(abierto);
+  /* La línea no viaja en el cuerpo (la fija la orden SAP): sólo filtra la lista. */
+  const [lineaSap, setLineaSap] = React.useState(lineaId ?? '');
+  const [ordenSap, setOrdenSap] = React.useState<OrdenSapListItem | null>(null);
+  const tri = useTriTimer(abierto && medirTri);
+  const queryClient = useQueryClient();
+  /* Bloqueo síncrono del envío: el doble clic llega antes que `isPending`. */
+  const enviando = React.useRef(false);
   const { user } = useSession();
   const { data: lineas } = useLineas();
   const { data: turnos } = useTurnos();
   const { data: personas } = usePersonas();
   const { data: colaboradores } = useColaboradores();
-  const { data: ultimas } = useOrdenes({ pageSize: 1, sort: 'codigo', orden: 'desc' });
   const crear = useCrearOrden();
 
   const form = useForm<CreateOrdenInput>({
     resolver: zodResolver(createOrdenSchema),
     mode: 'onTouched',
-    defaultValues: {
-      lineaId: lineaId ?? '',
-      productoId: '',
-      codigo: '',
-      lote: loteSugerido(),
-      vencimiento: vencimientoSugerido(),
-      turno: turnoSugerido(),
-      planificado: 0,
-      maquinistaId: '',
-      supervisorId: '',
-      operarios: 1,
-      colaboradorIds: [],
-      tiempoRegistroSeg: 0,
-    },
+    defaultValues: valoresIniciales(),
   });
 
   const valores = form.watch();
   const errores = form.formState.errors;
-  /* Sólo productos con par producto × línea activo en la línea elegida. */
-  const { data: productos } = useProductos({ lineaId: valores.lineaId || undefined });
-  /* La velocidad estándar vive en el par, nunca en el producto. */
-  const { data: pares } = useVelocidadesEstandar(
-    { productoId: valores.productoId, lineaId: valores.lineaId, estado: 'activo' },
-    { enabled: Boolean(valores.productoId && valores.lineaId) },
-  );
-  const par = pares?.data.find(
-    (v) => v.productoId === valores.productoId && v.lineaId === valores.lineaId,
-  );
-  const producto = productos?.data.find((p) => p.id === valores.productoId);
-  const linea = lineas?.data.find((l) => l.id === valores.lineaId);
-  const turno = turnos?.data.find((t) => t.codigo === valores.turno);
+  const linea = lineas?.data.find((l) => l.id === (ordenSap?.lineaId ?? lineaSap));
+  const turno = turnos?.data.find((t) => t.codigo === ordenSap?.turno);
   const maquinista = personas?.data.find((p) => p.id === valores.maquinistaId);
   const supervisor = personas?.data.find((p) => p.id === valores.supervisorId);
-  const codigoSugerido = siguienteCodigo(ultimas?.data[0]?.codigo);
 
   React.useEffect(() => {
     if (!abierto) return;
     setPaso(0);
-    form.reset({
-      lineaId: lineaId ?? '',
-      productoId: '',
-      codigo: codigoSugerido,
-      lote: loteSugerido(),
-      vencimiento: vencimientoSugerido(),
-      turno: turnoSugerido(),
-      planificado: 0,
-      maquinistaId: '',
-      supervisorId: '',
-      operarios: 1,
-      colaboradorIds: [],
-    });
-    /* `codigoSugerido` depende de una query: solo interesa el valor al abrir. */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [abierto, lineaId]);
+    setLineaSap(lineaId ?? '');
+    setOrdenSap(null);
+    form.reset(valoresIniciales());
+  }, [abierto, lineaId, form]);
 
-  React.useEffect(() => {
-    if (!abierto || form.getValues('codigo')) return;
-    form.setValue('codigo', codigoSugerido);
-  }, [abierto, codigoSugerido, form]);
+  const elegirOrdenSap = (orden: OrdenSapListItem | null) => {
+    setOrdenSap(orden);
+    form.setValue('ordenSapId', orden?.id ?? '', { shouldValidate: Boolean(orden) });
+    /* Al elegir otra fila o cambiar de línea, el error de la anterior no aplica. */
+    form.clearErrors('ordenSapId');
+  };
+
+  /* Maquinistas de la línea de la orden SAP (todos si la línea no tiene ninguno asignado). */
+  /* Sólo personas activas: un usuario desactivado no puede figurar en una orden nueva. */
+  const activas = (personas?.data ?? []).filter((p) => p.activo !== false);
+  const maquinistas = activas.filter((p) => p.rol === 'maquinista');
+  const lineaObjetivo = ordenSap?.lineaId ?? lineaSap;
+  const maquinistasLinea = maquinistas.filter((p) => p.lineaId === lineaObjetivo);
+  const opcionesMaquinista = maquinistasLinea.length > 0 ? maquinistasLinea : maquinistas;
 
   /* `register` guarda el valor como texto: se normaliza antes de calcular. */
-  const planificado = Number(valores.planificado) || 0;
   const operarios = Number(valores.operarios) || 0;
-  /* El estándar del par está en u/min: unidades ÷ u/min = minutos. */
+  /* El estándar está en u/min: unidades ÷ u/min = minutos. */
   const minutosEstimados =
-    par && par.velocidadUnidMin > 0 && planificado > 0 ? planificado / par.velocidadUnidMin : 0;
-  const velocidadTexto = par
-    ? `${formatSpeed(par.velocidadUnidMin, 1)} · ${formatNumber(par.velocidadUnidHora)} u/h`
-    : undefined;
+    ordenSap && ordenSap.velocidadEstandar && ordenSap.planificadoUnidades > 0
+      ? ordenSap.planificadoUnidades / ordenSap.velocidadEstandar
+      : 0;
+  const velocidadTexto = velocidadDeSap(ordenSap);
+  const planificadoTexto = ordenSap
+    ? `${formatPlanificadoSap(ordenSap)}${
+        minutosEstimados > 0 ? ` · ≈ ${formatDurationMin(minutosEstimados)}` : ''
+      }`
+    : '—';
 
   const siguiente = async () => {
+    /* Sin velocidad estándar la orden no puede iniciarse: se avisa aquí, no al final. */
+    if (paso === 0 && ordenSap && ordenSap.velocidadEstandar == null) {
+      form.setError('ordenSapId', {
+        message: 'Esta orden SAP no tiene velocidad estándar en la línea ni en SAP: no puede iniciarse',
+      });
+      return;
+    }
     const ok = await form.trigger(CAMPOS_PASO[paso] ?? []);
     if (ok) setPaso((p) => p + 1);
   };
 
   const guardar = form.handleSubmit(async (values) => {
-    const segundos = tri.detener();
+    if (enviando.current) return;
+    enviando.current = true;
+    const segundos = medirTri ? tri.detener() : 0;
     try {
-      const orden = await crear.mutateAsync({ ...values, tiempoRegistroSeg: segundos });
-      toast.success(`Orden ${orden.codigo} iniciada en ${formatTriCorto(segundos)}`);
+      /* Un asistente abierto más de 1 h no mide el tiempo de registro: se
+         descarta (0 = sin fila de postest) en vez de sesgar el TRI o dar 422. */
+      const tiempoRegistroSeg = segundos > TIEMPO_REGISTRO_MAX_SEG ? 0 : segundos;
+      const orden = await crear.mutateAsync({ ...values, tiempoRegistroSeg });
+      toast.success(
+        medirTri
+          ? `Orden ${orden.codigo} iniciada en ${formatTriCorto(segundos)}`
+          : `Orden ${orden.codigo} creada`,
+        { description: `${orden.lineaCodigo} · ${orden.productoNombre}` },
+      );
       onOpenChange(false);
     } catch (e) {
-      /* 422: el backend detalla el campo (p. ej. `productoId` sin velocidad
-         estándar en la línea); se pinta bajo el campo y se vuelve a su paso. */
+      /* 422: el backend detalla el campo (p. ej. `ordenSapId` sin velocidad
+         estándar); se pinta bajo el campo y se vuelve a su paso. */
       const campos = aplicarErroresApi<CreateOrdenInput>(e, form.setError);
       if (campos.length > 0) {
         setPaso(pasoDelCampo(campos[0] as string));
         toast.error('Revisa los campos marcados', { description: 'La orden no se inició.' });
+      } else if (e instanceof ApiClientError && e.statusCode === 409 && e.details?.ordenSapId) {
+        /* Otra persona inició antes esa fila SAP: se refresca la lista y se
+           vuelve a elegir (la fila consumida deja de ofrecerse). */
+        void queryClient.invalidateQueries({ queryKey: queryKeys.ordenesSap.all });
+        elegirOrdenSap(null);
+        setPaso(0);
+        form.setError('ordenSapId', { message: e.message });
+        toast.error(e.message, { description: 'Elige otra orden SAP de la lista.' });
       } else {
         toast.error(mensajeDeError(e, 'No se pudo iniciar la orden'));
       }
+    } finally {
+      enviando.current = false;
     }
   });
 
@@ -201,9 +276,10 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
           variant="primary"
           icon={<Icon name="play-circle" size={20} />}
           loading={crear.isPending}
+          disabled={crear.isPending}
           onClick={() => void guardar()}
         >
-          Iniciar orden
+          {medirTri ? 'Iniciar orden' : 'Crear orden'}
         </Button>
       </>
     ) : (
@@ -229,9 +305,9 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
     <Modal open={abierto} onOpenChange={onOpenChange}>
       <ModalContent
         size="lg"
-        title="Iniciar orden de fabricación"
+        title={titulo}
         aria-describedby={undefined}
-        headerExtra={<TimerChip value={tri.etiqueta} />}
+        headerExtra={medirTri ? <TimerChip value={tri.etiqueta} /> : undefined}
         footer={footer}
       >
         <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
@@ -250,111 +326,38 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
                     .join('   ·   ')}
                 </p>
               </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Controller
-                  control={form.control}
-                  name="lineaId"
-                  render={({ field }) => (
-                    <Select
-                      label="Línea"
-                      hint={errores.lineaId?.message ?? 'Línea de producción de la planta'}
-                      placeholder="Selecciona la línea"
-                      destructive={Boolean(errores.lineaId)}
-                      options={(lineas?.data ?? []).map((l) => ({
-                        value: l.id,
-                        label: `${l.codigo} · ${l.nombre}`,
-                      }))}
-                      value={field.value}
-                      onValueChange={(v) => {
-                        field.onChange(v);
-                        /* El par producto × línea cambia con la línea. */
-                        form.setValue('productoId', '');
-                        form.clearErrors('productoId');
-                      }}
-                    />
-                  )}
-                />
-                <Controller
-                  control={form.control}
-                  name="productoId"
-                  render={({ field }) => (
-                    <Select
-                      label="Producto"
-                      hint={
-                        errores.productoId?.message ??
-                        (velocidadTexto
-                          ? `Velocidad estándar ${velocidadTexto}`
-                          : producto
-                            ? 'Sin velocidad estándar en esta línea'
-                            : valores.lineaId
-                              ? 'Sólo productos con velocidad estándar en la línea'
-                              : 'Elige primero la línea')
-                      }
-                      placeholder="Selecciona el producto"
-                      disabled={!valores.lineaId}
-                      destructive={Boolean(errores.productoId)}
-                      options={(productos?.data ?? []).map((p) => ({
-                        value: p.id,
-                        label: p.nombre,
-                      }))}
-                      value={field.value}
-                      onValueChange={(v) => {
-                        field.onChange(v);
-                        form.clearErrors('productoId');
-                      }}
-                    />
-                  )}
-                />
-                <Input
-                  label="N.º de OF"
-                  hint={errores.codigo?.message ?? 'Correlativo sugerido'}
-                  destructive={Boolean(errores.codigo)}
-                  {...form.register('codigo')}
-                />
-                <Controller
-                  control={form.control}
-                  name="turno"
-                  render={({ field }) => (
-                    <Select
-                      label="Turno"
-                      hint={errores.turno?.message}
-                      placeholder="Selecciona el turno"
-                      destructive={Boolean(errores.turno)}
-                      options={(turnos?.data ?? []).map((t) => ({
-                        value: t.codigo,
-                        label: `${t.label} · ${t.inicio}–${t.fin}`,
-                      }))}
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    />
-                  )}
-                />
-                <Input
-                  label="Lote"
-                  hint={errores.lote?.message ?? 'Formato L-AAMMDD-NN'}
-                  destructive={Boolean(errores.lote)}
-                  {...form.register('lote')}
-                />
-                <Input
-                  type="date"
-                  label="Vencimiento"
-                  hint={errores.vencimiento?.message ?? 'Vida útil 18 meses'}
-                  destructive={Boolean(errores.vencimiento)}
-                  {...form.register('vencimiento')}
-                />
-                <Input
-                  inputMode="numeric"
-                  label="Planificado (unidades)"
-                  hint={
-                    errores.planificado?.message ??
-                    (minutosEstimados > 0
-                      ? `≈ ${formatDurationMin(minutosEstimados)} a velocidad estándar`
-                      : 'Objetivo de unidades del turno')
-                  }
-                  destructive={Boolean(errores.planificado)}
-                  {...form.register('planificado')}
-                />
-              </div>
+              <SelectorOrdenSap
+                lineaId={lineaSap}
+                conSelectorLinea={!lineaId}
+                onLineaChange={setLineaSap}
+                value={valores.ordenSapId}
+                onChange={elegirOrdenSap}
+                error={errores.ordenSapId?.message}
+              />
+              {ordenSap && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Input
+                    label="Lote"
+                    hint={errores.lote?.message ?? 'Formato L-AAMMDD-NN'}
+                    destructive={Boolean(errores.lote)}
+                    {...form.register('lote')}
+                  />
+                  <Input
+                    type="date"
+                    label="Vencimiento"
+                    hint={errores.vencimiento?.message ?? 'Vida útil 18 meses'}
+                    destructive={Boolean(errores.vencimiento)}
+                    {...form.register('vencimiento')}
+                  />
+                  <Input
+                    label="Planificado (SAP)"
+                    readOnly
+                    value={formatPlanificadoSap(ordenSap)}
+                    hint={avisoPlan(ordenSap, minutosEstimados, velocidadTexto)}
+                    destructive={ordenSap.velocidadEstandar == null}
+                  />
+                </div>
+              )}
             </>
           )}
 
@@ -362,7 +365,12 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
             <>
               <div className="w-full rounded-sm bg-background-subtle px-3 py-2.5">
                 <p className="text-body-sm text-text-secondary">
-                  {[valores.codigo, linea ? `${linea.codigo} · ${linea.nombre}` : '', producto?.nombre, turno ? `Turno ${turno.label}` : '']
+                  {[
+                    ordenSap ? `# ${ordenSap.numero}` : '',
+                    linea ? `${linea.codigo} · ${linea.nombre}` : '',
+                    ordenSap?.productoNombre,
+                    turno ? `Turno ${turno.label}` : '',
+                  ]
                     .filter(Boolean)
                     .join('   ·   ')}
                 </p>
@@ -377,9 +385,7 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
                       hint={errores.maquinistaId?.message ?? 'Responsable del registro en línea'}
                       placeholder="Selecciona al maquinista"
                       destructive={Boolean(errores.maquinistaId)}
-                      options={(personas?.data ?? [])
-                        .filter((p) => p.rol === 'maquinista')
-                        .map((p) => ({ value: p.id, label: p.nombre }))}
+                      options={opcionesMaquinista.map((p) => ({ value: p.id, label: p.nombre }))}
                       value={field.value}
                       onValueChange={field.onChange}
                     />
@@ -394,7 +400,7 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
                       hint={errores.supervisorId?.message ?? 'Valida paradas y mermas'}
                       placeholder="Selecciona al supervisor"
                       destructive={Boolean(errores.supervisorId)}
-                      options={(personas?.data ?? [])
+                      options={activas
                         .filter((p) => p.rol === 'supervisor' || p.rol === 'jefe')
                         .map((p) => ({ value: p.id, label: p.nombre }))}
                       value={field.value}
@@ -446,22 +452,24 @@ export function IniciarOrdenWizard({ abierto, onOpenChange, lineaId }: IniciarOr
                 <DescriptionList
                   labelWidth={168}
                   items={[
-                    { label: 'N.º de OF', value: valores.codigo },
+                    { label: 'Orden SAP', value: ordenSap ? `# ${ordenSap.numero}` : '—' },
+                    {
+                      label: 'Plan SAP',
+                      value: ordenSap
+                        ? `${formatFechaSap(ordenSap.fecha)} · Turno ${turno ? `${turno.label} · ${turno.inicio}–${turno.fin}` : ordenSap.turno}`
+                        : '—',
+                    },
                     { label: 'Línea', value: linea ? `${linea.codigo} · ${linea.nombre}` : '—' },
                     {
                       label: 'Producto',
-                      value: producto
-                        ? [producto.nombre, velocidadTexto].filter(Boolean).join(' · ')
+                      value: ordenSap
+                        ? [`${ordenSap.codigoProducto} - ${ordenSap.productoNombre}`, velocidadTexto]
+                            .filter(Boolean)
+                            .join(' · ')
                         : '—',
                     },
-                    { label: 'Turno', value: turno ? `${turno.label} · ${turno.inicio}–${turno.fin}` : '—' },
                     { label: 'Lote / vencimiento', value: `${valores.lote} · ${valores.vencimiento}` },
-                    {
-                      label: 'Planificado',
-                      value: `${formatNumber(planificado)} u${
-                        minutosEstimados > 0 ? ` · ≈ ${formatDurationMin(minutosEstimados)}` : ''
-                      }`,
-                    },
+                    { label: 'Planificado', value: planificadoTexto },
                     { label: 'Maquinista', value: maquinista?.nombre ?? '—' },
                     { label: 'Supervisor', value: supervisor?.nombre ?? '—' },
                     {

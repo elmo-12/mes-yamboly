@@ -201,7 +201,9 @@ describe('evidencia · importación y validación de calidad (e2e)', () => {
       .field('mapeo', JSON.stringify({ linea: 'Línea', fecha_hora: 'Fecha y hora', estado: 'Estado' }))
       .attach('archivo', archivo, 'sin-columna.xlsx')
       .expect(201);
-    expect(ok.body.filasOk + ok.body.filasDuplicadas).toBe(1);
+    /* La fila ya existe (misma línea y hora) pero sin velocidad: cuenta como
+       conflicto visible, no como error de columnas. */
+    expect(ok.body.filasOk + ok.body.filasDuplicadas + ok.body.filasConflicto).toBe(1);
   });
 
   it('importa solicitudes y transferencias SAP con el mapeo de columnas', async () => {
@@ -438,7 +440,8 @@ describe('evidencia · importación y validación de calidad (e2e)', () => {
       url: string;
       respondida: boolean;
     };
-    expect(invitacion.token).toMatch(/^tsp-\d{4}-01$/);
+    /* Token aleatorio de 128 bits (base64url), no adivinable. */
+    expect(invitacion.token).toMatch(/^tsp-[A-Za-z0-9_-]{22}$/);
     expect(invitacion.usuarioId).toBe('USR-02');
     expect(invitacion.url).toContain(`/encuesta/${invitacion.token}`);
     expect(invitacion.respondida).toBe(false);

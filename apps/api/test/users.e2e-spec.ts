@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { DataSource } from 'typeorm';
 import { crearApp, CREDENCIALES, login } from './app.factory';
 
 /** Mantenedor de usuarios (11 del seed real, todos en `SED-LIMA`). */
@@ -283,6 +284,32 @@ describe('usuarios (e2e)', () => {
         .send({ email: NUEVO_USUARIO.email, password: NUEVO_USUARIO.password })
         .expect(401);
       expect(error.code).toBe('UNAUTHORIZED');
+    });
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Barrido de ids: un hueco en la numeración no pisa a otro usuario    */
+  /* ------------------------------------------------------------------ */
+
+  describe('alta con huecos en la numeración', () => {
+    it('no sobrescribe al usuario que ya tiene el id `count() + 1`', async () => {
+      const ds = app.get(DataSource);
+      const [{ total }] = await ds.query(`SELECT COUNT(*) AS total FROM usuario`);
+      /* Fila «heredada» con el id que el alta calcularía tras ella (count + 2). */
+      const ocupado = `USR-${String(Number(total) + 2).padStart(2, '0')}`;
+      await ds.query(
+        `INSERT INTO usuario (id, nombre, email, dni, rol, cargo, iniciales, "passwordHash")
+         VALUES ($1, 'Heredado Legado', 'heredado@yamboly.lat', '11122233', 'calidad', 'Legado', 'HL', 'x')`
+          .replace('$1', `'${ocupado}'`),
+      );
+      const { body } = await request(server())
+        .post('/api/v1/usuarios')
+        .set(jefe())
+        .send({ ...NUEVO_USUARIO, email: 'hueco.ids@yamboly.lat', dni: '55566677' })
+        .expect(201);
+      expect(body.id).not.toBe(ocupado);
+      const [heredado] = await ds.query(`SELECT nombre FROM usuario WHERE id = '${ocupado}'`);
+      expect(heredado.nombre).toBe('Heredado Legado');
     });
   });
 });

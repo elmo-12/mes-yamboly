@@ -1,6 +1,8 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { crearApp, CREDENCIALES, login } from './app.factory';
+import { crearApp, login } from './app.factory';
+
+const MAQUINISTA_LLEN_M2 = { email: 'luis.vargas@yamboly.lat', password: 'Yamboly2026' };
 
 /**
  * Fotos de evidencia de las capturas de planta.
@@ -21,7 +23,8 @@ describe('evidencias (e2e)', () => {
 
   beforeAll(async () => {
     app = await crearApp();
-    token = await login(app, CREDENCIALES.maquinista);
+    /* Luis Vargas es el maquinista de la Llenadora M2 (ORD-0814). */
+    token = await login(app, MAQUINISTA_LLEN_M2);
   });
 
   afterAll(async () => {

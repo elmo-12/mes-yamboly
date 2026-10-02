@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { Merma, TipoMermaCodigo } from '@mes/types';
+import { ROLES_CAPTURA_MERMA } from '@mes/types';
 import {
   buscarCausaMerma,
   cadenaCausaMerma,
@@ -8,9 +9,18 @@ import {
   registrarBitacora,
   registrarTri,
 } from '../store';
-import { API, ahoraIso, errores, listaQuery, numeroQuery, paginar, preludio } from './_utils';
+import {
+  API,
+  ahoraIso,
+  errorTiempoRegistro,
+  errores,
+  listaQuery,
+  numeroQuery,
+  paginar,
+  preludio,
+} from './_utils';
 import { enriquecerMerma } from './_enrich';
-import { usuarioDesdeToken } from './auth';
+import { capturaEnOrden, exigeRoles } from './auth';
 
 interface JerarquiaMerma {
   causaId: string;
@@ -32,6 +42,10 @@ function validarCausa(entrada: {
   clasificacionId?: string | null;
   observacion?: string;
   numeroSolicitud?: string;
+  /** Línea del registro: la causa puede limitarse a algunas líneas. */
+  lineaId?: string;
+  /** `undefined` = no se comprueba (edición sin cambio de foto). */
+  evidenciaUrl?: string | null;
 }): { jerarquia?: JerarquiaMerma; error?: Response } {
   const causa = buscarCausaMerma(entrada.causaId);
   if (!causa) {
@@ -47,6 +61,15 @@ function validarCausa(entrada: {
   if (causa.estado !== 'activo') {
     return {
       error: errores.validacion({ causaId: `La causa ${causa.codigo} está dada de baja` }),
+    };
+  }
+  if (
+    entrada.lineaId &&
+    causa.lineasAplicables.length > 0 &&
+    !causa.lineasAplicables.includes(entrada.lineaId)
+  ) {
+    return {
+      error: errores.validacion({ causaId: `La causa ${causa.codigo} no aplica a esta línea` }),
     };
   }
   if (causa.aplicaA.length > 0 && !causa.aplicaA.includes(entrada.tipo)) {
@@ -88,6 +111,14 @@ function validarCausa(entrada: {
     };
   }
 
+  if (causa.requiereEvidencia && entrada.evidenciaUrl !== undefined && !entrada.evidenciaUrl) {
+    return {
+      error: errores.validacion({
+        evidenciaUrl: `La causa ${causa.codigo} exige una foto de evidencia`,
+      }),
+    };
+  }
+
   return { jerarquia: { causaId: causa.id, tipoCausaId, clasificacionId } };
 }
 
@@ -125,11 +156,26 @@ export const scrapHandlers = [
   http.post(`${API}/mermas`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+    const { usuario, respuesta } = exigeRoles(request, ROLES_CAPTURA_MERMA);
+    if (respuesta) return respuesta;
     const store = getStore();
     const body = (await request.json()) as Record<string, unknown>;
+    const lineaId = String(body.lineaId ?? '');
+    if (!store.lineas.some((l) => l.id === lineaId)) {
+      return errores.validacion({ lineaId: 'La línea seleccionada no existe' });
+    }
+    const orden = store.ordenes.find((o) => o.id === body.ordenId || o.codigo === body.ordenId);
+    if (!orden) return errores.noEncontrado('Orden de fabricación');
+    const accesoOrden = capturaEnOrden(orden, usuario, lineaId);
+    if (accesoOrden) return accesoOrden;
+    const tiempoInvalido = errorTiempoRegistro(body);
+    if (tiempoInvalido) return tiempoInvalido;
     const cantidadKg = Number(body.cantidadKg ?? 0);
     if (!(cantidadKg > 0)) {
       return errores.validacion({ cantidadKg: 'La cantidad debe ser mayor que 0' });
+    }
+    if (cantidadKg > 500) {
+      return errores.validacion({ cantidadKg: 'Cantidad fuera de rango (máximo 500 kg)' });
     }
     const tipo = (body.tipo as Merma['tipo']) ?? 'EP';
     const { jerarquia, error: invalida } = validarCausa({
@@ -139,15 +185,17 @@ export const scrapHandlers = [
       clasificacionId: (body.clasificacionId as string | null | undefined) ?? null,
       observacion: opcional(body.observacion),
       numeroSolicitud: opcional(body.numeroSolicitud),
+      lineaId,
+      evidenciaUrl: opcional(body.evidenciaUrl) ?? null,
     });
     if (invalida) return invalida;
     const causa = buscarCausaMerma(jerarquia!.causaId)!;
 
-    const ordenId = String(body.ordenId ?? '');
+    const ordenId = orden.id;
     const merma: Merma = {
       id: `MER-${ordenId.slice(4)}-N${store.mermas.length + 1}`,
       ordenId,
-      lineaId: String(body.lineaId ?? ''),
+      lineaId,
       tipo,
       cantidadKg,
       sabor: String(body.sabor ?? 'Vainilla'),
@@ -167,14 +215,13 @@ export const scrapHandlers = [
     recalcularOrden(merma.ordenId);
     registrarTri(`Merma ${merma.tipo} ${merma.cantidadKg} kg`, merma.tiempoRegistroSeg, merma.registradaEn.slice(0, 10), merma.id);
 
-    const usuario = usuarioDesdeToken(request);
     registrarBitacora({
       ordenId: merma.ordenId,
       fecha: merma.registradaEn,
-      usuario: usuario?.nombre ?? 'María Torres',
-      usuarioIniciales: usuario?.iniciales ?? 'MT',
+      usuario: usuario.nombre,
+      usuarioIniciales: usuario.iniciales,
       tipo: 'merma',
-      texto: `${usuario?.nombre ?? 'María Torres'} registró merma ${merma.tipo} ${merma.cantidadKg} kg · ${causa.codigo} ${causa.nombre}`,
+      texto: `${usuario.nombre} registró merma ${merma.tipo} ${merma.cantidadKg} kg · ${causa.codigo} ${causa.nombre}`,
     });
 
     return HttpResponse.json(enriquecerMerma(merma), { status: 201 });
@@ -184,9 +231,22 @@ export const scrapHandlers = [
     const simulado = await preludio(request);
     if (simulado) return simulado;
     const store = getStore();
+    const { usuario, respuesta } = exigeRoles(request, ROLES_CAPTURA_MERMA);
+    if (respuesta) return respuesta;
     const merma = store.mermas.find((m) => m.id === params.id);
     if (!merma) return errores.noEncontrado('Merma');
+    const orden = store.ordenes.find((o) => o.id === merma.ordenId);
+    if (orden) {
+      const accesoOrden = capturaEnOrden(orden, usuario);
+      if (accesoOrden) return accesoOrden;
+    }
     const body = (await request.json()) as Partial<Merma>;
+    if (body.ordenId !== undefined && body.ordenId !== merma.ordenId) {
+      return errores.validacion({ ordenId: 'Una merma no se puede mover a otra orden' });
+    }
+    if (body.lineaId !== undefined && body.lineaId !== merma.lineaId) {
+      return errores.validacion({ lineaId: 'Una merma no se puede mover a otra línea' });
+    }
 
     if (body.cantidadKg !== undefined && body.cantidadKg <= 0) {
       return errores.validacion({ cantidadKg: 'La cantidad debe ser mayor que 0' });
@@ -202,6 +262,7 @@ export const scrapHandlers = [
         clasificacionId: body.clasificacionId ?? null,
         observacion: opcional(body.observacion) ?? merma.observacion,
         numeroSolicitud: opcional(body.numeroSolicitud) ?? merma.numeroSolicitud ?? undefined,
+        lineaId: merma.lineaId,
       });
       if (resultado.error) return resultado.error;
       jerarquia = resultado.jerarquia;

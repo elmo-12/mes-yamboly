@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TIEMPO_REGISTRO_MAX_SEG } from './common';
 import type { PaginationQuery } from './common';
 import { TIPOS_MERMA } from './catalogs';
 import type { TipoMermaCodigo } from './catalogs';
@@ -60,13 +61,14 @@ export const createMermaSchema = z.object({
   cantidadKg: z.coerce
     .number()
     .positive('La cantidad debe ser mayor que 0')
-    .max(500, 'Cantidad fuera de rango'),
-  sabor: z.string().min(1, 'Selecciona un sabor'),
+    .min(0.01, 'La cantidad mínima es 0,01 kg')
+    .max(500, 'Cantidad fuera de rango (máximo 500 kg)'),
+  sabor: z.string().trim().min(1, 'Selecciona un sabor').max(80, 'Máximo 80 caracteres'),
   tipoCausaId: z.string().min(1, 'Selecciona el tipo de producción'),
   clasificacionId: z.string().nullable().default(null),
   causaId: z.string().min(1, 'Selecciona una causa'),
   responsableId: z.string().min(1, 'Selecciona un responsable'),
-  codigoBalde: z.string().optional(),
+  codigoBalde: z.string().trim().max(50, 'Máximo 50 caracteres').optional(),
   enviarPasteurizacion: z.boolean().default(false),
   /**
    * `observacion` y `numeroSolicitud` son **condicionalmente obligatorios** según
@@ -74,11 +76,16 @@ export const createMermaSchema = z.object({
    * Esa regla depende del catálogo, así que NO se expresa en este zod base:
    * la valida el wizard (`MermaWizard`) y la API (422 con campo→mensaje).
    */
-  observacion: z.string().max(300, 'Máximo 300 caracteres').optional(),
-  numeroSolicitud: z.string().max(50, 'Máximo 50 caracteres').optional(),
+  observacion: z.string().trim().max(300, 'Máximo 300 caracteres').optional(),
+  numeroSolicitud: z.string().trim().max(50, 'Máximo 50 caracteres').optional(),
   /** La devuelve `POST /evidencias` tras subir la foto; el cliente no la inventa. */
   evidenciaUrl: z.string().optional(),
-  tiempoRegistroSeg: z.coerce.number().min(0).default(0),
+  tiempoRegistroSeg: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(TIEMPO_REGISTRO_MAX_SEG, `El tiempo de registro no puede superar ${TIEMPO_REGISTRO_MAX_SEG} s`)
+    .default(0),
 });
 export type CreateMermaInput = z.infer<typeof createMermaSchema>;
 export type CreateMerma = CreateMermaInput;

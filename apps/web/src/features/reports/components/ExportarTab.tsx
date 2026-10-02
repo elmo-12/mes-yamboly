@@ -23,16 +23,17 @@ import {
   Table,
   toast,
 } from '@mes/ui';
-import type { DatasetExport, ExportJob, ExportRequestInput, FormatoExport } from '@mes/types';
+import type { DatasetExport, ExportJob, ExportRequestInput, FormatoExport, Turno } from '@mes/types';
 import {
-  DATASETS_EXPORT,
   DATASET_EXPORT_LABEL,
+  datasetsExportablesPara,
   FORMATOS_EXPORT_DISPONIBLES,
   exportRequestSchema,
 } from '@mes/types';
 import { formatDate, formatDateTime, formatNumber } from '@mes/shared';
 import { descargarArchivo } from '@/services/api/client';
 import { mensajeDeError } from '@/services/api/form-errors';
+import { useSession } from '@/hooks/use-session';
 import { useExportaciones, useExportar } from '../hooks';
 import { TabError } from './estados';
 
@@ -40,6 +41,9 @@ export interface ExportarTabProps {
   /** Rango vigente en la barra de filtros; precarga el formulario. */
   desde: string;
   hasta: string;
+  /** Líneas y turnos filtrados en la página: el archivo los respeta (A4). */
+  lineaIds?: readonly string[];
+  turnos?: readonly Turno[];
 }
 
 const DATASET_AYUDA: Record<DatasetExport, string> = {
@@ -70,9 +74,12 @@ const ESTADO_BADGE = {
 };
 
 /** `Reportes / Exportar` (Figma 2163:19635) — RF13, trazabilidad del archivo. */
-export function ExportarTab({ desde, hasta }: ExportarTabProps) {
+export function ExportarTab({ desde, hasta, lineaIds = [], turnos = [] }: ExportarTabProps) {
   const historial = useExportaciones();
   const exportar = useExportar();
+  const { rol } = useSession();
+  /* La evidencia TRI/TCI solo la exportan jefe e investigador (la API lo exige). */
+  const permitidos = datasetsExportablesPara(rol);
 
   /* El archivo se pide con `fetch` para poder enviar el token; un `<a download>`
      no admite cabeceras. Ver `descargarArchivo`. */
@@ -96,7 +103,9 @@ export function ExportarTab({ desde, hasta }: ExportarTabProps) {
   } = useForm<ExportRequestInput>({
     resolver: zodResolver(exportRequestSchema),
     defaultValues: {
-      datasets: ['ordenes', 'paradas', 'mermas', 'indicadores', 'evidencia'],
+      datasets: ['ordenes', 'paradas', 'mermas', 'indicadores', 'evidencia'].filter((d) =>
+        (permitidos as string[]).includes(d),
+      ) as DatasetExport[],
       formato: 'xlsx',
       desde,
       hasta,
@@ -106,6 +115,12 @@ export function ExportarTab({ desde, hasta }: ExportarTabProps) {
   const datasets = watch('datasets');
   const formato = watch('formato');
 
+  /* Si la sesión cambia de rol, se quitan los conjuntos que ya no le corresponden. */
+  React.useEffect(() => {
+    const vigentes = datasets.filter((d) => (permitidos as string[]).includes(d));
+    if (vigentes.length !== datasets.length) setValue('datasets', vigentes, { shouldValidate: true });
+  }, [datasets, permitidos.length, setValue]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const alternar = (d: DatasetExport) => {
     setValue(
       'datasets',
@@ -114,16 +129,28 @@ export function ExportarTab({ desde, hasta }: ExportarTabProps) {
     );
   };
 
+  /* El doble clic llega antes de que `isPending` deshabilite el botón (A5). */
+  const enviando = React.useRef(false);
+
   const onSubmit = handleSubmit((valores) => {
-    exportar.mutate(valores, {
+    if (enviando.current) return;
+    enviando.current = true;
+    const filtros = {
+      lineaId: lineaIds.length ? lineaIds.join(',') : undefined,
+      turno: turnos.length ? [...turnos] : undefined,
+    };
+    exportar.mutate({ ...valores, ...filtros }, {
+      onSettled: () => {
+        enviando.current = false;
+      },
       onSuccess: (job) => {
         toast.success('Exportación en curso', {
           description: `${job.nombre} · el archivo aparecerá en el historial al terminar.`,
         });
       },
-      onError: () =>
+      onError: (error) =>
         toast.error('No se pudo generar el archivo', {
-          description: 'Revisa la selección e inténtalo de nuevo.',
+          description: mensajeDeError(error, 'Revisa la selección e inténtalo de nuevo.'),
         }),
     });
   });
@@ -141,11 +168,11 @@ export function ExportarTab({ desde, hasta }: ExportarTabProps) {
           <div className="flex flex-col gap-1">
             <h3 className="text-h4 text-text-primary">Conjuntos de datos</h3>
             <p className="text-body-sm text-text-secondary">
-              {formatNumber(datasets.length)} de {DATASETS_EXPORT.length} conjuntos seleccionados
+              {formatNumber(datasets.length)} de {permitidos.length} conjuntos seleccionados
             </p>
           </div>
           <div className="flex flex-col gap-3.5">
-            {DATASETS_EXPORT.map((d) => (
+            {permitidos.map((d) => (
               <Checkbox
                 key={d}
                 checked={datasets.includes(d)}
@@ -162,7 +189,7 @@ export function ExportarTab({ desde, hasta }: ExportarTabProps) {
             <button
               type="button"
               className="font-medium text-primary hover:underline"
-              onClick={() => setValue('datasets', [...DATASETS_EXPORT], { shouldValidate: true })}
+              onClick={() => setValue('datasets', [...permitidos], { shouldValidate: true })}
             >
               Seleccionar todos
             </button>
@@ -248,7 +275,10 @@ export function ExportarTab({ desde, hasta }: ExportarTabProps) {
           <p className="rounded-sm bg-background-subtle px-2.5 py-1.5 text-body-sm font-medium text-neutral-text">
             {formatNumber(datasets.length)} conjuntos · {FORMATO_AYUDA[formato].label} ·{' '}
             {formatDate(watch('desde'))} – {formatDate(watch('hasta'))}
+            {lineaIds.length > 0 && ` · ${lineaIds.length === 1 ? '1 línea' : `${lineaIds.length} líneas`}`}
+            {turnos.length > 0 && ` · turno ${turnos.join(', ')}`}
           </p>
+
 
           <Button
             type="submit"

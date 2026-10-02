@@ -3,12 +3,18 @@
 import * as React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Badge, Input, Switch, Tag, toast } from '@mes/ui';
+import { Badge, Input, Select, Switch, Tag, toast } from '@mes/ui';
 import { causaParadaSchema } from '@mes/types';
 import type { CausaParada, CausaParadaInput, Linea } from '@mes/types';
-import { formatDate, formatNumber } from '@mes/shared';
+import { formatNumber } from '@mes/shared';
+import { esConflictoVersion, TOAST_CONFLICTO_VERSION } from '@/features/catalogs/errores';
 import { useBajaCausaParada, useGuardarCausaParada } from '@/features/catalogs/hooks';
+import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
 import { CausaDetalleShell, EtiquetaCampo } from './CausaDetalleShell';
+
+/** Campos editables: código, nivel y padre son inmutables (definen id y posición). */
+const formSchema = causaParadaSchema.omit({ codigo: true, nivel: true, parentId: true });
+type FormValores = Omit<CausaParadaInput, 'codigo' | 'nivel' | 'parentId'>;
 
 const NIVEL_LABEL = {
   tipo: 'Tipo (nivel 1)',
@@ -34,12 +40,11 @@ export function CausaParadaDetalle({
   const guardar = useGuardarCausaParada();
   const baja = useBajaCausaParada();
 
-  const valoresIniciales = React.useMemo<CausaParadaInput>(
+  /* Código, nivel y padre son inmutables (definen el id y la posición en el
+     árbol): no forman parte del formulario ni del PATCH. */
+  const valoresIniciales = React.useMemo<FormValores>(
     () => ({
-      codigo: causa.codigo,
       nombre: causa.nombre,
-      nivel: causa.nivel,
-      parentId: causa.parentId,
       clasificacion: causa.clasificacion,
       afectaOee: causa.afectaOee,
       requiereEvidencia: causa.requiereEvidencia,
@@ -50,6 +55,7 @@ export function CausaParadaDetalle({
       /* Trazabilidad interna con el maestro legado: se conserva al guardar,
          pero ya no se muestra en la ficha. */
       codigoLegado: causa.codigoLegado ?? null,
+      version: causa.version,
     }),
     [causa],
   );
@@ -60,23 +66,38 @@ export function CausaParadaDetalle({
     handleSubmit,
     reset,
     setValue,
+    setError,
     watch,
     formState: { errors, isDirty, isSubmitting },
-  } = useForm<CausaParadaInput>({
-    resolver: zodResolver(causaParadaSchema),
+  } = useForm<FormValores>({
+    resolver: zodResolver(formSchema),
     values: valoresIniciales,
   });
 
   const onSubmit = handleSubmit(async (valores) => {
     try {
-      await guardar.mutateAsync({ id: causa.id, input: valores });
-      reset(valores);
-      toast.success(`Causa ${valores.codigo} actualizada`, {
-        description: 'El cambio aplica a los próximos registros de parada.',
+      const guardada = await guardar.mutateAsync({
+        id: causa.id,
+        input: valores as CausaParadaInput,
+      });
+      reset({ ...valores, version: guardada.version });
+      toast.success(`Causa ${causa.codigo} actualizada`, {
+        description:
+          causa.nivel === 'tipo' && valores.clasificacion !== causa.clasificacion
+            ? 'La clasificación se aplicó también a todas sus causas.'
+            : 'El cambio aplica a los próximos registros de parada.',
       });
     } catch (error) {
+      if (esConflictoVersion(error)) {
+        toast.error(TOAST_CONFLICTO_VERSION.titulo, { description: TOAST_CONFLICTO_VERSION.descripcion });
+        return;
+      }
+      if (aplicarErroresApi<FormValores>(error, setError).length > 0) {
+        toast.error('Revisa los campos marcados', { description: 'La causa no se guardó.' });
+        return;
+      }
       toast.error('No se pudo guardar la causa', {
-        description: error instanceof Error ? error.message : 'Revisa los campos.',
+        description: mensajeDeError(error, 'Revisa los campos.'),
       });
     }
   });
@@ -136,6 +157,40 @@ export function CausaParadaDetalle({
         {
           label: <EtiquetaCampo titulo="Categoría general" apoyo="Nodo padre en el árbol" />,
           value: padre ? `${padre.codigo} · ${padre.nombre}` : 'Sin categoría (nodo raíz)',
+        },
+        {
+          label: (
+            <EtiquetaCampo
+              titulo="Clasificación"
+              apoyo={
+                causa.nivel === 'tipo'
+                  ? 'Se aplica a todas las causas de este tipo'
+                  : 'Heredada del tipo raíz; cámbiala en el tipo'
+              }
+            />
+          ),
+          value:
+            causa.nivel === 'tipo' ? (
+              <Controller
+                control={control}
+                name="clasificacion"
+                render={({ field }) => (
+                  <Select
+
+                    options={[
+                      { value: 'imprevista', label: 'No planificada (imprevista)' },
+                      { value: 'programada', label: 'Planificada (programada)' },
+                    ]}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  />
+                )}
+              />
+            ) : programada ? (
+              'Planificada (programada)'
+            ) : (
+              'No planificada (imprevista)'
+            ),
         },
         {
           label: (
@@ -235,7 +290,9 @@ export function CausaParadaDetalle({
               name="lineasAplicables"
               render={({ field }) => (
                 <div className="flex flex-wrap gap-2">
-                  {lineas.map((l) => {
+                  {lineas
+                    .filter((l) => l.estado === 'activo' || field.value.includes(l.id))
+                    .map((l) => {
                     const activa = field.value.includes(l.id);
                     return (
                       <Tag
@@ -287,7 +344,7 @@ export function CausaParadaDetalle({
               apoyo="Se conservan aunque se dé de baja"
             />
           ),
-          value: `${formatNumber(causa.paradasHistoricas)} registros · última revisión ${formatDate(new Date())}`,
+          value: `${formatNumber(causa.paradasHistoricas)} registros`,
         },
       ]}
     />

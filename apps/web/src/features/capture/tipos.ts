@@ -52,14 +52,70 @@ export function contextoDeLinea(linea: LineaEstado, resumen: TiempoRealResumen):
   };
 }
 
-/** Hora local `HH:mm` de "ahora" — valor por defecto del campo "Hora de inicio". */
-export function horaActual(): string {
-  return new Date().toTimeString().slice(0, 5);
+/* ------------------------------------------------------------------ */
+/* Fechas de planta: siempre en la zona de Lima                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * La API guarda `inicio`/`fin` como ISO local de Lima sin zona. Una tablet con
+ * otra zona horaria (o un turno noche que cruza la medianoche) no debe mover la
+ * hora: todo se calcula con `America/Lima` (UTC−5 fijo, sin horario de verano).
+ */
+const OFFSET_LIMA_MS = -5 * 60 * 60 * 1000;
+
+/** Tolerancia hacia el futuro, igual que la API (`TOLERANCIA_FUTURO_MIN`). */
+const TOLERANCIA_FUTURO_MS = 5 * 60 * 1000;
+
+/** "Ahora" en Lima como ISO local `AAAA-MM-DDTHH:mm:ss`. */
+export function ahoraLimaIso(ahora: Date = new Date()): string {
+  return new Date(ahora.getTime() + OFFSET_LIMA_MS).toISOString().slice(0, 19);
 }
 
-/** `14:02` + hoy → ISO-8601 local que espera la API (`inicio`, `fin`). */
-export function isoDesdeHora(hora: string): string {
-  const hoy = new Date();
-  const fecha = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-  return `${fecha}T${/^\d{2}:\d{2}$/.test(hora) ? `${hora}:00` : '00:00:00'}`;
+/** Milisegundos epoch de un ISO local de Lima (`2026-08-28T14:10:00`). */
+export function msDesdeIsoLima(iso: string): number {
+  return Date.parse(`${iso.slice(0, 19)}Z`) - OFFSET_LIMA_MS;
+}
+
+/** Hora `HH:mm` de "ahora" en Lima — valor por defecto del campo "Hora de inicio". */
+export function horaActual(ahora: Date = new Date()): string {
+  return ahoraLimaIso(ahora).slice(11, 16);
+}
+
+/**
+ * `14:02` → ISO local de Lima que espera la API. El día es el de hoy en Lima,
+ * salvo que esa hora quede en el futuro: entonces es del día anterior (a las
+ * 00:10 del turno noche, "23:50" es la de anoche, no la de mañana).
+ */
+export function isoDesdeHora(hora: string, ahora: Date = new Date()): string {
+  const hhmmss = /^\d{2}:\d{2}$/.test(hora) ? `${hora}:00` : '00:00:00';
+  const hoy = ahoraLimaIso(ahora).slice(0, 10);
+  const candidato = `${hoy}T${hhmmss}`;
+  if (msDesdeIsoLima(candidato) <= ahora.getTime() + TOLERANCIA_FUTURO_MS) return candidato;
+  const ayer = new Date(Date.parse(`${hoy}T00:00:00Z`) - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return `${ayer}T${hhmmss}`;
+}
+
+/**
+ * Cambia solo la hora de un ISO existente conservando su fecha (para editar
+ * una parada sin moverla de día).
+ */
+export function isoConHora(isoOriginal: string, hora: string): string {
+  return `${isoOriginal.slice(0, 10)}T${/^\d{2}:\d{2}$/.test(hora) ? `${hora}:00` : isoOriginal.slice(11, 19)}`;
+}
+
+/**
+ * Normaliza lo que se teclea en un campo decimal: acepta `.` y `,` como
+ * separador (se muestra con coma), deja un solo separador y solo dígitos. Si el
+ * texto trae un segundo separador se conserva el valor anterior.
+ */
+export function normalizarDecimal(texto: string, anterior: string, maxLargo = 7): string {
+  const unificado = texto.replace(/\./g, ',');
+  if ((unificado.match(/,/g) ?? []).length > 1) return anterior;
+  return unificado.replace(/[^0-9,]/g, '').slice(0, maxLargo);
+}
+
+/** `2,5` → 2.5 · vacío o inválido → 0. */
+export function numeroDesdeDecimal(texto: string): number {
+  const valor = Number(texto.replace(',', '.'));
+  return Number.isFinite(valor) ? valor : 0;
 }

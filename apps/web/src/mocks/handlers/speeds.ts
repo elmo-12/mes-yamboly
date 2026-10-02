@@ -1,10 +1,20 @@
 import { http, HttpResponse } from 'msw';
 import type { RegistroVelocidad } from '@mes/types';
+import { ROLES_CAPTURA_VELOCIDAD } from '@mes/types';
 import { calcDesvioVelocidad } from '@mes/shared';
 import { getStore, parActivo, registrarBitacora, registrarTri } from '../store';
-import { API, ahoraIso, errores, listaQuery, numeroQuery, paginar, preludio } from './_utils';
+import {
+  API,
+  ahoraIso,
+  errorTiempoRegistro,
+  errores,
+  listaQuery,
+  numeroQuery,
+  paginar,
+  preludio,
+} from './_utils';
 import { enriquecerVelocidad } from './_enrich';
-import { usuarioDesdeToken } from './auth';
+import { capturaEnOrden, exigeRoles } from './auth';
 
 export const speedsHandlers = [
   http.get(`${API}/velocidades`, async ({ request }) => {
@@ -27,13 +37,26 @@ export const speedsHandlers = [
     const simulado = await preludio(request);
     if (simulado) return simulado;
     const store = getStore();
+    const { usuario, respuesta } = exigeRoles(request, ROLES_CAPTURA_VELOCIDAD);
+    if (respuesta) return respuesta;
     const body = (await request.json()) as Record<string, unknown>;
+    const lineaIdBody = body.lineaId === undefined ? undefined : String(body.lineaId);
+    if (lineaIdBody !== undefined && !store.lineas.some((l) => l.id === lineaIdBody)) {
+      return errores.validacion({ lineaId: 'La línea seleccionada no existe' });
+    }
+    const orden = store.ordenes.find((o) => o.id === body.ordenId || o.codigo === body.ordenId);
+    if (!orden) return errores.noEncontrado('Orden de fabricación');
+    const accesoOrden = capturaEnOrden(orden, usuario, lineaIdBody);
+    if (accesoOrden) return accesoOrden;
+    const tiempoInvalido = errorTiempoRegistro(body);
+    if (tiempoInvalido) return tiempoInvalido;
     const velocidadReal = Number(body.velocidadReal ?? 0);
     if (!(velocidadReal > 0)) {
       return errores.validacion({ velocidadReal: 'La velocidad debe ser mayor que 0' });
     }
-    const orden = store.ordenes.find((o) => o.id === body.ordenId);
-    if (!orden) return errores.noEncontrado('Orden de fabricación');
+    if (velocidadReal > 1000) {
+      return errores.validacion({ velocidadReal: 'Velocidad fuera de rango' });
+    }
 
     /* Estándar congelado en la orden; si faltara, el par producto × línea. */
     const velocidadEstandar =
@@ -57,14 +80,13 @@ export const speedsHandlers = [
     const linea = store.lineaEstados.find((l) => l.lineaId === registro.lineaId);
     if (linea && linea.estado === 'produciendo') linea.velocidad = registro.velocidadReal;
 
-    const usuario = usuarioDesdeToken(request);
     registrarBitacora({
       ordenId: registro.ordenId,
       fecha: registro.registradaEn,
-      usuario: usuario?.nombre ?? 'Jorge Quispe',
-      usuarioIniciales: usuario?.iniciales ?? 'JQ',
+      usuario: usuario.nombre,
+      usuarioIniciales: usuario.iniciales,
       tipo: 'velocidad',
-      texto: `${usuario?.nombre ?? 'Jorge Quispe'} registró velocidad real ${registro.velocidadReal} u/min (estándar ${velocidadEstandar} · ${registro.desvioPct} %)`,
+      texto: `${usuario.nombre} registró velocidad real ${registro.velocidadReal} u/min (estándar ${velocidadEstandar} · ${registro.desvioPct} %)`,
     });
 
     return HttpResponse.json(enriquecerVelocidad(registro), { status: 201 });

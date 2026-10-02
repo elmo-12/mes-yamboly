@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { PaginationQuery } from './common';
+import { numeroRequerido } from './catalogs';
 
 export const TIPOS_ALERTA = ['parada_prevista', 'merma_prevista', 'velocidad_baja', 'oee_bajo'] as const;
 export type TipoAlerta = (typeof TIPOS_ALERTA)[number];
@@ -70,6 +71,8 @@ export interface AlertaListQuery extends PaginationQuery {
   desde?: string;
   hasta?: string;
   search?: string;
+  /** Solo las que esperan confirmar el resultado real (atendidas o vencidas sin acierto). */
+  pendientes?: boolean;
 }
 
 export interface AlertasResumen {
@@ -79,6 +82,8 @@ export interface AlertasResumen {
   vencidas: number;
   /** EP acumulada mostrada en el header 07.A. */
   epAcumulada: number;
+  /** Predicciones confirmadas (Anexo 06). Con 0 la EP no se ha medido aún: la UI muestra «—». */
+  epConfirmadas?: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -147,25 +152,41 @@ export interface Umbrales {
   tciToleranciaDiasSap: number;
   actualizadoEn: string;
   actualizadoPor: string;
+  /** Versión para la concurrencia optimista (sube en cada guardado). */
+  version?: number;
 }
 
 export const umbralesSchema = z.object({
-  velocidadBajoEstandarPct: z.coerce
-    .number()
-    .min(1, 'Mínimo 1 %')
-    .max(50, 'Máximo 50 %'),
-  oeeMinimo: z.coerce.number().min(1, 'Mínimo 1 %').max(100, 'Máximo 100 %'),
-  probabilidadMinima: z.coerce.number().min(50, 'Mínimo 50 %').max(99, 'Máximo 99 %'),
+  velocidadBajoEstandarPct: numeroRequerido('Ingresa el porcentaje').pipe(
+    z.number().min(1, 'Mínimo 1 %').max(50, 'Máximo 50 %'),
+  ),
+  oeeMinimo: numeroRequerido('Ingresa el OEE mínimo').pipe(
+    z.number().min(1, 'Mínimo 1 %').max(100, 'Máximo 100 %'),
+  ),
+  probabilidadMinima: numeroRequerido('Ingresa la probabilidad').pipe(
+    z.number().min(50, 'Mínimo 50 %').max(99, 'Máximo 99 %'),
+  ),
   notificarN8n: z.boolean().default(false),
   mostrarTv: z.boolean().default(true),
-  /* --- Validación de calidad (TCI) · sección de Configuración 10.C --- */
-  tciToleranciaMin: z.coerce.number().min(0, 'Mínimo 0 min').max(60, 'Máximo 60 min').default(5),
-  tciToleranciaPct: z.coerce.number().min(0, 'Mínimo 0 %').max(50, 'Máximo 50 %').default(5),
-  tciToleranciaDiasSap: z.coerce
-    .number()
-    .int('Debe ser un número entero de días')
-    .min(0, 'Mínimo 0 días')
-    .max(15, 'Máximo 15 días')
+  /* --- Validación de calidad (TCI) · sección de Configuración 10.C ---
+   * Un campo vacío es un error, no 0: antes `z.coerce` guardaba 0 en silencio
+   * (tolerancia nula ⇒ TCI estrictísimo). Sin el campo se conserva el valor. */
+  tciToleranciaMin: numeroRequerido('Ingresa la tolerancia en minutos')
+    .pipe(z.number().min(0, 'Mínimo 0 min').max(60, 'Máximo 60 min'))
+    .default(5),
+  tciToleranciaPct: numeroRequerido('Ingresa la tolerancia en %')
+    .pipe(z.number().min(0, 'Mínimo 0 %').max(50, 'Máximo 50 %'))
+    .default(5),
+  tciToleranciaDiasSap: numeroRequerido('Ingresa los días de holgura')
+    .pipe(
+      z
+        .number()
+        .int('Debe ser un número entero de días')
+        .min(0, 'Mínimo 0 días')
+        .max(15, 'Máximo 15 días'),
+    )
     .default(1),
+  /** Versión leída: la API responde 409 si otra persona guardó después. */
+  version: z.number().int().positive().optional(),
 });
 export type UmbralesInput = z.infer<typeof umbralesSchema>;

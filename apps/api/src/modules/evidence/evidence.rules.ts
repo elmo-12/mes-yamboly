@@ -1,5 +1,5 @@
 import { esRegistroValidoTci } from '@mes/shared';
-import { CRITERIO_TCI_LABEL } from '@mes/types';
+import { CRITERIO_TCI_LABEL, ITEMS_ENCUESTA_TSP } from '@mes/types';
 import type {
   ClaveCriterioTci,
   CriterioTCI,
@@ -360,12 +360,14 @@ export function aplicarOverrides(
 ): CriterioTCI[] {
   if (!overrides) return criterios;
   return criterios.map((c) => {
-    const forzado = overrides[c.clave];
-    if (forzado === undefined) return c;
+    const forzado: unknown = overrides[c.clave];
+    /* Sólo un booleano fuerza el criterio (datos legados con basura no). */
+    if (typeof forzado !== 'boolean') return c;
     return {
       ...c,
       cumple: forzado,
       override: forzado,
+      cumpleRegla: c.cumple,
       detalle: `Override manual (${forzado ? 'válido' : 'inválido'}) · ${c.detalle}`,
     };
   });
@@ -382,3 +384,23 @@ export const CRITERIOS_POR_TIPO: Record<TipoRegistroTci, ClaveCriterioTci[]> = {
   merma: ['completo', 'sap', 'solicitud'],
   velocidad: ['completo', 'sensor'],
 };
+
+/* ------------------------------------------------------------------ */
+/* TSP                                                                 */
+/* ------------------------------------------------------------------ */
+
+/** `true` si el valor es una respuesta Likert válida (entero 1–5). */
+export function esLikert(valor: unknown): valor is number {
+  return typeof valor === 'number' && Number.isInteger(valor) && valor >= 1 && valor <= 5;
+}
+
+/**
+ * Respuestas que cuentan para el TSP: sólo los 8 primeros ítems y sólo
+ * valores Likert válidos. Una fila legada con más ítems o con basura no puede
+ * inflar ni hundir el porcentaje.
+ */
+export function respuestasValidas(respuestas: unknown): number[][] {
+  const fila = Array.isArray(respuestas) ? respuestas.slice(0, ITEMS_ENCUESTA_TSP) : [];
+  return fila.map((v) => (esLikert(v) ? [v] : []));
+}
+

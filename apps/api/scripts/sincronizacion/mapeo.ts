@@ -43,6 +43,12 @@ import {
 } from '../../src/database/entities';
 import causasMermaJson from '../../src/database/seeds/data/real/causas-merma.json';
 import causasParadaJson from '../../src/database/seeds/data/real/causas-parada.json';
+import {
+  type FilaSapOrigen,
+  idOrdenSap,
+  turnoDesdeSap,
+  velocidadSapUnidHora,
+} from '../../src/modules/ordenes-sap/origen-sap';
 import type { MermaOrigen, OrdenOrigen, ParadaOrigen, ProductoOrigen } from './origen';
 
 /**
@@ -628,6 +634,45 @@ export class Mapeador {
       motivo: fila.observacion,
       responsableId: orden.maquinistaId,
       tiempoRegistroSeg: acotarRegistro(fila.registroSeg),
+    };
+  }
+
+  /**
+   * Fila de `orden_sap` (la cabecera SAP tal cual, sin convertir a unidades).
+   * `ordenId` es la orden del MES que la ejecutó, o `null` si sigue pendiente.
+   * Devuelve `null` si la línea no es del MES (ya anotado por `orden()` en las
+   * ejecutadas; en las pendientes se anota aquí).
+   */
+  ordenSap(
+    fila: FilaSapOrigen,
+    ordenId: string | null,
+    sincronizadaEn: string,
+  ): Record<string, unknown> | null {
+    const linea = this.linea(fila.lineaProduccion);
+    if (!linea) {
+      if (!ordenId) {
+        this.anotar(
+          'orden SAP pendiente en línea fuera del maestro',
+          `${fila.lineaProduccion ?? '—'} · OF ${fila.numero}`,
+          fila.fecha,
+        );
+      }
+      return null;
+    }
+    return {
+      id: idOrdenSap(fila.sapId),
+      numero: fila.numero,
+      fecha: fila.fecha,
+      turno: turnoDesdeSap(fila.turno),
+      lineaId: linea.id,
+      productoId: this.producto(fila.codigoProducto)?.id ?? null,
+      codigoProducto: fila.codigoProducto ?? '',
+      productoNombre: fila.producto ?? '',
+      planificadoCajas: fila.planificadoCajas,
+      velocidadUnidHora: velocidadSapUnidHora(fila.velocidadEstandarTexto),
+      tipoProduccion: fila.tipoProduccion,
+      ordenId,
+      sincronizadaEn,
     };
   }
 

@@ -4,11 +4,22 @@ import * as React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Input, Switch, Tag, toast } from '@mes/ui';
-import { NIVEL_CAUSA_MERMA_LABEL, TIPOS_MERMA, TIPO_MERMA_LABEL, causaMermaSchema } from '@mes/types';
+import {
+  NIVEL_CAUSA_MERMA_LABEL,
+  TIPOS_MERMA,
+  TIPO_MERMA_LABEL,
+  causaMermaSchema,
+} from '@mes/types';
 import type { CausaMerma, CausaMermaInput, Linea } from '@mes/types';
-import { formatDate, formatNumber } from '@mes/shared';
+import { formatNumber } from '@mes/shared';
+import { esConflictoVersion, TOAST_CONFLICTO_VERSION } from '@/features/catalogs/errores';
 import { useBajaCausaMerma, useGuardarCausaMerma } from '@/features/catalogs/hooks';
+import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
 import { CausaDetalleShell, EtiquetaCampo } from './CausaDetalleShell';
+
+/** Campos editables: código, nivel y padre son inmutables (definen id y posición). */
+const formSchema = causaMermaSchema.omit({ codigo: true, nivel: true, parentId: true });
+type FormValores = Omit<CausaMermaInput, 'codigo' | 'nivel' | 'parentId'>;
 
 const NIVEL_ORDINAL = {
   tipo: 'Tipo de producción (nivel 1)',
@@ -33,18 +44,17 @@ export function CausaMermaDetalle({ causa, padre, lineas, onEliminada }: CausaMe
   const guardar = useGuardarCausaMerma();
   const baja = useBajaCausaMerma();
 
-  const valoresIniciales = React.useMemo<CausaMermaInput>(
+  /* Código, nivel y padre son inmutables: no van en el formulario ni en el PATCH. */
+  const valoresIniciales = React.useMemo<FormValores>(
     () => ({
-      codigo: causa.codigo,
       nombre: causa.nombre,
-      nivel: causa.nivel,
-      parentId: causa.parentId,
       aplicaA: causa.aplicaA,
       lineasAplicables: causa.lineasAplicables,
       requiereEvidencia: causa.requiereEvidencia,
       requiereComentario: causa.requiereComentario,
       requiereSolicitud: causa.requiereSolicitud,
       estado: causa.estado,
+      version: causa.version,
     }),
     [causa],
   );
@@ -55,23 +65,35 @@ export function CausaMermaDetalle({ causa, padre, lineas, onEliminada }: CausaMe
     handleSubmit,
     reset,
     setValue,
+    setError,
     watch,
     formState: { errors, isDirty, isSubmitting },
-  } = useForm<CausaMermaInput>({
-    resolver: zodResolver(causaMermaSchema),
+  } = useForm<FormValores>({
+    resolver: zodResolver(formSchema),
     values: valoresIniciales,
   });
 
   const onSubmit = handleSubmit(async (valores) => {
     try {
-      await guardar.mutateAsync({ id: causa.id, input: valores });
-      reset(valores);
-      toast.success(`Causa ${valores.codigo} actualizada`, {
+      const guardada = await guardar.mutateAsync({
+        id: causa.id,
+        input: valores as CausaMermaInput,
+      });
+      reset({ ...valores, version: guardada.version });
+      toast.success(`Causa ${causa.codigo} actualizada`, {
         description: 'El cambio aplica a los próximos registros de merma.',
       });
     } catch (error) {
+      if (esConflictoVersion(error)) {
+        toast.error(TOAST_CONFLICTO_VERSION.titulo, { description: TOAST_CONFLICTO_VERSION.descripcion });
+        return;
+      }
+      if (aplicarErroresApi<FormValores>(error, setError).length > 0) {
+        toast.error('Revisa los campos marcados', { description: 'La causa no se guardó.' });
+        return;
+      }
       toast.error('No se pudo guardar la causa', {
-        description: error instanceof Error ? error.message : 'Revisa los campos.',
+        description: mensajeDeError(error, 'Revisa los campos.'),
       });
     }
   });
@@ -236,7 +258,9 @@ export function CausaMermaDetalle({ causa, padre, lineas, onEliminada }: CausaMe
               name="lineasAplicables"
               render={({ field }) => (
                 <div className="flex flex-wrap gap-2">
-                  {lineas.map((l) => {
+                  {lineas
+                    .filter((l) => l.estado === 'activo' || (field.value ?? []).includes(l.id))
+                    .map((l) => {
                     const activa = field.value.includes(l.id);
                     return (
                       <Tag
@@ -288,7 +312,7 @@ export function CausaMermaDetalle({ causa, padre, lineas, onEliminada }: CausaMe
               apoyo="Se conservan aunque se dé de baja"
             />
           ),
-          value: `${formatNumber(causa.mermasHistoricas)} registros · última revisión ${formatDate(new Date())}`,
+          value: `${formatNumber(causa.mermasHistoricas)} registros`,
         },
       ]}
     />

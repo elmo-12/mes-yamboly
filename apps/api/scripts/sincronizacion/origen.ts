@@ -27,10 +27,16 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Client } from 'pg';
+import {
+  type FilaSapOrigen,
+  leerOrdenesSapPendientes,
+} from '../../src/modules/ordenes-sap/origen-sap';
 
 /** Cabecera de OF + registro de ejecución, ya resueltos en una sola fila. */
 export interface OrdenOrigen {
   ofId: number;
+  /** `orden_fabricacion_dbs.id`: la fila SAP que consumió esta ejecución. */
+  sapId: number;
   codigo: string;
   fecha: string;
   turno: string | null;
@@ -185,7 +191,13 @@ export class OrigenReal {
   private constructor(private readonly cliente: Client) {}
 
   static async abrir(url: string): Promise<OrigenReal> {
-    const cliente = new Client({ connectionString: url, ssl: false, application_name: 'mes-sync' });
+    const cliente = new Client({
+      connectionString: url,
+      ssl: false,
+      application_name: 'mes-sync',
+      /* La sesión nace en sólo lectura (además del `set session…` de abajo). */
+      options: '-c default_transaction_read_only=on',
+    });
     try {
       await cliente.connect();
       /* Sesión de sólo lectura: cualquier INSERT/UPDATE accidental falla. */
@@ -242,6 +254,7 @@ export class OrigenReal {
     const { rows } = await this.cliente.query(
       `select
          o.id                                as "ofId",
+         d.id                                as "sapId",
          d.orden_fabricacion                 as "codigo",
          to_char(d.fecha,'YYYY-MM-DD')       as "fecha",
          d.turno                             as "turno",
@@ -362,6 +375,14 @@ export class OrigenReal {
       [ofIds],
     );
     return rows as VelocidadOrigen[];
+  }
+
+  /**
+   * Órdenes SAP **pendientes** (sin ejecución, `Produccion`, desde ayer en hora
+   * de Lima): el mismo lector que usa la API en `OrdenesSapService`.
+   */
+  async ordenesSapPendientes(): Promise<FilaSapOrigen[]> {
+    return leerOrdenesSapPendientes(this.cliente);
   }
 
   /** Productos del maestro real por código (para altas puntuales en el MES). */

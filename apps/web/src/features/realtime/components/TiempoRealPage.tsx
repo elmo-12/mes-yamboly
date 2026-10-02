@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { Button, Divider, EmptyState, Icon, SectionTitle, toast } from '@mes/ui';
-import type { LineaEstado } from '@mes/types';
+import { puedeIniciarOrden, type LineaEstado } from '@mes/types';
+import { useSession } from '@/hooks/use-session';
 import { useDescartarDeteccion } from '@/features/downtimes/hooks';
 import {
   FinalizarOrdenModal,
@@ -39,6 +40,7 @@ export function TiempoRealPage() {
 
   /* Yamboly opera una única planta (Lima): el tablero pide todas las líneas. */
   const { data, isPending, isError, error, refetch } = useLineasTiempoReal();
+  const { user } = useSession();
   const descartar = useDescartarDeteccion();
 
   const lineas = data?.lineas ?? [];
@@ -134,14 +136,17 @@ export function TiempoRealPage() {
           title="No hay órdenes activas en este turno"
           description="Inicia una orden de fabricación para empezar a monitorear las líneas."
           action={
-            <Button
-              variant="primary"
-              icon={<Icon name="play-circle" size={20} />}
-              disabled={overlay !== null}
-              onClick={() => abrir('iniciar-orden', null)}
-            >
-              Iniciar orden
-            </Button>
+            /* Iniciar orden: sólo jefatura y supervisión (`POST /ordenes`). */
+            puedeIniciarOrden(user) ? (
+              <Button
+                variant="primary"
+                icon={<Icon name="play-circle" size={20} />}
+                disabled={overlay !== null}
+                onClick={() => abrir('iniciar-orden', null)}
+              >
+                Iniciar orden
+              </Button>
+            ) : undefined
           }
         />
       ) : (

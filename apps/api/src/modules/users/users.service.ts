@@ -2,16 +2,18 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
 import { Not, Repository } from 'typeorm';
-import { SEDE_UNICA_ID } from '@mes/types';
+import { MENSAJE_MAQUINISTA_SIN_LINEA, SEDE_UNICA_ID } from '@mes/types';
 import type { Colaborador, User as UserDto } from '@mes/types';
 import {
   BusinessRuleException,
   ConflictoException,
   NoEncontradoException,
+  ValidationException,
 } from '../../common/exceptions/business.exception';
 import { toUserDto } from '../../common/mappers/user.mapper';
+import { insertarConIdSecuencial } from '../../common/utils/ids';
 import { normalizar, toList } from '../../common/utils/query';
-import { User } from '../../database/entities';
+import { Linea, User } from '../../database/entities';
 import { colaboradoresBase } from '../../database/seeds/data/users';
 import type {
   CreateUsuarioDto,
@@ -19,6 +21,13 @@ import type {
   UpdateUsuarioDto,
   UsuarioQueryDto,
 } from './dto/usuario.dto';
+
+/** M9: un maquinista sin línea no podría registrar nada (la captura se ata a su línea). */
+function verificarLineaMaquinista(rol: string, lineaId: string | null | undefined): void {
+  if (rol === 'maquinista' && !lineaId) {
+    throw new ValidationException({ lineaId: MENSAJE_MAQUINISTA_SIN_LINEA });
+  }
+}
 
 /** Mismo coste que el seed (`usuarios.seeder.ts`), para que los hashes sean homogéneos. */
 const BCRYPT_ROUNDS = 10;
@@ -33,7 +42,10 @@ export function derivarIniciales(nombre: string): string {
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectRepository(User) private readonly usuarios: Repository<User>) {}
+  constructor(
+    @InjectRepository(User) private readonly usuarios: Repository<User>,
+    @InjectRepository(Linea) private readonly lineas: Repository<Linea>,
+  ) {}
 
   async listar(query: UsuarioQueryDto = {}): Promise<UserDto[]> {
     const roles = toList(query.rol);
@@ -53,11 +65,15 @@ export class UsersService {
 
   async crear(dto: CreateUsuarioDto): Promise<UserDto> {
     await this.verificarUnicidad(dto.email, dto.dni);
-    const total = await this.usuarios.count();
+    await this.verificarLinea(dto.lineaId);
+    verificarLineaMaquinista(dto.rol, dto.lineaId);
     const usuario = this.usuarios.create({
-      id: `USR-${String(total + 1).padStart(2, '0')}`,
+      /* El id lo asigna `insertarConIdSecuencial` (INSERT puro con reintento):
+       * con `count() + 1` y `save()`, un hueco en la numeración (usuarios
+       * importados del legado) hacía que el alta pisara a otro usuario. */
+      id: '',
       nombre: dto.nombre,
-      email: dto.email,
+      email: dto.email.trim().toLowerCase(),
       dni: dto.dni,
       rol: dto.rol,
       cargo: dto.cargo,
@@ -70,20 +86,39 @@ export class UsersService {
       ultimoAcceso: null,
       passwordHash: await hash(dto.password, BCRYPT_ROUNDS),
     });
-    await this.usuarios.save(usuario);
+    await insertarConIdSecuencial(this.usuarios, usuario, (n) => `USR-${String(n).padStart(2, '0')}`);
     return toUserDto(usuario);
   }
 
-  async actualizar(id: string, dto: UpdateUsuarioDto): Promise<UserDto> {
+  async actualizar(id: string, dto: UpdateUsuarioDto, solicitanteId?: string): Promise<UserDto> {
     const usuario = await this.buscar(id);
     await this.verificarUnicidad(
       dto.email && dto.email !== usuario.email ? dto.email : undefined,
       dto.dni && dto.dni !== usuario.dni ? dto.dni : undefined,
       id,
     );
+    await this.verificarLinea(dto.lineaId);
+    verificarLineaMaquinista(
+      dto.rol ?? usuario.rol,
+      dto.lineaId !== undefined ? dto.lineaId : usuario.lineaId,
+    );
+    const pierdeJefatura = usuario.rol === 'jefe' && dto.rol !== undefined && dto.rol !== 'jefe';
+    if (pierdeJefatura && usuario.id === solicitanteId) {
+      throw new BusinessRuleException('No puedes quitarte el rol de jefe de producción', {
+        rol: 'No puedes quitarte el rol de jefe de producción',
+      });
+    }
+    if (pierdeJefatura) await this.verificarOtroJefeActivo(usuario.id, 'rol');
+
+    const cambiaAcceso =
+      (dto.rol !== undefined && dto.rol !== usuario.rol) ||
+      (dto.lineaId !== undefined && (dto.lineaId ?? null) !== (usuario.lineaId ?? null));
     Object.assign(usuario, dto);
     if (dto.lineaId !== undefined) usuario.lineaId = dto.lineaId ?? null;
     if (dto.nombre) usuario.iniciales = derivarIniciales(dto.nombre);
+    /* Un cambio de rol o de línea obliga a iniciar sesión de nuevo: la web
+     * guarda el rol de la sesión y, si no, seguiría mostrando el anterior. */
+    if (cambiaAcceso) usuario.tokenVersion = (usuario.tokenVersion ?? 0) + 1;
     await this.usuarios.save(usuario);
     return toUserDto(usuario);
   }
@@ -96,6 +131,11 @@ export class UsersService {
         activo: 'No puedes desactivar tu propia cuenta',
       });
     }
+    if (!activo && usuario.rol === 'jefe' && usuario.activo) {
+      await this.verificarOtroJefeActivo(usuario.id, 'activo');
+    }
+    /* Dar de baja revoca las sesiones abiertas (el token deja de valer). */
+    if (!activo && usuario.activo) usuario.tokenVersion = (usuario.tokenVersion ?? 0) + 1;
     usuario.activo = activo;
     await this.usuarios.save(usuario);
     return toUserDto(usuario);
@@ -104,6 +144,8 @@ export class UsersService {
   async restablecerPassword(id: string, dto: RestablecerPasswordDto): Promise<UserDto> {
     const usuario = await this.buscar(id);
     usuario.passwordHash = await hash(dto.password, BCRYPT_ROUNDS);
+    /* Contraseña nueva = las sesiones con la anterior dejan de valer. */
+    usuario.tokenVersion = (usuario.tokenVersion ?? 0) + 1;
     await this.usuarios.save(usuario);
     return toUserDto(usuario);
   }
@@ -112,6 +154,23 @@ export class UsersService {
     const usuario = await this.usuarios.findOne({ where: { id } });
     if (!usuario) throw new NoEncontradoException('Usuario');
     return usuario;
+  }
+
+  /** 422 si `lineaId` no existe (antes la FK reventaba con 500). */
+  private async verificarLinea(lineaId?: string | null): Promise<void> {
+    if (!lineaId) return;
+    if ((await this.lineas.count({ where: { id: lineaId } })) === 0) {
+      throw new ValidationException({ lineaId: 'La línea seleccionada no existe' });
+    }
+  }
+
+  /** La planta no puede quedarse sin ningún jefe de producción activo. */
+  private async verificarOtroJefeActivo(id: string, campo: 'rol' | 'activo'): Promise<void> {
+    const otros = await this.usuarios.count({ where: { rol: 'jefe', activo: true, id: Not(id) } });
+    if (otros === 0) {
+      const mensaje = 'Debe quedar al menos un jefe de producción activo';
+      throw new BusinessRuleException(mensaje, { [campo]: mensaje });
+    }
   }
 
   /** 409 `CONFLICT` cuando el correo o el DNI ya están en uso por otra persona. */

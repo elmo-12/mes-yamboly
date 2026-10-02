@@ -1,6 +1,22 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsIn, IsOptional, IsString, Matches } from 'class-validator';
-import { DATASETS_EXPORT, FORMATOS_EXPORT, type DatasetExport, type FormatoExport } from '@mes/types';
+import {
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
+  IsIn,
+  IsOptional,
+  IsString,
+  Matches,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  DATASETS_EXPORT,
+  FORMATOS_EXPORT,
+  TURNOS,
+  type DatasetExport,
+  type FormatoExport,
+  type Turno,
+} from '@mes/types';
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -8,6 +24,7 @@ export class ExportRequestDto {
   @ApiProperty({ isArray: true, enum: DATASETS_EXPORT, example: ['ordenes', 'paradas'] })
   @IsArray({ message: 'datasets debe ser una lista' })
   @ArrayMinSize(1, { message: 'Selecciona al menos un dataset' })
+  @ArrayUnique({ message: 'Hay conjuntos repetidos' })
   @IsIn(DATASETS_EXPORT, { each: true, message: 'dataset no reconocido' })
   datasets!: DatasetExport[];
 
@@ -28,4 +45,11 @@ export class ExportRequestDto {
   @IsOptional()
   @IsString()
   lineaId?: string;
+
+  @ApiPropertyOptional({ isArray: true, enum: TURNOS, example: ['D'] })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value))
+  @IsArray({ message: 'turno debe ser una lista' })
+  @IsIn(TURNOS, { each: true, message: 'turno no reconocido' })
+  turno?: Turno[];
 }

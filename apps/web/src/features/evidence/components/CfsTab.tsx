@@ -106,11 +106,16 @@ function FilaCfs({ item }: { item: VerificacionCFS }) {
 
   React.useEffect(() => setObservacion(item.observacion), [item.observacion]);
 
-  const guardar = async (cambios: { cumple: boolean; observacion: string }) => {
+  /* Con `cumple` la funcionalidad queda verificada; sólo con `observacion`
+     se guarda la nota sin verificarla. */
+  const guardar = async (cambios: { cumple?: boolean; observacion: string }) => {
     try {
       await actualizar.mutateAsync({ id: item.id, input: cambios });
       toast.success(`${item.rf} actualizado`, {
-        description: `${item.funcionalidad}: ${cambios.cumple ? 'cumple' : 'no cumple'}.`,
+        description:
+          cambios.cumple === undefined
+            ? `${item.funcionalidad}: observación guardada.`
+            : `${item.funcionalidad}: ${cambios.cumple ? 'cumple' : 'no cumple'}.`,
       });
     } catch (e) {
       toast.error('No se pudo guardar el checklist', {
@@ -146,7 +151,7 @@ function FilaCfs({ item }: { item: VerificacionCFS }) {
           onChange={(e) => setObservacion(e.target.value)}
           onBlur={() => {
             if (observacion !== item.observacion) {
-              void guardar({ cumple: item.cumple, observacion });
+              void guardar({ observacion });
             }
           }}
         />

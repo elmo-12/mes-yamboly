@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Badge, Icon, Skeleton, type BadgeColor } from '@mes/ui';
 import type { Alerta, SeveridadAlerta } from '@mes/types';
 import { SEVERIDAD_ALERTA_LABEL } from '@mes/types';
+import { formatPct } from '@mes/shared';
 
 /** Fila del popover de la campana. */
 export interface NotificacionAlerta {
@@ -60,7 +61,13 @@ export function NotificationsPopover({
         <h2 className="min-w-0 flex-1 text-body-md font-semibold text-text-primary">
           Alertas recientes
         </h2>
-        {!enCarga && noLeidas > 0 && <Badge color="critical">{noLeidas} nuevas</Badge>}
+        {/* El popover lista las 3 más recientes; el badge cuenta todas las activas
+         * (antes decía «3 nuevas» con 12 activas en la bandeja). */}
+        {!enCarga && (total ?? noLeidas) > 0 && (
+          <Badge color="critical">
+            {total ?? noLeidas} {(total ?? noLeidas) === 1 ? 'activa' : 'activas'}
+          </Badge>
+        )}
       </header>
 
       {enCarga ? (
@@ -134,7 +141,7 @@ export function mapAlertaANotificacion(alerta: Alerta, horaRelativa: string): No
     id: alerta.id,
     titulo: alerta.prediccion,
     detalle: alerta.lineaNombre,
-    meta: `Probabilidad ${alerta.probabilidad} % · ${horaRelativa}`,
+    meta: `Probabilidad ${formatPct(alerta.probabilidad)} · ${horaRelativa}`,
     severidad: alerta.severidad,
     leida: alerta.estado !== 'activa',
   };

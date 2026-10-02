@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useSessionStore } from '@/features/auth/session-store';
 import { queryKeys } from '@/services/api/query-keys';
 import { realtimeApi } from './api';
 import type { TiempoRealFiltros } from './api';
@@ -41,7 +42,11 @@ export function useLineaTimeline(lineaId: string | undefined) {
 
 /** Modo TV (Figma 2163:8523): solo lectura, refresco cada 5 s. */
 export function useModoTv() {
+  /* La pestaña del Modo TV nace sin sesión: espera a que otra pestaña le pase el
+   * token (`session-store`) para no pedir sin `Authorization` y recibir 401. */
+  const sincronizando = useSessionStore((s) => s.sincronizando);
   return useQuery({
+    enabled: !sincronizando,
     queryKey: queryKeys.realtime.tv(),
     queryFn: realtimeApi.tv,
     refetchInterval: REFRESCO_TIEMPO_REAL_MS,

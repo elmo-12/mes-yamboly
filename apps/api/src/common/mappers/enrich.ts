@@ -112,6 +112,27 @@ export function enriquecerVelocidad(
   };
 }
 
+/**
+ * Primer ancestro (padre, abuelo…) dado de baja de una causa, o `undefined` si
+ * la rama está activa entera. La baja en cascada lo evita hoy, pero los datos
+ * heredados pueden tener una hija activa bajo un padre inactivo.
+ */
+export function ancestroInactivo<T extends { parentId?: string | null; estado: string }>(
+  mapa: ReadonlyMap<string, T>,
+  causaId: string,
+): T | undefined {
+  const vistos = new Set<string>([causaId]);
+  let padreId = mapa.get(causaId)?.parentId;
+  while (padreId && !vistos.has(padreId)) {
+    vistos.add(padreId);
+    const padre = mapa.get(padreId);
+    if (!padre) return undefined;
+    if (padre.estado !== 'activo') return padre;
+    padreId = padre.parentId;
+  }
+  return undefined;
+}
+
 /** Sube por el árbol de causas hasta el nodo raíz (`nivel: 'tipo'`). */
 export function tipoDeCausa(lookups: Lookups, causaId: string) {
   let actual = lookups.causasParada.get(causaId);

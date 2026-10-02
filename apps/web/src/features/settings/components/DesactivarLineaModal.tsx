@@ -62,11 +62,13 @@ export function DesactivarLineaModal({
         }
       >
         <div className="flex flex-col gap-2">
-          <Overline>Esta acción no se puede deshacer</Overline>
+          <Overline>Baja lógica · podrás reactivarla</Overline>
           <p className="text-body leading-[22px] text-neutral-text">
             Las órdenes y paradas ya registradas conservan el código {linea.codigo} para no romper
             la trazabilidad, pero la línea dejará de estar disponible al crear nuevas órdenes,
-            paradas, mermas y velocidades estándar.
+            paradas, mermas y velocidades estándar, y dejará de mostrarse en planta. Sus
+            velocidades estándar también se dan de baja; al reactivar la línea habrá que
+            reactivarlas una a una.
           </p>
         </div>
       </ModalContent>

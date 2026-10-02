@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import {
   METAS_TESIS,
   calcCfsOpcional,
@@ -17,7 +18,7 @@ import {
   formatNumber,
   segundosAMinutos,
 } from '@mes/shared';
-import { ROLE_LABEL } from '@mes/types';
+import { ROLE_LABEL, TIEMPO_REGISTRO_MAX_SEG, esFechaIsoReal } from '@mes/types';
 import type {
   EvidenciaCFS,
   EvidenciaEP,
@@ -33,7 +34,7 @@ import type {
 } from '@mes/types';
 import type { EnvVars } from '../../config/env.validation';
 import { ConflictoException, NoEncontradoException, ValidationException } from '../../common/exceptions';
-import { ahoraIso, hoyIso, redondear } from '../../common/utils';
+import { ahoraIso, hoyIso, insertarCopia, redondear } from '../../common/utils';
 import {
   EncuestaRespuesta,
   EncuestaSesion,
@@ -44,6 +45,8 @@ import {
 } from '../../database/entities';
 import { ITEMS_TSP } from '../../database/seeds/thesis-evidence.seed';
 import { EvidenceValidationService } from './evidence-validation.service';
+import { respuestasValidas } from './evidence.rules';
+import { ColaSerial } from './cola-serial';
 import type { CargarPretestDto, CrearInvitacionDto, VerificacionCfsDto } from './dto/evidence.dto';
 
 /** Ventanas de medición declaradas en la tesis (spec 09.A). */
@@ -54,8 +57,21 @@ export const PERIODOS_TESIS = {
   postestHasta: '2026-12-19',
 } as const;
 
+/** `true` si una fila del TRI postest puede entrar en el promedio. */
+function filaTriValida(f: { fecha: string; segundos: number }): boolean {
+  return (
+    esFechaIsoReal(f.fecha) &&
+    Number.isFinite(f.segundos) &&
+    f.segundos > 0 &&
+    f.segundos <= TIEMPO_REGISTRO_MAX_SEG
+  );
+}
+
 @Injectable()
 export class EvidenceService {
+  private readonly logger = new Logger(EvidenceService.name);
+  private readonly cola = new ColaSerial();
+
   constructor(
     @InjectRepository(RegistroTiempo) private readonly tiempos: Repository<RegistroTiempo>,
     @InjectRepository(EncuestaRespuesta) private readonly encuestas: Repository<EncuestaRespuesta>,
@@ -65,6 +81,7 @@ export class EvidenceService {
     @InjectRepository(User) private readonly usuarios: Repository<User>,
     private readonly validacion: EvidenceValidationService,
     private readonly config: ConfigService<EnvVars, true>,
+    private readonly dataSource: DataSource,
   ) {}
 
   /* ---------------------------------------------------------------- */
@@ -176,7 +193,22 @@ export class EvidenceService {
 
   async tri(): Promise<EvidenciaTRI> {
     const filas = await this.tiempos.find({ order: { etapa: 'ASC', n: 'ASC' } });
-    const postest = filas.filter((f) => f.etapa === 'postest').map((f) => this.aRegistroTri(f));
+    /* El postest llega de eventos de otros módulos: una fecha imposible o un
+       tiempo fuera de rango no entra al promedio (se informa cuántos). `n` se
+       numera al leer, por orden cronológico, para que dos altas simultáneas
+       nunca muestren el mismo número. */
+    const postestBrutas = filas.filter((f) => f.etapa === 'postest');
+    const postestValidas = postestBrutas
+      .filter(filaTriValida)
+      .sort(
+        (a, b) =>
+          a.fecha.localeCompare(b.fecha) ||
+          a.horaInicioRegistro.localeCompare(b.horaInicioRegistro) ||
+          a.n - b.n ||
+          a.id.localeCompare(b.id),
+      );
+    const descartadosPostest = postestBrutas.length - postestValidas.length;
+    const postest = postestValidas.map((f, i) => ({ ...this.aRegistroTri(f), n: i + 1 }));
     const pretest = filas.filter((f) => f.etapa === 'pretest').map((f) => this.aRegistroTri(f));
 
     const promedioPostest = calcTriOpcional(postest.map((r) => r.tiempoMin));
@@ -189,16 +221,22 @@ export class EvidenceService {
       promedioPostest,
       promedioPretest,
       reduccionPct,
+      descartadosPostest,
       meta: `Reducción ≥ ${METAS_TESIS.TRI_REDUCCION_PCT} % vs pretest`,
       estado: estadoTri(reduccionPct),
     };
   }
 
-  /** Carga la hoja del pretest medida a mano (Anexo 02). */
+  /**
+   * Carga la hoja del pretest medida a mano (Anexo 02). Reemplaza la línea base
+   * en **una transacción**: si alguna fila falla, se conserva la anterior.
+   */
   async cargarPretest(dto: CargarPretestDto): Promise<{ data: RegistroTRI[]; promedioPretest: number }> {
-    await this.tiempos.delete({ etapa: 'pretest' });
-    const filas = dto.registros.map((r, i) =>
-      this.tiempos.create({
+    const guardadas = await this.cola.ejecutar(() => this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(RegistroTiempo);
+      await repo.delete({ etapa: 'pretest' });
+      const filas = dto.registros.map((r, i) =>
+      repo.create({
         id: `TRI-PR-${String(i + 1).padStart(2, '0')}`,
         n: i + 1,
         fecha: r.fecha,
@@ -209,8 +247,9 @@ export class EvidenceService {
         tipo: 'manual',
         observacion: r.observacion ?? 'Registro manual en hoja de cálculo',
       }),
-    );
-    const guardadas = await this.tiempos.save(filas);
+      );
+      return repo.save(filas);
+    }));
     const data = guardadas.map((f) => this.aRegistroTri(f));
     return { data, promedioPretest: calcTri(data.map((r) => r.tiempoMin)) };
   }
@@ -224,16 +263,25 @@ export class EvidenceService {
     descripcion?: string;
     referenciaId?: string;
   }): Promise<RegistroTiempo | null> {
-    if (entrada.segundos <= 0) return null;
+    const fecha = entrada.fecha ?? hoyIso();
+    if (!filaTriValida({ fecha, segundos: entrada.segundos })) {
+      if (entrada.segundos > 0) {
+        this.logger.warn(
+          `TRI descartado (${entrada.tipo}): fecha «${fecha}» o ${entrada.segundos} s fuera de 1–${TIEMPO_REGISTRO_MAX_SEG} s`,
+        );
+      }
+      return null;
+    }
+    /* `n` es sólo orientativo: `tri()` renumera al leer (sin carrera). */
     const n = (await this.tiempos.countBy({ etapa: 'postest' })) + 1;
     const ahora = new Date();
     return this.tiempos.save(
       this.tiempos.create({
         id: `TRI-PO-AUTO-${entrada.referenciaId ?? `${Date.now().toString(36)}-${n}`}`,
         n,
-        fecha: entrada.fecha ?? hoyIso(),
+        fecha,
         eventoRegistrado: entrada.descripcion ?? this.descripcionPorTipo(entrada.tipo),
-        horaInicioRegistro: ahora.toTimeString().slice(0, 8),
+        horaInicioRegistro: ahoraIso(ahora).slice(11, 19),
         segundos: Math.round(entrada.segundos),
         etapa: 'postest',
         tipo: entrada.tipo,
@@ -271,10 +319,10 @@ export class EvidenceService {
 
   async tsp(): Promise<EvidenciaTSP> {
     const [filas, sesiones] = await Promise.all([this.encuestas.find(), this.sesiones.find()]);
-    const matriz = filas.map((f) => f.respuestas);
+    const matriz = filas.map((f) => respuestasValidas(f.respuestas));
 
     const items: ItemEncuesta[] = ITEMS_TSP.map((texto, j) => {
-      const columna = matriz.map((fila) => fila[j] ?? 0).filter((v) => v > 0);
+      const columna = matriz.flatMap((fila) => fila[j] ?? []);
       const deAcuerdo = columna.filter((v) => v >= 4).length;
       const suma = columna.reduce((a, b) => a + b, 0);
       return {
@@ -289,7 +337,7 @@ export class EvidenceService {
     let total = 0;
     let suma = 0;
     for (const fila of matriz) {
-      for (const valor of fila) {
+      for (const valor of fila.flat()) {
         total += 1;
         suma += valor;
         if (valor >= 4) deAcuerdo += 1;
@@ -319,7 +367,12 @@ export class EvidenceService {
    * derivan de su cuenta (`nombre`, `ROLE_LABEL[rol]`), token de un solo uso y
    * enlace público (`{WEB_URL ?? CORS_ORIGIN}/encuesta/<token>`).
    */
-  async crearInvitacion(dto: CrearInvitacionDto): Promise<{ invitacion: InvitacionTSP; resumen: EvidenciaTSP }> {
+  crearInvitacion(dto: CrearInvitacionDto): Promise<{ invitacion: InvitacionTSP; resumen: EvidenciaTSP }> {
+    /* En cola: dos altas simultáneas para el mismo usuario creaban dos invitaciones. */
+    return this.cola.ejecutar(() => this.crearInvitacionEnCola(dto));
+  }
+
+  private async crearInvitacionEnCola(dto: CrearInvitacionDto): Promise<{ invitacion: InvitacionTSP; resumen: EvidenciaTSP }> {
     const usuario = await this.usuarios.findOne({ where: { id: dto.usuarioId } });
     if (!usuario) {
       throw new ValidationException({ usuarioId: 'El usuario seleccionado no existe' });
@@ -334,25 +387,19 @@ export class EvidenceService {
       throw new ConflictoException(`${usuario.nombre} ya tiene una invitación`, { usuarioId: usuario.id });
     }
 
-    const anio = new Date().getFullYear();
-    const prefijo = `tsp-${anio}-`;
-    const usados = existentes
-      .filter((s) => s.token.startsWith(prefijo))
-      .map((s) => Number(s.token.slice(prefijo.length)))
-      .filter((n) => Number.isFinite(n));
-    const siguiente = (usados.length ? Math.max(...usados) : 0) + 1;
-
-    const sesion = await this.sesiones.save(
-      this.sesiones.create({
-        token: `${prefijo}${String(siguiente).padStart(2, '0')}`,
+    /* Token aleatorio de 128 bits: la encuesta es pública, así que el enlace
+       no puede ser adivinable (antes era `tsp-AAAA-NN`, secuencial). Los
+       tokens legados siguen funcionando: se buscan tal cual. */
+    const sesion = this.sesiones.create({
+        token: `tsp-${randomBytes(16).toString('base64url')}`,
         usuarioId: usuario.id,
         invitado: usuario.nombre,
         rol: ROLE_LABEL[usuario.rol] ?? usuario.rol,
         respondida: false,
         respondidaEn: null,
         creadaEn: ahoraIso(),
-      }),
-    );
+      });
+    await insertarCopia(this.sesiones, sesion);
 
     return { invitacion: this.aInvitacion(sesion), resumen: await this.tsp() };
   }
@@ -412,10 +459,16 @@ export class EvidenceService {
   async actualizarCfs(id: string, dto: VerificacionCfsDto): Promise<{ item: VerificacionCFS; resumen: EvidenciaCFS }> {
     const fila = await this.verificaciones.findOne({ where: { id } });
     if (!fila) throw new NoEncontradoException('Verificación funcional');
-    fila.cumple = dto.cumple;
-    fila.observacion = dto.observacion ?? fila.observacion;
-    /* Marcarla desde la ficha ya cuenta como verificada, cumpla o no. */
-    fila.verificadaEn = ahoraIso();
+    if (dto.cumple === undefined && dto.observacion === undefined) {
+      throw new ValidationException({ cumple: 'Indica si cumple o escribe una observación' });
+    }
+    if (dto.observacion !== undefined) fila.observacion = dto.observacion;
+    /* Sólo marcar Cumple Sí/No cuenta como verificación; una nota sola no
+       convierte la funcionalidad en «verificada y no cumple». */
+    if (dto.cumple !== undefined) {
+      fila.cumple = dto.cumple;
+      fila.verificadaEn = ahoraIso();
+    }
     await this.verificaciones.save(fila);
     const resumen = await this.cfs();
     const item = resumen.items.find((i) => i.id === id)!;

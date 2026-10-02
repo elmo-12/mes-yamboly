@@ -24,10 +24,13 @@ import {
 } from '@mes/ui';
 import {
   ESTADO_ALERTA_LABEL,
+  ROLES_CONFIRMAR_EP,
   SEVERIDAD_ALERTA_LABEL,
   TIPO_ALERTA_LABEL,
+  puedeAtenderAlerta,
   type Alerta,
 } from '@mes/types';
+import { useSession } from '@/hooks/use-session';
 import { formatDateTime, formatPct } from '@mes/shared';
 import { useAlerta, useAtenderAlerta, useConfirmarEvento, useDescartarAlerta } from '../hooks';
 import {
@@ -39,6 +42,11 @@ import {
   toneFactor,
   ventanaCerrada,
 } from './alerta-format';
+
+/** Los textos de los factores llegan con punto decimal («-61.3 %»); la app usa coma. */
+function textoConComa(texto: string): string {
+  return texto.replace(/(\d)\.(\d)/g, '$1,$2');
+}
 
 export interface AlertaDrawerProps {
   /** `?id=` de la bandeja. `undefined` = cerrado. */
@@ -111,8 +119,18 @@ function CuerpoAlerta({ alerta, onClose }: { alerta: Alerta; onClose: () => void
    * y sigue sin confirmarse (o cuando su ventana ya se cerró): es lo que
    * alimenta el Anexo 06 / KPI EP.
    */
-  const mostrarResultado = esperaConfirmacion(alerta) || (ventanaCerrada(alerta) && alerta.acierto === null && alerta.estado !== 'descartada');
-  const puedeAtender = alerta.estado === 'activa';
+  const { user, rol } = useSession();
+  /* Mismas reglas que el API (`@mes/types/permisos-alertas-analitica`): la UI
+   * no ofrece acciones que el servidor rechazaría con 403/409. */
+  const puedeOperar = puedeAtenderAlerta(user, alerta.lineaId);
+  const puedeConfirmar = rol !== null && ROLES_CONFIRMAR_EP.includes(rol);
+  const pendienteResultado =
+    esperaConfirmacion(alerta) ||
+    (alerta.estado === 'activa' && ventanaCerrada(alerta) && alerta.acierto === null);
+  const mostrarResultado = pendienteResultado && puedeConfirmar;
+  const puedeAtender = alerta.estado === 'activa' && puedeOperar;
+  const sinPermiso =
+    (alerta.estado === 'activa' && !puedeOperar) || (pendienteResultado && !puedeConfirmar);
 
   return (
     <div className="flex flex-col gap-5">
@@ -126,7 +144,7 @@ function CuerpoAlerta({ alerta, onClose }: { alerta: Alerta; onClose: () => void
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Badge color={SEVERIDAD_BADGE[alerta.severidad]} dot>
-            Severidad {SEVERIDAD_ALERTA_LABEL[alerta.severidad]} · {alerta.probabilidad} %
+            Severidad {SEVERIDAD_ALERTA_LABEL[alerta.severidad]} · {formatPct(alerta.probabilidad)}
           </Badge>
           <Badge color={ESTADO_BADGE[alerta.estado]} dot>
             {ESTADO_ALERTA_LABEL[alerta.estado]}
@@ -141,10 +159,10 @@ function CuerpoAlerta({ alerta, onClose }: { alerta: Alerta; onClose: () => void
           { label: 'Tipo', value: TIPO_ALERTA_LABEL[alerta.tipo] },
           { label: 'Línea', value: etiquetaLinea(alerta) },
           { label: 'Ventana', value: formatVentana(alerta.ventanaInicio, alerta.ventanaFin) },
-          { label: 'Probabilidad', value: `${alerta.probabilidad} %` },
+          { label: 'Probabilidad', value: formatPct(alerta.probabilidad) },
           { label: 'Generada', value: formatDateTime(alerta.generadaEn) },
           {
-            label: 'Atendida por',
+            label: alerta.estado === 'descartada' ? 'Descartada por' : 'Atendida por',
             value: alerta.atendidaPor ?? '—',
           },
         ]}
@@ -161,7 +179,7 @@ function CuerpoAlerta({ alerta, onClose }: { alerta: Alerta; onClose: () => void
           {alerta.factores.map((factor, i) => (
             <li key={factor.texto} className="flex flex-col gap-1.5 border-b border-divider py-2.5">
               <div className="flex items-start justify-between gap-3">
-                <span className="min-w-0 text-body text-text-primary">{factor.texto}</span>
+                <span className="min-w-0 text-body text-text-primary">{textoConComa(factor.texto)}</span>
                 <span className="shrink-0 text-body font-medium tabular text-text-primary">
                   {factor.contribucion} %
                 </span>
@@ -185,6 +203,17 @@ function CuerpoAlerta({ alerta, onClose }: { alerta: Alerta; onClose: () => void
       )}
 
       {puedeAtender && <BloqueAtender alerta={alerta} />}
+
+      {sinPermiso && (
+        <>
+          <Divider />
+          <p className="text-body-sm text-text-secondary">
+            {alerta.estado === 'activa' && !puedeOperar
+              ? 'Solo el jefe, el supervisor o el maquinista de esta línea pueden atender o descartar la alerta.'
+              : 'El resultado real (KPI EP) lo confirman el jefe de producción o el supervisor.'}
+          </p>
+        </>
+      )}
 
       {mostrarResultado && <BloqueResultado alerta={alerta} onConfirmado={onClose} />}
 
@@ -213,12 +242,17 @@ function BloqueAtender({ alerta }: { alerta: Alerta }) {
   const [motivo, setMotivo] = React.useState(MOTIVOS[0].value);
   const [detalle, setDetalle] = React.useState('');
 
+  /* Un doble clic llega antes de que `isPending` se pinte: se bloquea con un ref. */
+  const enviando = React.useRef(false);
+
   const confirmarAtender = async () => {
+    if (enviando.current) return;
     if (accion.trim().length < 10) {
       setError('Describe la acción tomada (mínimo 10 caracteres)');
       return;
     }
     setError(null);
+    enviando.current = true;
     try {
       await atender.mutateAsync({ id: alerta.id, input: { accionTomada: accion.trim() } });
       toast.success('Alerta atendida', {
@@ -230,10 +264,14 @@ function BloqueAtender({ alerta }: { alerta: Alerta }) {
       toast.error('No se pudo atender la alerta', {
         description: e instanceof Error ? e.message : 'Reintenta en unos segundos.',
       });
+    } finally {
+      enviando.current = false;
     }
   };
 
   const confirmarDescartar = async () => {
+    if (enviando.current) return;
+    enviando.current = true;
     const etiqueta = MOTIVOS.find((m) => m.value === motivo)?.label ?? 'Otro motivo';
     const texto = detalle.trim() ? `${etiqueta}: ${detalle.trim()}` : etiqueta;
     try {
@@ -244,6 +282,8 @@ function BloqueAtender({ alerta }: { alerta: Alerta }) {
       toast.error('No se pudo descartar la alerta', {
         description: e instanceof Error ? e.message : 'Reintenta en unos segundos.',
       });
+    } finally {
+      enviando.current = false;
     }
   };
 
@@ -338,12 +378,16 @@ function BloqueResultado({ alerta, onConfirmado }: { alerta: Alerta; onConfirmad
   const [observacion, setObservacion] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
 
+  const enviando = React.useRef(false);
+
   const enviar = async () => {
+    if (enviando.current) return;
     if (ocurrio === '') {
       setError('Indica si el evento ocurrió');
       return;
     }
     setError(null);
+    enviando.current = true;
     try {
       const respuesta = await confirmar.mutateAsync({
         id: alerta.id,
@@ -363,6 +407,8 @@ function BloqueResultado({ alerta, onConfirmado }: { alerta: Alerta; onConfirmad
       toast.error('No se pudo confirmar el resultado', {
         description: e instanceof Error ? e.message : 'Reintenta en unos segundos.',
       });
+    } finally {
+      enviando.current = false;
     }
   };
 

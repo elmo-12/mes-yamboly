@@ -188,10 +188,11 @@ export function UmbralesDrawer({ open, onOpenChange }: UmbralesDrawerProps) {
                 name="notificarN8n"
                 render={({ field }) => (
                   <Switch
+                    disabled
                     checked={field.value ?? false}
                     onCheckedChange={field.onChange}
-                    label="Notificar por n8n / WhatsApp"
-                    supporting="Envía la alerta al grupo Supervisores de línea"
+                    label="Notificar por n8n / WhatsApp · próximamente"
+                    supporting="Próximamente: el envío a n8n aún no está integrado, el valor se guarda pero no tiene efecto"
                   />
                 )}
               />
@@ -200,10 +201,11 @@ export function UmbralesDrawer({ open, onOpenChange }: UmbralesDrawerProps) {
                 name="mostrarTv"
                 render={({ field }) => (
                   <Switch
+                    disabled
                     checked={field.value ?? false}
                     onCheckedChange={field.onChange}
-                    label="Mostrar en Modo TV"
-                    supporting="Panel de planta en el mural del área de producción"
+                    label="Mostrar en Modo TV · próximamente"
+                    supporting="Próximamente: el Modo TV aún no consulta este ajuste y siempre muestra el riesgo"
                   />
                 )}
               />

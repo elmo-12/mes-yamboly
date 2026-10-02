@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, IntersectionType, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
@@ -12,12 +12,12 @@ import {
   MinLength,
 } from 'class-validator';
 import { NIVELES_CAUSA, type NivelCausa } from '@mes/types';
+import { BOOLEANO, ConVersionDto, Recortar } from './comunes.dto';
 
-const BOOLEANO = ({ value }: { value: unknown }): unknown =>
-  value === 'true' ? true : value === 'false' ? false : value;
 
 export class CreateCausaParadaDto {
-  @ApiProperty({ example: 'PN-02-04', description: 'PN-02, PN-02-A o PN-02-01' })
+  @ApiProperty({ example: 'PN-02-04', description: 'PN-02, PN-02-A o PN-02-01. Inmutable.' })
+  @Recortar()
   @IsString()
   @Matches(/^P[A-Z]-\d{2}(-[A-Z0-9]{1,2})?$/, {
     message: 'Formato esperado PP-01, PP-01-A o PP-01-01',
@@ -25,6 +25,7 @@ export class CreateCausaParadaDto {
   codigo!: string;
 
   @ApiProperty({ example: 'Rotura de piñón' })
+  @Recortar()
   @IsString()
   @MinLength(3, { message: 'El nombre es obligatorio' })
   nombre!: string;
@@ -64,7 +65,7 @@ export class CreateCausaParadaDto {
   @ApiPropertyOptional({ default: 0, minimum: 0 })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
+  @IsInt({ message: 'Debe ser un número entero de minutos' })
   @Min(0, { message: 'Debe ser 0 o mayor' })
   tiempoEstandarMin?: number;
 
@@ -89,7 +90,14 @@ export class CreateCausaParadaDto {
   codigoLegado?: string | null;
 }
 
-export class UpdateCausaParadaDto extends PartialType(CreateCausaParadaDto) {}
+/**
+ * Edición (`PATCH /causas-parada/:id`). `codigo`, `nivel` y `parentId` se
+ * aceptan sólo si no cambian (422 si cambian); `clasificacion` sólo en un tipo.
+ */
+export class UpdateCausaParadaDto extends IntersectionType(
+  PartialType(CreateCausaParadaDto),
+  ConVersionDto,
+) {}
 
 export class CausaParadaQueryDto {
   @ApiPropertyOptional({ enum: ['arbol', 'plano'], default: 'arbol' })

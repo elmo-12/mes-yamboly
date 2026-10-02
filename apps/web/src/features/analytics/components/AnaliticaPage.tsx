@@ -20,6 +20,7 @@ import { Forbidden } from '@/components/Forbidden';
 import { PageSkeleton } from '@/components/PageSkeleton';
 import { useRequireRole } from '@/hooks/use-require-role';
 import { useSession } from '@/hooks/use-session';
+import { ROLES_GESTIONAR_MODELO, ROLES_VER_ANALITICA } from '@mes/types';
 import {
   useAnaliticaResumen,
   useEstadoDatos,
@@ -35,7 +36,8 @@ import { PrediccionesTab } from './PrediccionesTab';
 import { ReentrenarModal } from './ReentrenarModal';
 import { ResumenTab } from './ResumenTab';
 
-const ROLES = ['jefe', 'supervisor', 'investigador'] as const;
+/** Mismos roles que el API (`@mes/types/permisos-alertas-analitica`). */
+const ROLES = ROLES_VER_ANALITICA;
 
 const TABS = ['resumen', 'patrones', 'predicciones', 'modelo'] as const;
 type AnaliticaTab = (typeof TABS)[number];
@@ -64,7 +66,11 @@ export function AnaliticaPage() {
   const searchParams = useSearchParams();
 
   const tab: AnaliticaTab = esTab(searchParams.get('tab')) ? (searchParams.get('tab') as AnaliticaTab) : 'resumen';
-  const estadoForzado = searchParams.get('estado') ?? undefined;
+  /* `?estado=insuficiente|suficiente` fuerza la variante para demos/QA; en el
+   * build de producción se ignora (el API también lo ignora con NODE_ENV=production). */
+  const estadoForzado =
+    process.env.NODE_ENV === 'production' ? undefined : (searchParams.get('estado') ?? undefined);
+  const puedeGestionarModelo = rol !== null && ROLES_GESTIONAR_MODELO.includes(rol);
 
   const irA = React.useCallback(
     (siguiente: AnaliticaTab) => {
@@ -153,7 +159,7 @@ export function AnaliticaPage() {
             <Button variant="secondary" onClick={() => irA('modelo')}>
               {insuficiente ? 'Ver metodología' : 'Ver modelo'}
             </Button>
-            {!insuficiente && rol === 'jefe' && (
+            {!insuficiente && puedeGestionarModelo && (
               <Button
                 variant="primary"
                 icon={<Icon name="arrow-path" />}
@@ -245,9 +251,13 @@ export function AnaliticaPage() {
             reentrenar.mutate(undefined, {
               onSuccess: (job) =>
                 toast.success('Reentrenamiento iniciado', {
-                  description: `${job.mensaje} · la versión ${job.version} quedará vigente al terminar.`,
+                  /* La candidata solo queda vigente si supera a la actual: no se promete. */
+                  description: `${job.mensaje} · al terminar se decide si la versión ${job.version} reemplaza a la vigente.`,
                 }),
-              onError: () => toast.error('No se pudo iniciar el reentrenamiento'),
+              onError: (error) =>
+                toast.error('No se pudo iniciar el reentrenamiento', {
+                  description: error instanceof Error ? error.message : 'Reintenta en unos segundos.',
+                }),
             });
           }}
         />

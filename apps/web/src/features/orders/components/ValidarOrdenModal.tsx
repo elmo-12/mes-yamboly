@@ -2,9 +2,10 @@
 
 import * as React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, Checkbox, Modal, ModalContent, Overline, toast } from '@mes/ui';
+import { AlertCard, Button, Checkbox, Modal, ModalContent, Overline, toast } from '@mes/ui';
 import type { OrdenListItem, ValidateOrdenInput } from '@mes/types';
 import { formatNumber } from '@mes/shared';
+import { mensajeDeError } from '@/services/api/form-errors';
 import { queryKeys } from '@/services/api/query-keys';
 import { useOrdenMermas, useOrdenParadas, useValidarOrden } from '../hooks';
 
@@ -33,6 +34,10 @@ export function ValidarOrdenModal({ open, onOpenChange, orden }: ValidarOrdenMod
   const queryClient = useQueryClient();
   const paradas = useOrdenParadas(open ? orden.codigo : undefined);
   const mermas = useOrdenMermas(open ? orden.codigo : undefined);
+  /* Bloqueo síncrono: el doble clic disparaba dos validaciones antes de que
+     `isPending` deshabilitara el botón. */
+  const enviando = React.useRef(false);
+  const abiertas = paradas.data?.data.filter((p) => p.fin === null).length ?? 0;
 
   React.useEffect(() => {
     if (!open) setMarcados([]);
@@ -41,7 +46,9 @@ export function ValidarOrdenModal({ open, onOpenChange, orden }: ValidarOrdenMod
   const soporte: Record<ItemChecklist, string> = {
     produccionRegistrada: `${formatNumber(orden.producido)} u de ${formatNumber(orden.planificado)} u planificadas`,
     paradasConCausa: paradas.data
-      ? `${paradas.data.resumen.cantidad} paradas · ${paradas.data.resumen.minutos} min · todas con causa codificada`
+      ? `${paradas.data.resumen.cantidad} paradas · ${paradas.data.resumen.minutos} min${
+          abiertas > 0 ? ` · ${abiertas} sin cerrar` : ' · todas cerradas y con causa codificada'
+        }`
       : 'Cargando paradas…',
     mermasClasificadas: mermas.data
       ? `${mermas.data.resumen.cantidad} registros · ${formatNumber(mermas.data.resumen.kg, 1)} kg clasificados`
@@ -52,6 +59,8 @@ export function ValidarOrdenModal({ open, onOpenChange, orden }: ValidarOrdenMod
   const completo = ITEMS.every((i) => marcados.includes(i.id));
 
   const confirmar = async () => {
+    if (enviando.current) return;
+    enviando.current = true;
     try {
       await validar.mutateAsync({
         produccionRegistrada: true,
@@ -66,8 +75,10 @@ export function ValidarOrdenModal({ open, onOpenChange, orden }: ValidarOrdenMod
       onOpenChange(false);
     } catch (error) {
       toast.error('No se pudo validar la orden', {
-        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        description: mensajeDeError(error, 'Inténtalo de nuevo.'),
       });
+    } finally {
+      enviando.current = false;
     }
   };
 
@@ -82,7 +93,7 @@ export function ValidarOrdenModal({ open, onOpenChange, orden }: ValidarOrdenMod
             </Button>
             <Button
               variant="primary"
-              disabled={!completo}
+              disabled={!completo || validar.isPending || abiertas > 0 || !paradas.data}
               loading={validar.isPending}
               onClick={confirmar}
             >
@@ -92,6 +103,13 @@ export function ValidarOrdenModal({ open, onOpenChange, orden }: ValidarOrdenMod
         }
       >
         <div className="flex flex-col gap-4">
+          {abiertas > 0 && (
+            <AlertCard
+              variant="warning"
+              title="Cierra la parada abierta antes de validar"
+              description="La orden tiene paradas sin hora de fin: ciérralas desde la pestaña Paradas."
+            />
+          )}
           <Overline>Checklist de cierre</Overline>
           <p className="text-body leading-[22px] text-neutral-text">
             Al validar, la orden se sella: no se podrán editar paradas, mermas ni producción sin

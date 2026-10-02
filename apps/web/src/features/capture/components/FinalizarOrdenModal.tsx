@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
+  AlertCard,
   Button,
   Icon,
   Input,
@@ -15,8 +16,17 @@ import {
   cn,
   toast,
 } from '@mes/ui';
-import { computeOee, formatNumber, formatPct, formatSpeed } from '@mes/shared';
-import { finalizeOrdenSchema, type FinalizeOrdenInput } from '@mes/types';
+import {
+  MARGEN_PLAUSIBILIDAD_PRODUCCION,
+  ahoraPlanta,
+  formatNumber,
+  formatPct,
+  formatSpeed,
+  minutosEntreLocal,
+  oeeDeOrden,
+  produccionMaximaPlausible,
+} from '@mes/shared';
+import { TIEMPO_REGISTRO_MAX_SEG, finalizeOrdenSchema, type FinalizeOrdenInput } from '@mes/types';
 import { useFinalizarOrden, useOrden, useOrdenMermas, useOrdenParadas } from '@/features/orders/hooks';
 import type { ContextoLinea } from '../tipos';
 import { formatTriCorto, useTriTimer } from '../use-tri-timer';
@@ -24,8 +34,6 @@ import { AdjuntarFoto } from './AdjuntarFoto';
 import { ContextoCaptura } from './ContextoCaptura';
 import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
 
-/** Minutos programados de un turno de planta (D 06:00–18:00 / N 18:00–06:00). */
-const MINUTOS_TURNO = 720;
 /** Tolerancia del control cruzado producción ↔ codificadora (spec 04.J). */
 const TOLERANCIA_CONTEO_PCT = 0.5;
 
@@ -48,6 +56,8 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
   const { data: paradas } = useOrdenParadas(abierto ? ordenId : undefined);
   const { data: mermas } = useOrdenMermas(abierto ? ordenId : undefined);
   const finalizar = useFinalizarOrden(ordenId);
+  /* Bloqueo síncrono del envío: el doble clic llega antes que `isPending`. */
+  const enviando = React.useRef(false);
 
   const form = useForm<FinalizeOrdenInput>({
     resolver: zodResolver(finalizeOrdenSchema),
@@ -82,22 +92,32 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
   /* Estándar congelado en la orden al iniciarla (u/min del par producto × línea). */
   const velocidadEstandar = orden?.velocidadEstandar ?? contexto.velocidadEstandar;
 
-  const oee = computeOee({
-    tiempoPlanificadoMin: MINUTOS_TURNO,
+  /* Misma fórmula que el servidor (`oeeDeOrden`): el tiempo planificado es la
+     duración real de la orden, de su inicio a este cierre. */
+  const duracionMin = orden ? minutosEntreLocal(orden.inicio, ahoraPlanta()) : 0;
+  const oee = oeeDeOrden({
+    duracionMin,
     paradasMin,
-    unidadesProducidas: producido,
-    unidadesBuenas: Math.min(producido, conteo),
+    producido,
+    conteoCodificadora: conteo,
     velocidadEstandar,
   });
+  const maximoPlausible =
+    orden && velocidadEstandar > 0 ? produccionMaximaPlausible(velocidadEstandar, duracionMin) : null;
+  const implausible = maximoPlausible !== null && producido > maximoPlausible;
+  const paradaAbierta = paradas?.data.find((p) => p.fin === null) ?? null;
 
   const guardar = form.handleSubmit(async (values) => {
+    if (enviando.current) return;
+    enviando.current = true;
     const segundos = tri.detener();
     try {
       await finalizar.mutateAsync({
         ...values,
         comentario: values.comentario || undefined,
         evidenciaUrl: foto?.url,
-        tiempoRegistroSeg: segundos,
+        /* Un modal abierto más de 1 h no mide el registro: se descarta. */
+        tiempoRegistroSeg: segundos > TIEMPO_REGISTRO_MAX_SEG ? 0 : segundos,
       });
       toast.success(
         `Orden ${contexto.ordenCodigo ?? ''} finalizada en ${formatTriCorto(segundos)}`.trim(),
@@ -108,6 +128,8 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
       toast.error(
         campos.length > 0 ? 'Revisa los campos marcados' : mensajeDeError(e, 'No se pudo finalizar la orden'),
       );
+    } finally {
+      enviando.current = false;
     }
   });
 
@@ -127,6 +149,7 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
               variant="primary"
               icon={<Icon name="check" size={20} />}
               loading={finalizar.isPending}
+              disabled={finalizar.isPending || Boolean(paradaAbierta) || implausible}
               onClick={() => void guardar()}
             >
               Finalizar orden
@@ -135,6 +158,13 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
         }
       >
         <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
+          {paradaAbierta && (
+            <AlertCard
+              variant="warning"
+              title="Cierra la parada abierta antes de finalizar"
+              description={`La parada iniciada a las ${paradaAbierta.inicio.slice(11, 16)} sigue abierta: finalízala para que la orden cierre con sus minutos de parada.`}
+            />
+          )}
           <ContextoCaptura
             items={[
               contexto.etiqueta,
@@ -150,9 +180,11 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
               label="Total producido (unidades)"
               hint={
                 errores.producido?.message ??
-                `Planificado ${formatNumber(orden?.planificado ?? contexto.plan)} u`
+                (implausible && maximoPlausible !== null
+                  ? `No es posible en ${formatNumber(Math.round(duracionMin))} min: máximo ${formatNumber(maximoPlausible)} u (×${formatNumber(MARGEN_PLAUSIBILIDAD_PRODUCCION, 1)} la velocidad estándar)`
+                  : `Planificado ${formatNumber(orden?.planificado ?? contexto.plan)} u`)
               }
-              destructive={Boolean(errores.producido)}
+              destructive={Boolean(errores.producido) || implausible}
               {...form.register('producido')}
             />
             <Input
@@ -188,7 +220,7 @@ export function FinalizarOrdenModal({ contexto, abierto, onOpenChange }: Finaliz
             {...form.register('comentario')}
           />
           <div className="flex flex-col gap-2">
-            <Overline>{`OEE estimado del turno · ${formatPct(oee.oee)}`}</Overline>
+            <Overline>{`OEE estimado de la orden · ${formatPct(oee.oee)}`}</Overline>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <MiniKpi
                 label="Disponibilidad"

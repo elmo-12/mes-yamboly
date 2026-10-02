@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, IntersectionType, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsIn,
@@ -11,6 +11,7 @@ import {
   Min,
 } from 'class-validator';
 import { ESTADOS_CATALOGO, type EstadoCatalogo } from '@mes/types';
+import { ConVersionDto } from './comunes.dto';
 
 /**
  * Alta de par producto × línea (`POST /velocidades-estandar`) — espejo de
@@ -64,7 +65,10 @@ export class CreateVelocidadEstandarDto {
 }
 
 /** Edición parcial (`PATCH /velocidades-estandar/:id`). */
-export class UpdateVelocidadEstandarDto extends PartialType(CreateVelocidadEstandarDto) {}
+export class UpdateVelocidadEstandarDto extends IntersectionType(
+  PartialType(CreateVelocidadEstandarDto),
+  ConVersionDto,
+) {}
 
 export class VelocidadEstandarQueryDto {
   @ApiPropertyOptional({ example: 'PRD-1110001' })

@@ -50,10 +50,10 @@ export function colorEstadoPrediccion(estado: string): BadgeColor {
  * Formatea el delta que publica el modelo frente a la versión anterior.
  * `undefined` cuando todavía no hay con qué comparar (primer entrenamiento).
  */
-function delta(valor: number | undefined, unidad = 'pp'): string | undefined {
+function delta(valor: number | undefined, unidad = 'pp', decimales = 1): string | undefined {
   if (valor === undefined) return undefined;
   const signo = valor > 0 ? '+' : valor < 0 ? '−' : '';
-  return `${signo}${formatNumber(Math.abs(valor), 1)} ${unidad}`;
+  return `${signo}${formatNumber(Math.abs(valor), decimales)} ${unidad}`;
 }
 
 function tendencia(valor: number | undefined): 'up' | 'down' | 'flat' {
@@ -73,17 +73,23 @@ function etiquetaTipo(tipo: string): string {
 /** `Analítica / Resumen` (Figma 2156:4301). */
 export function ResumenTab({ resumen }: ResumenTabProps) {
   const { kpis, insights, riesgoPorLinea, prediccionesActivas, variablesModelo } = resumen;
+  /* Sin confirmaciones en el Anexo 06 la EP no está medida: «—», no «0,0 %». */
+  const epMedida = (kpis.epConfirmadas ?? 1) > 0;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Exactitud de predicción (EP)"
-          value={formatPct(kpis.ep)}
-          trend={tendencia(kpis.epDelta)}
+          value={epMedida ? formatPct(kpis.ep) : '—'}
+          trend={epMedida ? tendencia(kpis.epDelta) : 'flat'}
           favorable={(kpis.epDelta ?? 0) >= 0}
-          delta={delta(kpis.epDelta)}
-          context="vs modelo anterior"
+          delta={epMedida ? delta(kpis.epDelta) : undefined}
+          context={
+            epMedida
+              ? `${formatNumber(kpis.epConfirmadas ?? 0)} predicciones confirmadas`
+              : 'Sin predicciones confirmadas todavía'
+          }
         />
         <KpiCard
           label="Precisión"
@@ -91,7 +97,7 @@ export function ResumenTab({ resumen }: ResumenTabProps) {
           trend={tendencia(kpis.precisionDelta)}
           favorable={(kpis.precisionDelta ?? 0) >= 0}
           delta={delta(kpis.precisionDelta)}
-          context={`sobre ${formatNumber(kpis.alertas30d)} alertas`}
+          context="del modelo vigente"
         />
         <KpiCard
           label="Recall"
@@ -105,8 +111,8 @@ export function ResumenTab({ resumen }: ResumenTabProps) {
           label="Alertas generadas (30 d)"
           value={formatNumber(kpis.alertas30d)}
           trend={tendencia(kpis.alertas30dDelta)}
-          favorable={(kpis.alertas30dDelta ?? 0) >= 0}
-          delta={delta(kpis.alertas30dDelta, 'alertas')}
+          favorable={(kpis.alertas30dDelta ?? 0) <= 0}
+          delta={delta(kpis.alertas30dDelta, 'alertas', 0)}
           context="últimos 30 días"
         />
       </div>

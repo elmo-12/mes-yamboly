@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import type { AuditEvent as AuditEventDto, TipoAuditoria } from '@mes/types';
 import { AuditEvent } from '../../database/entities';
 import type { AuthUser } from '../decorators/current-user';
+import { insertarConIdSecuencial } from '../utils/ids';
 import { ahoraIso } from '../utils/query';
 
 export interface RegistrarAuditoria {
@@ -23,9 +24,9 @@ export class AuditService {
   constructor(@InjectRepository(AuditEvent) private readonly eventos: Repository<AuditEvent>) {}
 
   async registrar(entrada: RegistrarAuditoria): Promise<AuditEventDto> {
-    const total = await this.eventos.count();
+    const marca = Date.now().toString(36).toUpperCase();
     const evento = this.eventos.create({
-      id: `AUD-${Date.now().toString(36).toUpperCase()}-${total + 1}`,
+      id: '',
       ordenId: entrada.ordenId,
       fecha: entrada.fecha ?? ahoraIso(),
       usuario: entrada.usuario?.nombre ?? 'Sistema',
@@ -33,7 +34,9 @@ export class AuditService {
       tipo: entrada.tipo,
       texto: entrada.texto,
     });
-    return this.eventos.save(evento);
+    /* Mismo formato `AUD-<marca>-<n>`, sin la carrera de `count() + 1`: dos
+     * capturas simultáneas ya no chocan (500) al escribir su bitácora. */
+    return insertarConIdSecuencial(this.eventos, evento, (n) => `AUD-${marca}-${n}`);
   }
 
   /** Bitácora de una orden, descendente por fecha. */

@@ -47,23 +47,24 @@ export class ReportsController {
   @Post('exportar')
   @HttpCode(202)
   @ApiOperation({ summary: 'Encola una exportación XLSX (06.D)' })
-  exportar(@Body() dto: ExportRequestDto, @CurrentUser() user?: AuthUser): Promise<ExportJob> {
-    return this.exports.crear(dto, user?.nombre ?? 'Sistema');
+  exportar(@Body() dto: ExportRequestDto, @CurrentUser() user: AuthUser): Promise<ExportJob> {
+    return this.exports.crear(dto, user);
   }
 
   @Get('exportaciones')
   @ApiOkResponse({ description: 'Historial de exportaciones, más recientes primero' })
-  async exportaciones(): Promise<{ data: ExportJob[] }> {
-    return { data: await this.exports.historial() };
+  async exportaciones(@CurrentUser() user: AuthUser): Promise<{ data: ExportJob[] }> {
+    return { data: await this.exports.historial(user) };
   }
 
   @Get('exportaciones/:id/descargar')
   @ApiOperation({ summary: 'Descarga el archivo generado' })
   async descargar(
     @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
-    const { stream, nombre, tipo } = await this.exports.descargar(id);
+    const { stream, nombre, tipo } = await this.exports.descargar(id, user);
     res.set({
       'Content-Type': tipo,
       'Content-Disposition': `attachment; filename="${nombre}"`,

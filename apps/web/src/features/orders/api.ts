@@ -6,9 +6,12 @@ import type {
   OrdenesResumen,
   OrdenListItem,
   OrdenListQuery,
+  OrdenSapListItem,
+  OrdenSapQuery,
   Paginated,
   ParadaListItem,
   RegistroVelocidadListItem,
+  SincronizacionOrdenesSap,
   ValidateOrdenInput,
 } from '@mes/types';
 import { api } from '@/services/api/client';
@@ -50,4 +53,11 @@ export const ordersApi = {
     api.post<OrdenListItem>(`/ordenes/${id}/finalizar`, input),
   validar: (id: string, input: ValidateOrdenInput) =>
     api.post<OrdenListItem>(`/ordenes/${id}/validar`, input),
+};
+
+/** Órdenes SAP pendientes: la materia prima del alta de una orden. */
+export const ordenesSapApi = {
+  list: (query: OrdenSapQuery = {}) =>
+    api.get<{ data: OrdenSapListItem[] }>('/ordenes-sap', { lineaId: query.lineaId, q: query.q }),
+  sincronizar: () => api.post<SincronizacionOrdenesSap>('/ordenes-sap/sincronizar', {}),
 };

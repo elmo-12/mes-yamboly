@@ -6,6 +6,62 @@ import {
 import type { EstadoCatalogo, TipoProcesoLinea, Turno, TurnoInfo } from './common';
 
 /* ------------------------------------------------------------------ */
+/* Helpers de formulario compartidos por los mantenedores              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Número obligatorio de formulario: `''`, `null` o texto no numérico dan
+ * `mensaje` en español (antes `z.coerce` convertía `''` en 0 en silencio o
+ * mostraba «Expected number, received nan»). Acepta coma decimal.
+ */
+export function numeroRequerido(mensaje = 'Ingresa un número') {
+  return z.preprocess(
+    (v) => {
+      if (v === '' || v === null || v === undefined) return Number.NaN;
+      if (typeof v === 'string') return Number(v.trim().replace(',', '.'));
+      return v;
+    },
+    z.number({ invalid_type_error: mensaje, required_error: mensaje }).finite(mensaje),
+  );
+}
+
+/**
+ * Número opcional desde un input: `''`, `null` o espacios quedan en `null`
+ * (`z.coerce.number()` los convertía en 0, que es un valor distinto de «sin dato»).
+ */
+export function numeroOpcional(mensaje = 'Ingresa un número') {
+  return z.preprocess(
+    (v) => {
+      if (v === '' || v === null || v === undefined) return null;
+      if (typeof v === 'string') {
+        const t = v.trim();
+        return t === '' ? null : Number(t.replace(',', '.'));
+      }
+      return v;
+    },
+    z.number({ invalid_type_error: mensaje }).finite(mensaje).nullable(),
+  );
+}
+
+/** Texto obligatorio sin espacios sobrantes: `'   '` ya no pasa `min(n)`. */
+export function textoRequerido(min: number, mensaje: string) {
+  return z.string({ required_error: mensaje }).trim().min(min, mensaje);
+}
+
+/**
+ * Versión leída del registro, para el control de concurrencia optimista: la API
+ * responde 409 si otra persona lo guardó después. Opcional por compatibilidad.
+ */
+const versionLeida = z.number().int().positive().optional();
+
+/** Mensaje del 409 de concurrencia optimista (lo comparten API y web). */
+export const MENSAJE_CONFLICTO_VERSION =
+  'Otra persona modificó este registro mientras lo editabas. Recarga para ver los cambios y vuelve a intentarlo.';
+
+/** Capacidad nominal máxima admitida para una línea (u/min). */
+export const CAPACIDAD_LINEA_MAX = 100_000;
+
+/* ------------------------------------------------------------------ */
 /* Líneas                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -30,10 +86,12 @@ export interface Linea {
   tipoProceso: TipoProcesoLinea;
   estado: EstadoCatalogo;
   /**
-   * Unidades por minuto nominales de la línea: máximo `velocidadUnidMin`
-   * de sus pares producto × línea activos.
+   * Capacidad nominal en unidades por minuto, capturada en el mantenedor. El
+   * OEE usa la velocidad del par producto × línea, no este valor.
    */
   capacidadUnidadesMin: number;
+  /** Versión para la concurrencia optimista (sube en cada edición). */
+  version?: number;
 }
 
 /** Fila del mantenedor de líneas con los contadores ya resueltos. */
@@ -46,21 +104,31 @@ export interface LineaListItem extends Linea {
 
 /** Alta/edición de línea (`POST /lineas`, `PATCH /lineas/:id`). */
 export const lineaSchema = z.object({
+  /** Inmutable tras el alta: el id `LIN-<codigo>` lo referencian órdenes y paradas. */
   codigo: z
     .string()
+    .trim()
     .regex(/^[A-Z]{3,4}-[A-Z]?\d{1,2}$/, 'Formato esperado LLEN-M2, EXTR-2 o MOLD-A3'),
-  nombre: z.string().min(3, 'El nombre es obligatorio'),
-  nombreCorto: z.string().min(2, 'El nombre corto es obligatorio'),
+  nombre: textoRequerido(3, 'El nombre es obligatorio'),
+  nombreCorto: textoRequerido(2, 'El nombre corto es obligatorio'),
   tipoProceso: z.enum(TIPOS_PROCESO_LINEA, {
     errorMap: () => ({ message: 'Selecciona el tipo de proceso' }),
   }),
   estado: z.enum(ESTADOS_CATALOGO).default('activo'),
-  capacidadUnidadesMin: z.coerce.number().min(0, 'Debe ser 0 o mayor').default(0),
+  capacidadUnidadesMin: numeroRequerido('Ingresa la capacidad (0 si no aplica)')
+    .pipe(
+      z
+        .number()
+        .min(0, 'Debe ser 0 o mayor')
+        .max(CAPACIDAD_LINEA_MAX, `Máximo ${CAPACIDAD_LINEA_MAX.toLocaleString('es-PE')} u/min`),
+    )
+    .default(0),
+  version: versionLeida,
 });
 export type LineaInput = z.infer<typeof lineaSchema>;
 
-/** Edición parcial (`PATCH /lineas/:id`). */
-export const updateLineaSchema = lineaSchema.partial();
+/** Edición parcial (`PATCH /lineas/:id`); el código no se edita. */
+export const updateLineaSchema = lineaSchema.omit({ codigo: true }).partial();
 export type UpdateLineaInput = z.infer<typeof updateLineaSchema>;
 
 /* ------------------------------------------------------------------ */
@@ -131,18 +199,25 @@ export interface Producto {
   /** Nombre del sabor (informativo, derivado del maestro): `Capuccino`. */
   sabor: string;
   estado: EstadoCatalogo;
+  /** Versión para la concurrencia optimista (sube en cada edición). */
+  version?: number;
 }
 
 export const productoSchema = z.object({
-  codigo: z.string().regex(/^\d{7}$/, 'Formato esperado 1110001 (7 dígitos)'),
-  descripcionLarga: z.string().min(3, 'La descripción larga es obligatoria'),
-  descripcionCorta: z.string().min(3, 'La descripción corta es obligatoria'),
-  nombre: z.string().min(3, 'El nombre es obligatorio'),
+  /** Inmutable tras el alta: el id `PRD-<codigo>` lo referencian las órdenes. */
+  codigo: z.string().trim().regex(/^\d{7}$/, 'Formato esperado 1110001 (7 dígitos)'),
+  descripcionLarga: textoRequerido(3, 'La descripción larga es obligatoria'),
+  descripcionCorta: textoRequerido(3, 'La descripción corta es obligatoria'),
+  nombre: textoRequerido(3, 'El nombre es obligatorio'),
   alias: z.string().nullable().default(null),
   marca: z.string().nullable().default(null),
   presentacion: z.string().nullable().default(null),
-  unidadesPorCaja: z.coerce.number().int().min(1, 'Debe ser 1 o mayor').default(1),
-  pesoKg: z.coerce.number().positive('El peso debe ser mayor que 0'),
+  unidadesPorCaja: numeroRequerido('Ingresa las unidades por caja')
+    .pipe(z.number().int('Debe ser un número entero').min(1, 'Debe ser 1 o mayor'))
+    .default(1),
+  pesoKg: numeroRequerido('Ingresa el peso').pipe(
+    z.number().positive('El peso debe ser mayor que 0').max(10_000, 'Peso fuera de rango'),
+  ),
   saborId: z.string().nullable().default(null),
   /**
    * Texto derivado del maestro; queda vacío en los productos cuya heurística de
@@ -151,11 +226,12 @@ export const productoSchema = z.object({
    */
   sabor: z.string().default(''),
   estado: z.enum(ESTADOS_CATALOGO).default('activo'),
+  version: versionLeida,
 });
 export type ProductoInput = z.infer<typeof productoSchema>;
 
-/** Edición parcial (`PATCH /productos/:id`). */
-export const updateProductoSchema = productoSchema.partial();
+/** Edición parcial (`PATCH /productos/:id`); el código no se edita. */
+export const updateProductoSchema = productoSchema.omit({ codigo: true }).partial();
 export type UpdateProductoInput = z.infer<typeof updateProductoSchema>;
 
 /* ------------------------------------------------------------------ */
@@ -193,6 +269,8 @@ export interface VelocidadEstandar {
   /** Minutos de arranque del par; `null` si el maestro no lo define. */
   arranqueMin: number | null;
   estado: EstadoCatalogo;
+  /** Versión para la concurrencia optimista (sube en cada edición). */
+  version?: number;
 }
 
 /** Fila de la matriz producto × línea con los textos ya resueltos. */
@@ -207,19 +285,24 @@ export interface VelocidadEstandarListItem extends VelocidadEstandar {
 export const velocidadEstandarSchema = z.object({
   productoId: z.string().min(1, 'Selecciona un producto'),
   lineaId: z.string().min(1, 'Selecciona una línea'),
-  velocidadUnidHora: z.coerce
-    .number()
-    .int('Debe ser un número entero')
-    .min(1, 'Debe ser mayor que 0')
-    .max(60_000, 'Velocidad fuera de rango'),
-  mermaEstandarPct: z.coerce
-    .number()
-    .min(0, 'Debe ser 0 o mayor')
-    .max(100, 'No puede superar 100 %')
+  velocidadUnidHora: numeroRequerido('Ingresa la velocidad en u/h').pipe(
+    z
+      .number()
+      .int('Debe ser un número entero')
+      .min(1, 'Debe ser mayor que 0')
+      .max(60_000, 'Velocidad fuera de rango'),
+  ),
+  mermaEstandarPct: numeroRequerido('Ingresa la merma (0 si no aplica)')
+    .pipe(z.number().min(0, 'Debe ser 0 o mayor').max(100, 'No puede superar 100 %'))
     .default(0),
-  cipMin: z.coerce.number().min(0, 'Debe ser 0 o mayor').nullable().default(null),
-  arranqueMin: z.coerce.number().min(0, 'Debe ser 0 o mayor').nullable().default(null),
+  cipMin: numeroOpcional()
+    .pipe(z.number().min(0, 'Debe ser 0 o mayor').nullable())
+    .default(null),
+  arranqueMin: numeroOpcional()
+    .pipe(z.number().min(0, 'Debe ser 0 o mayor').nullable())
+    .default(null),
   estado: z.enum(ESTADOS_CATALOGO).default('activo'),
+  version: versionLeida,
 });
 export type VelocidadEstandarInput = z.infer<typeof velocidadEstandarSchema>;
 
@@ -244,6 +327,8 @@ export interface NodoCausaBase {
   /** Id del nodo padre; `null` en las raíces. */
   parentId: string | null;
   estado: EstadoCatalogo;
+  /** Versión para la concurrencia optimista (sube en cada edición). */
+  version?: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -269,7 +354,10 @@ export interface CausaParada {
   nivel: NivelCausa;
   /** Id del nodo padre; `null` en los tipos raíz (`PP-01`, `PN-02`, `PN-03`, `PN-04`, `PS-05`). */
   parentId: string | null;
-  /** `programada` (CIP, cambio de producto) o `imprevista`. */
+  /**
+   * `programada` (CIP, cambio de producto) o `imprevista`. Se hereda del tipo
+   * raíz: sólo se edita en el tipo y se propaga a su subárbol.
+   */
   clasificacion: 'programada' | 'imprevista';
   afectaOee: boolean;
   requiereEvidencia: boolean;
@@ -278,10 +366,16 @@ export interface CausaParada {
   /** Ids de líneas donde aplica; vacío = todas. */
   lineasAplicables: string[];
   estado: EstadoCatalogo;
-  /** Nº de paradas históricas — se conservan aunque se dé de baja la causa. */
+  /**
+   * Nº de paradas registradas con esta causa, calculado al consultar (paradas
+   * con `causaId` + el histórico heredado del maestro). Se conservan aunque se
+   * dé de baja la causa.
+   */
   paradasHistoricas: number;
   /** Código del sistema original (`PNP`, `RUT04`, `FAL02`, `IMP10`); `null` si no existía. */
   codigoLegado?: string | null;
+  /** Versión para la concurrencia optimista (sube en cada edición). */
+  version?: number;
 }
 
 /** Nodo del árbol devuelto por `GET /causas-parada?formato=arbol`. */
@@ -290,23 +384,38 @@ export interface CausaParadaNodo extends CausaParada {
 }
 
 export const causaParadaSchema = z.object({
+  /** Inmutable tras el alta: el id `CPA-<codigo>` lo referencian las paradas. */
   codigo: z
     .string()
+    .trim()
     .regex(/^P[A-Z]-\d{2}(-[A-Z0-9]{1,2})?$/, 'Formato esperado PP-01, PP-01-A o PP-01-01'),
-  nombre: z.string().min(3, 'El nombre es obligatorio'),
+  nombre: textoRequerido(3, 'El nombre es obligatorio'),
   nivel: z.enum(NIVELES_CAUSA),
   parentId: z.string().nullable().default(null),
   clasificacion: z.enum(['programada', 'imprevista']).default('imprevista'),
   afectaOee: z.boolean().default(true),
   requiereEvidencia: z.boolean().default(false),
   requiereSolicitud: z.boolean().default(false),
-  tiempoEstandarMin: z.coerce.number().min(0, 'Debe ser 0 o mayor').default(0),
+  tiempoEstandarMin: numeroRequerido('Ingresa los minutos (0 si no aplica)')
+    .pipe(z.number().int('Debe ser un número entero de minutos').min(0, 'Debe ser 0 o mayor'))
+    .default(0),
   lineasAplicables: z.array(z.string()).default([]),
   estado: z.enum(ESTADOS_CATALOGO).default('activo'),
   /** Código del sistema original; opcional y anulable. */
   codigoLegado: z.string().nullable().optional(),
+  version: versionLeida,
 });
 export type CausaParadaInput = z.infer<typeof causaParadaSchema>;
+
+/**
+ * Edición (`PATCH /causas-parada/:id`): código, nivel y padre son inmutables
+ * (definen el id y la posición en el árbol); `clasificacion` sólo se acepta en
+ * un tipo raíz y se propaga a su subárbol.
+ */
+export const updateCausaParadaSchema = causaParadaSchema
+  .omit({ codigo: true, nivel: true, parentId: true })
+  .partial();
+export type UpdateCausaParadaInput = z.infer<typeof updateCausaParadaSchema>;
 
 /* ------------------------------------------------------------------ */
 /* Causas de merma (árbol Tipo → Clasificación → Causa)                */
@@ -357,8 +466,13 @@ export interface CausaMerma {
   /** Obliga a `numeroSolicitud` en el wizard de merma. */
   requiereSolicitud: boolean;
   estado: EstadoCatalogo;
-  /** Nº de mermas históricas — se conservan aunque se dé de baja la causa. */
+  /**
+   * Nº de mermas registradas con esta causa, calculado al consultar (mermas
+   * con `causaId` + el histórico heredado del maestro).
+   */
   mermasHistoricas: number;
+  /** Versión para la concurrencia optimista (sube en cada edición). */
+  version?: number;
 }
 
 /** Nodo del árbol devuelto por `GET /causas-merma?formato=arbol`. */
@@ -367,10 +481,12 @@ export interface CausaMermaNodo extends CausaMerma {
 }
 
 export const causaMermaSchema = z.object({
+  /** Inmutable tras el alta: el id `CME-<codigo>` lo referencian las mermas. */
   codigo: z
     .string()
+    .trim()
     .regex(/^M[A-Z]-\d{2}(-[A-Z0-9]{1,2})?$/, 'Formato esperado MP-01, MP-01-A o MP-01-01'),
-  nombre: z.string().min(3, 'El nombre es obligatorio'),
+  nombre: textoRequerido(3, 'El nombre es obligatorio'),
   nivel: z.enum(NIVELES_CAUSA_MERMA),
   parentId: z.string().nullable().default(null),
   aplicaA: z.array(z.enum(TIPOS_MERMA)).default([]),
@@ -379,8 +495,15 @@ export const causaMermaSchema = z.object({
   requiereComentario: z.boolean().default(false),
   requiereSolicitud: z.boolean().default(false),
   estado: z.enum(ESTADOS_CATALOGO).default('activo'),
+  version: versionLeida,
 });
 export type CausaMermaInput = z.infer<typeof causaMermaSchema>;
+
+/** Edición (`PATCH /causas-merma/:id`): código, nivel y padre son inmutables. */
+export const updateCausaMermaSchema = causaMermaSchema
+  .omit({ codigo: true, nivel: true, parentId: true })
+  .partial();
+export type UpdateCausaMermaInput = z.infer<typeof updateCausaMermaSchema>;
 
 /* ------------------------------------------------------------------ */
 /* Turnos                                                              */

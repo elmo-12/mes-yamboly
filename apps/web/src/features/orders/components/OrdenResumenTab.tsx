@@ -70,7 +70,13 @@ export function OrdenResumenTab({ orden, paradas, cargandoParadas }: OrdenResume
             <Skeleton className="h-4 w-80" />
           </div>
         ) : (
-          <TurnoTimeline inicio={orden.inicio} fin={orden.fin} paradas={paradas} />
+          <TurnoTimeline
+            inicio={orden.inicio}
+            fin={orden.fin}
+            fecha={orden.fecha}
+            turno={orden.turno}
+            paradas={paradas}
+          />
         )}
       </div>
 
@@ -92,6 +98,16 @@ export function OrdenResumenTab({ orden, paradas, cargandoParadas }: OrdenResume
                 label: 'Planificado',
                 value: `${formatNumber(orden.planificado)} u · turno ${TURNO_LABEL[orden.turno]}`,
               },
+              ...(orden.planSap
+                ? [
+                    {
+                      label: 'Plan SAP',
+                      value: `# ${orden.planSap.numero} · ${formatDate(orden.planSap.fecha)} · turno ${
+                        TURNO_LABEL[orden.planSap.turno]
+                      } · ${formatNumber(orden.planSap.planificadoCajas)} cjs`,
+                    },
+                  ]
+                : []),
               { label: 'Inicio real', value: formatDateTime(orden.inicio) },
               { label: 'Fin real', value: orden.fin ? formatDateTime(orden.fin) : 'En curso' },
             ]}

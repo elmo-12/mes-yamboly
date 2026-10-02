@@ -30,7 +30,37 @@ export const envSchema = z.object({
   ENTRENAMIENTO_CRON: z.string().default('0 3 * * 1'),
   /** Ya se leía en `inferencia.scheduler.ts`; aquí sólo se valida el formato. */
   INFERENCIA_ACTIVA: z.string().optional(),
+  /**
+   * Saltos de proxy de confianza delante de la API (`trust proxy` de Express):
+   * 0 = la API se expone directa y `req.ip` es la IP del socket; 1 = detrás del
+   * proxy de Next, que fija `X-Forwarded-For` con la IP real del cliente.
+   */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
   SWAGGER_PATH: z.string().default('docs'),
+  /**
+   * Base PostgreSQL del sistema legado (yamboli-back) de la que se leen, en
+   * sólo lectura, las órdenes SAP pendientes. Vacía = sincronización de
+   * órdenes SAP desactivada (se registra una vez en el log al arrancar).
+   */
+  ORIGEN_DATABASE_URL: z.string().optional(),
+  /** Minutos entre dos sincronizaciones automáticas de órdenes SAP. */
+  ORDENES_SAP_INTERVALO_MIN: z.coerce.number().positive().default(5),
+  /**
+   * Servicio IoT (`iot-yambo`) del que el tablero de Tiempo real toma el conteo
+   * y la velocidad reales de los sensores (cabecera `X-API-Key`). Sólo lectura:
+   * la API únicamente hace GET. Sin URL o sin clave la integración queda
+   * desactivada (se registra una vez en el log).
+   */
+  IOT_API_URL: z.string().url().optional().or(z.literal('')),
+  IOT_API_KEY: z.string().optional(),
+  /** Timeout por petición al IoT: el snapshot del tablero espera esta respuesta. */
+  IOT_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  /**
+   * Líneas del MES enlazadas al IoT, separadas por comas: `LIN-MOLD-A3` (por
+   * nombre de lineal) o `LIN-MOLD-A3=MOLDEADORA A3` (explícito). Vacía = todas
+   * las líneas cuyo nombre coincide con una lineal con sensores.
+   */
+  IOT_LINEAS: z.string().optional(),
 });
 
 export type EnvVars = z.infer<typeof envSchema>;

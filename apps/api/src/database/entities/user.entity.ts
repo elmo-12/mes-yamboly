@@ -50,6 +50,14 @@ export class User {
   @Column('text')
   passwordHash!: string;
 
+  /**
+   * Versión de las sesiones emitidas. Viaja en el JWT (`tv`) y `JwtStrategy`
+   * rechaza los tokens con una versión distinta: incrementarla revoca todas
+   * las sesiones abiertas del usuario (logout, cambio de contraseña, baja).
+   */
+  @Column('integer', { default: 0 })
+  tokenVersion!: number;
+
   /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
   @Index()
   @ManyToOne(() => Linea, { onDelete: 'SET NULL', nullable: true })

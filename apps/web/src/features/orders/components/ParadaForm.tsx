@@ -7,6 +7,7 @@ import { Input, Select, Switch, Textarea } from '@mes/ui';
 import type { CausaParadaNodo, ParadaListItem } from '@mes/types';
 import { useUsuarios } from '@/features/catalogs/hooks';
 import { especificasDeTipo } from '@/features/catalogs/causas';
+import { isoConHora, isoDesdeHora } from '@/features/capture/tipos';
 import { hora } from '../format';
 
 /**
@@ -31,8 +32,10 @@ export const paradaFormSchema = z
     responsableId: z.string().min(1, 'Selecciona un responsable'),
     afectaOee: z.boolean(),
   })
-  .refine((v) => !v.horaFin || v.horaFin > v.horaInicio, {
-    message: 'La hora de fin debe ser posterior a la de inicio',
+  /* Fin < inicio en el reloj = cruce de medianoche (23:50 → 00:10, día siguiente),
+   * como resuelve `isoDeHoraEnOrden`; sólo se rechaza una duración de 0 min. */
+  .refine((v) => !v.horaFin || v.horaFin !== v.horaInicio, {
+    message: 'La hora de fin debe ser distinta a la de inicio',
     path: ['horaFin'],
   });
 
@@ -52,17 +55,43 @@ export function valoresDeParada(parada: ParadaListItem): ParadaFormValues {
   };
 }
 
-/** `07:42` + fecha de la OF → `2026-08-28T07:42:00`. */
-export function aIso(fecha: string, hhmm: string): string {
-  return `${fecha}T${hhmm}:00`;
+function diaSiguiente(fecha: string): string {
+  return new Date(Date.parse(`${fecha}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 }
 
-/** Minutos entre dos `HH:mm` del mismo turno. */
+/**
+ * `HH:mm` tecleado → ISO local de Lima de una parada de la orden, sin mover la
+ * parada de día (antes se le pegaba siempre `orden.fecha`: editar sólo la
+ * acción de una parada del 03/10 02:00 la movía al 02/10 02:00).
+ *
+ * - Si la hora no cambió respecto de `original`, se conserva `original` tal cual.
+ * - Si cambió y había `original`, se conserva su fecha (`isoConHora`), salvo que
+ *   así quede antes de `noAntesDe` (cruce de medianoche): entonces el día siguiente.
+ * - Sin `original` (parada retroactiva): el primer día, desde el inicio de la
+ *   orden, en que esa hora no queda antes de `noAntesDe`; si eso cae en el
+ *   futuro, la regla de captura de `isoDesdeHora` (hoy, o ayer si es futura).
+ */
+export function isoDeHoraEnOrden(
+  hhmm: string,
+  orden: { inicio: string },
+  original?: string | null,
+  noAntesDe: string = orden.inicio,
+): string {
+  if (original && hora(original) === hhmm) return original;
+  const limite = noAntesDe.slice(0, 16);
+  const base = original ?? `${orden.inicio.slice(0, 10)}T00:00:00`;
+  let candidato = isoConHora(base, hhmm);
+  if (candidato.slice(0, 16) < limite) candidato = isoConHora(`${diaSiguiente(base.slice(0, 10))}T00:00:00`, hhmm);
+  return Date.parse(`${candidato}-05:00`) > Date.now() ? isoDesdeHora(hhmm) : candidato;
+}
+
+/** Minutos entre dos `HH:mm` del mismo turno (cruza medianoche: 23:50 → 00:10 = 20). */
 export function duracionMin(inicio: string, fin: string): number | null {
   if (!/^\d{2}:\d{2}$/.test(inicio) || !/^\d{2}:\d{2}$/.test(fin)) return null;
   const [hi = '0', mi = '0'] = inicio.split(':');
   const [hf = '0', mf = '0'] = fin.split(':');
-  const minutos = Number(hf) * 60 + Number(mf) - (Number(hi) * 60 + Number(mi));
+  let minutos = Number(hf) * 60 + Number(mf) - (Number(hi) * 60 + Number(mi));
+  if (minutos < 0) minutos += 24 * 60;
   return minutos > 0 ? minutos : null;
 }
 

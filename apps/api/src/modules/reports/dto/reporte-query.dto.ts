@@ -14,6 +14,8 @@ export const PERIODOS_REPORTE = [
 ] as const;
 export type PeriodoReporte = (typeof PERIODOS_REPORTE)[number];
 
+export const CLASIFICACIONES_PARADA = ['programada', 'imprevista'] as const;
+
 export const COMPARACIONES = ['periodo_anterior', 'anio_anterior'] as const;
 export type Comparacion = (typeof COMPARACIONES)[number];
 
@@ -39,7 +41,7 @@ export class ReporteQueryDto {
   @IsOptional()
   lineaId?: string | string[];
 
-  @ApiPropertyOptional({ description: 'M · T · N', example: 'M,T' })
+  @ApiPropertyOptional({ description: 'D · N (repetible o separado por comas)', example: 'D' })
   @IsOptional()
   turno?: Turno | Turno[];
 
@@ -47,6 +49,14 @@ export class ReporteQueryDto {
   @IsOptional()
   @IsIn(COMPARACIONES, { message: 'comparar debe ser periodo_anterior o anio_anterior' })
   comparar: Comparacion = 'periodo_anterior';
+
+  @ApiPropertyOptional({
+    enum: CLASIFICACIONES_PARADA,
+    description: 'Solo /reportes/paradas: limita a paradas programadas o imprevistas (no programadas)',
+  })
+  @IsOptional()
+  @IsIn(CLASIFICACIONES_PARADA, { message: 'clasificacion debe ser programada o imprevista' })
+  clasificacion?: (typeof CLASIFICACIONES_PARADA)[number];
 
   @ApiPropertyOptional({ description: 'Sólo mock: fuerza un error simulado' })
   @IsOptional()

@@ -4,9 +4,17 @@ import * as React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Drawer, DrawerContent, Input, Overline, Select, toast } from '@mes/ui';
-import { ESTADOS_CATALOGO, TIPOS_PROCESO_LINEA, TIPO_PROCESO_LABEL, lineaSchema } from '@mes/types';
+import {
+  CAPACIDAD_LINEA_MAX,
+  ESTADOS_CATALOGO,
+  TIPOS_PROCESO_LINEA,
+  TIPO_PROCESO_LABEL,
+  lineaSchema,
+} from '@mes/types';
 import type { EstadoCatalogo, Linea, LineaInput } from '@mes/types';
+import { esConflictoVersion, TOAST_CONFLICTO_VERSION } from '@/features/catalogs/errores';
 import { useActualizarLinea, useCrearLinea } from '@/features/catalogs/hooks';
+import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
 
 const ESTADO_LABEL: Record<EstadoCatalogo, string> = {
   activo: 'Activa',
@@ -30,6 +38,7 @@ function valoresDesde(linea: Linea): LineaInput {
     tipoProceso: linea.tipoProceso,
     estado: linea.estado,
     capacidadUnidadesMin: linea.capacidadUnidadesMin,
+    version: linea.version,
   };
 }
 
@@ -58,6 +67,7 @@ export function LineaDrawer({ open, onOpenChange, linea }: LineaDrawerProps) {
     control,
     handleSubmit,
     reset,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<LineaInput>({
     resolver: zodResolver(lineaSchema),
@@ -81,8 +91,17 @@ export function LineaDrawer({ open, onOpenChange, linea }: LineaDrawerProps) {
       }
       onOpenChange(false);
     } catch (error) {
+      if (esConflictoVersion(error)) {
+        toast.error(TOAST_CONFLICTO_VERSION.titulo, { description: TOAST_CONFLICTO_VERSION.descripcion });
+        onOpenChange(false);
+        return;
+      }
+      if (aplicarErroresApi<LineaInput>(error, setError).length > 0) {
+        toast.error('Revisa los campos marcados', { description: 'La línea no se guardó.' });
+        return;
+      }
       toast.error(enEdicion ? 'No se pudo actualizar la línea' : 'No se pudo crear la línea', {
-        description: error instanceof Error ? error.message : 'Revisa el código y el tipo de proceso.',
+        description: mensajeDeError(error, 'Revisa el código y el tipo de proceso.'),
       });
     }
   });
@@ -114,9 +133,19 @@ export function LineaDrawer({ open, onOpenChange, linea }: LineaDrawerProps) {
               label="Código de línea"
               placeholder="LLEN-M2"
               autoFocus={!enEdicion}
-              {...register('codigo')}
+              /* El código define el id (`LIN-<código>`) que referencian órdenes
+                 y paradas: no se edita una vez creada la línea. */
+              disabled={enEdicion}
+              {...register('codigo', {
+                setValueAs: (v: unknown) => (typeof v === 'string' ? v.trim().toUpperCase() : v),
+              })}
               destructive={Boolean(errors.codigo)}
-              hint={errors.codigo?.message ?? 'Formato LLEN-M2, EXTR-2 o MOLD-A3.'}
+              hint={
+                errors.codigo?.message ??
+                (enEdicion
+                  ? 'El código no se puede cambiar: lo usan las órdenes y paradas registradas.'
+                  : 'Formato LLEN-M2, EXTR-2 o MOLD-A3. No se podrá cambiar después.')
+              }
             />
             <Input
               label="Nombre de la línea"
@@ -155,6 +184,7 @@ export function LineaDrawer({ open, onOpenChange, linea }: LineaDrawerProps) {
               type="number"
               step="0.1"
               min={0}
+              max={CAPACIDAD_LINEA_MAX}
               {...register('capacidadUnidadesMin')}
               destructive={Boolean(errors.capacidadUnidadesMin)}
               hint={
@@ -171,6 +201,7 @@ export function LineaDrawer({ open, onOpenChange, linea }: LineaDrawerProps) {
                   options={ESTADOS_CATALOGO.map((e) => ({ value: e, label: ESTADO_LABEL[e] }))}
                   value={field.value}
                   onValueChange={field.onChange}
+                  hint="Al desactivarla se dan de baja sus velocidades estándar; deja de aparecer en planta."
                 />
               )}
             />

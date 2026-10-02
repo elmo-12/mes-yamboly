@@ -1,15 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
   Matches,
+  Validate,
+  ValidatorConstraint,
+  type ValidatorConstraintInterface,
   Max,
   MaxLength,
   Min,
@@ -19,6 +24,11 @@ import {
 import {
   CLAVES_CRITERIO_TCI,
   FORMATOS_EXPORT,
+  HORA_REAL,
+  ITEMS_ENCUESTA_TSP,
+  TIEMPO_PRETEST_MAX_MIN,
+  TIEMPO_PRETEST_MIN_MIN,
+  esFechaIsoReal,
   KPIS_TESIS,
   TIPOS_REGISTRO_TCI,
   type ClaveCriterioTci,
@@ -29,27 +39,41 @@ import {
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
-const HORA = /^\d{2}:\d{2}(:\d{2})?$/;
+
+/** Rechaza `2026-02-31`, `2026-13-45`: el formato solo no basta. */
+@ValidatorConstraint({ name: 'fechaReal' })
+class FechaRealConstraint implements ValidatorConstraintInterface {
+  validate(valor: unknown): boolean {
+    return typeof valor !== 'string' || !FECHA.test(valor) || esFechaIsoReal(valor);
+  }
+  defaultMessage(): string {
+    return 'La fecha no existe en el calendario';
+  }
+}
 
 /* --- Anexo 02 · carga del pretest -------------------------------- */
 
 export class RegistroPretestDto {
   @ApiProperty({ example: '2026-08-25' })
-  @Matches(FECHA, { message: 'Fecha inválida' })
+  @Matches(FECHA, { message: 'Fecha inválida (usa AAAA-MM-DD)' })
+  @Validate(FechaRealConstraint)
   fecha!: string;
 
   @ApiProperty({ example: 'Parada PN-02-01 · Llenadora M2' })
   @IsString()
   @MinLength(3, { message: 'Describe el evento' })
+  @MaxLength(200, { message: 'Máximo 200 caracteres' })
   eventoRegistrado!: string;
 
   @ApiProperty({ example: '07:45:00' })
-  @Matches(HORA, { message: 'Hora inválida' })
+  @Matches(HORA_REAL, { message: 'Hora inválida (usa HH:mm entre 00:00 y 23:59)' })
   horaInicioRegistro!: string;
 
-  @ApiProperty({ example: 2.8, description: 'Minutos con un decimal' })
+  @ApiProperty({ example: 2.8, description: `Minutos con un decimal (${TIEMPO_PRETEST_MIN_MIN}–${TIEMPO_PRETEST_MAX_MIN})` })
   @Type(() => Number)
-  @Min(0.1, { message: 'Debe ser mayor que 0' })
+  @IsNumber({ allowNaN: false, allowInfinity: false }, { message: 'El tiempo debe ser un número de minutos' })
+  @Min(TIEMPO_PRETEST_MIN_MIN, { message: `Debe ser de al menos ${TIEMPO_PRETEST_MIN_MIN} min` })
+  @Max(TIEMPO_PRETEST_MAX_MIN, { message: `No puede superar ${TIEMPO_PRETEST_MAX_MIN} min` })
   tiempoMin!: number;
 
   @ApiPropertyOptional({ maxLength: 300 })
@@ -63,6 +87,7 @@ export class CargarPretestDto {
   @ApiProperty({ type: [RegistroPretestDto] })
   @IsArray({ message: 'registros debe ser una lista' })
   @ArrayMinSize(1, { message: 'Carga al menos un registro' })
+  @ArrayMaxSize(500, { message: 'Máximo 500 registros por hoja' })
   @ValidateNested({ each: true })
   @Type(() => RegistroPretestDto)
   registros!: RegistroPretestDto[];
@@ -74,11 +99,13 @@ export class ValidarTciDto {
   @ApiPropertyOptional({ example: '2026-08-28', description: 'Por defecto, el primer día con captura del postest' })
   @IsOptional()
   @Matches(FECHA, { message: 'desde debe tener formato YYYY-MM-DD' })
+  @Validate(FechaRealConstraint)
   desde?: string;
 
   @ApiPropertyOptional({ example: '2026-08-28', description: 'Por defecto, hoy' })
   @IsOptional()
   @Matches(FECHA, { message: 'hasta debe tener formato YYYY-MM-DD' })
+  @Validate(FechaRealConstraint)
   hasta?: string;
 
   @ApiPropertyOptional({ isArray: true, enum: TIPOS_REGISTRO_TCI, description: 'Por defecto, los tres tipos' })
@@ -157,16 +184,21 @@ export class ImportarFuenteDto {
 
 /* --- Anexo 05 · lista de cotejo CFS ------------------------------- */
 
+/**
+ * `cumple` verifica la funcionalidad (fija `verificadaEn`). Sólo `observacion`
+ * guarda la nota sin verificarla; omitirla conserva la anterior.
+ */
 export class VerificacionCfsDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsBoolean({ message: 'cumple debe ser booleano' })
-  cumple!: boolean;
+  cumple?: boolean;
 
-  @ApiPropertyOptional({ maxLength: 300, default: '' })
+  @ApiPropertyOptional({ maxLength: 300 })
   @IsOptional()
   @IsString()
   @MaxLength(300, { message: 'Máximo 300 caracteres' })
-  observacion: string = '';
+  observacion?: string;
 }
 
 /* --- Encuesta pública (Anexo 04) ---------------------------------- */
@@ -174,7 +206,8 @@ export class VerificacionCfsDto {
 export class EncuestaRespuestaDto {
   @ApiProperty({ type: [Number], example: [5, 4, 4, 5, 4, 4, 5, 4], description: '8 valores Likert 1–5' })
   @IsArray({ message: 'respuestas debe ser una lista' })
-  @ArrayMinSize(8, { message: 'Responde los 8 ítems' })
+  @ArrayMinSize(ITEMS_ENCUESTA_TSP, { message: 'Responde los 8 ítems' })
+  @ArrayMaxSize(ITEMS_ENCUESTA_TSP, { message: 'El cuestionario tiene exactamente 8 ítems' })
   @Type(() => Number)
   @IsInt({ each: true, message: 'Responde de 1 a 5' })
   @Min(1, { each: true, message: 'Responde de 1 a 5' })

@@ -363,6 +363,7 @@ export function aplicarOverrides(
       ...c,
       cumple: forzado,
       override: forzado,
+      cumpleRegla: c.cumple,
       detalle: `Override manual (${forzado ? 'válido' : 'inválido'}) · ${c.detalle}`,
     };
   });

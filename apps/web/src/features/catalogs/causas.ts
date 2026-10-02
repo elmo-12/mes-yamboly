@@ -17,6 +17,8 @@ export type CausaPlana<T extends NodoCausaBase> = T & {
   raizId: string;
   /** Profundidad en el árbol: 0 raíz · 1 intermedio · 2 hoja. */
   nivelIndice: number;
+  /** `true` si el nodo y todos sus ancestros están activos (usable en captura). */
+  ramaActiva: boolean;
 };
 
 /** Causa de parada aplanada — atajo para las vistas que ya la usaban así. */
@@ -33,11 +35,13 @@ export function aplanarCausas<T extends NodoArbol<T>>(
   nodos: readonly T[],
   raizId?: string,
   nivelIndice = 0,
+  padreActivo = true,
 ): CausaPlana<T>[] {
   return nodos.flatMap((nodo) => {
     const raiz = raizId ?? nodo.id;
-    const plana = { ...nodo, raizId: raiz, nivelIndice } as CausaPlana<T>;
-    return [plana, ...aplanarCausas<T>(nodo.hijos, raiz, nivelIndice + 1)];
+    const ramaActiva = padreActivo && nodo.estado === 'activo';
+    const plana = { ...nodo, raizId: raiz, nivelIndice, ramaActiva } as CausaPlana<T>;
+    return [plana, ...aplanarCausas<T>(nodo.hijos, raiz, nivelIndice + 1, ramaActiva)];
   });
 }
 
@@ -61,7 +65,8 @@ export function hojasDeTipo<T extends NodoArbol<T>>(
   nivelHoja: string,
 ): CausaPlana<T>[] {
   return aplanarCausas<T>(nodos).filter(
-    (c) => c.raizId === tipoId && c.nivel === nivelHoja && c.estado === 'activo',
+    /* Una hoja activa bajo un tipo o una categoría inactivos no se ofrece. */
+    (c) => c.raizId === tipoId && c.nivel === nivelHoja && c.ramaActiva,
   );
 }
 
@@ -71,7 +76,7 @@ export function todasLasHojas<T extends NodoArbol<T>>(
   nivelHoja: string,
 ): CausaPlana<T>[] {
   return aplanarCausas<T>(nodos)
-    .filter((c) => c.nivel === nivelHoja && c.estado === 'activo')
+    .filter((c) => c.nivel === nivelHoja && c.ramaActiva)
     .sort((a, b) => a.codigo.localeCompare(b.codigo));
 }
 

@@ -21,6 +21,7 @@ import {
 import { TIPOS_PROCESO_LINEA } from '@mes/types';
 import type { Linea, Producto, TipoProcesoLinea, VelocidadEstandarListItem } from '@mes/types';
 import { formatNumber } from '@mes/shared';
+import { useSession } from '@/hooks/use-session';
 import { EliminarVelocidadModal } from './EliminarVelocidadModal';
 import { VelocidadEstandarModal } from './VelocidadEstandarModal';
 
@@ -76,6 +77,10 @@ export interface MatrizVelocidadesProps {
 export function MatrizVelocidades({ producto, lineas, pares }: MatrizVelocidadesProps) {
   const [editar, setEditar] = React.useState<{ lineaId?: string; par?: VelocidadEstandarListItem }>();
   const [eliminar, setEliminar] = React.useState<VelocidadEstandarListItem>();
+  /* `DELETE /velocidades-estandar/:id` es sólo del jefe: al supervisor no se
+     le ofrece una acción que acabaría en 403. */
+  const { user } = useSession();
+  const puedeDarDeBaja = user?.rol === 'jefe';
 
   const grupos = React.useMemo(() => agrupar(lineas), [lineas]);
   const porLinea = React.useMemo(
@@ -124,7 +129,7 @@ export function MatrizVelocidades({ producto, lineas, pares }: MatrizVelocidades
                           linea={linea}
                           par={par}
                           onEditar={() => setEditar({ par })}
-                          onEliminar={() => setEliminar(par)}
+                          onEliminar={puedeDarDeBaja ? () => setEliminar(par) : undefined}
                         />
                       ) : (
                         <CeldaVacia
@@ -178,7 +183,8 @@ function CeldaPar({
   linea: Linea;
   par: VelocidadEstandarListItem;
   onEditar: () => void;
-  onEliminar: () => void;
+  /** Ausente si el rol no puede dar de baja el par. */
+  onEliminar?: () => void;
 }) {
   return (
     <div className="flex items-start gap-1">
@@ -221,10 +227,12 @@ function CeldaPar({
             <Icon name="edit" size={16} />
             Editar velocidad
           </DropdownMenuItem>
-          <DropdownMenuItem danger onSelect={onEliminar}>
-            <Icon name="archive" size={16} />
-            Dar de baja
-          </DropdownMenuItem>
+          {onEliminar && (
+            <DropdownMenuItem danger onSelect={onEliminar}>
+              <Icon name="archive" size={16} />
+              Dar de baja
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

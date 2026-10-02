@@ -530,6 +530,7 @@ export function importarFuente(
     filasOk: nuevos.length,
     filasRechazadas: rechazos.length,
     filasDuplicadas: duplicadas,
+    filasConflicto: rechazos.filter((r) => r.conflicto).length,
     rechazos,
     ...(periodo ? { periodo } : {}),
   };

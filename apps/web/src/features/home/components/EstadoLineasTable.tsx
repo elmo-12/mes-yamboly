@@ -60,12 +60,14 @@ export interface EstadoLineasTableProps {
  * frame resuelve solo con texto.
  */
 export function EstadoLineasTable({ lineas, turnoLabel }: EstadoLineasTableProps) {
+  /* Mismo criterio que la cabecera del Inicio («N líneas activas»). */
+  const conOrden = lineas.filter((l) => l.estado !== 'sin_orden').length;
   return (
     <section className="flex w-full flex-col gap-4">
       <SectionTitle
         divider
         title="Estado de líneas"
-        description={`Situación de las ${lineas.length} líneas de producción al minuto${
+        description={`${lineas.length} líneas · ${conOrden} con orden en curso${
           turnoLabel ? ` · turno ${turnoLabel}` : ''
         }`}
       />
@@ -100,8 +102,15 @@ export function EstadoLineasTable({ lineas, turnoLabel }: EstadoLineasTableProps
               const avance = linea.plan > 0 ? Math.min(100, (linea.producido / linea.plan) * 100) : 0;
               return (
                 <TRow key={linea.lineaId}>
-                  <TCell className={`${COLS.linea} font-medium whitespace-nowrap`}>
-                    {linea.lineaCodigo} · {linea.lineaNombre}
+                  {/* M10: con `whitespace-nowrap` un nombre largo ensanchaba la
+                      columna y empujaba el resto de columnas fuera de la vista. */}
+                  <TCell className={`${COLS.linea} max-w-[200px] font-medium`}>
+                    <span
+                      className="block truncate whitespace-nowrap"
+                      title={`${linea.lineaCodigo} · ${linea.lineaNombre}`}
+                    >
+                      {linea.lineaCodigo} · {linea.lineaNombre}
+                    </span>
                   </TCell>
                   <TCell className={COLS.estado}>
                     <Badge color={estado.color} dot>
@@ -120,7 +129,7 @@ export function EstadoLineasTable({ lineas, turnoLabel }: EstadoLineasTableProps
                       <span className="text-text-disabled">—</span>
                     )}
                   </TCell>
-                  <TCell className={`${COLS.producto} text-neutral-text`}>
+                  <TCell className={`${COLS.producto} max-w-[200px] truncate text-neutral-text`}>
                     {linea.orden?.productoNombre ?? <span className="text-text-disabled">—</span>}
                   </TCell>
                   <TCell className={COLS.producido}>

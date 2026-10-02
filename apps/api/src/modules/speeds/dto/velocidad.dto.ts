@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { TIEMPO_REGISTRO_MAX_SEG } from '@mes/types';
 import {
   IsInt,
   IsNotEmpty,
@@ -26,13 +27,17 @@ export class CreateVelocidadDto {
 
   @ApiProperty({ example: 118, minimum: 0.1, maximum: 1000, description: 'Unidades por minuto' })
   @Type(() => Number)
-  @IsNumber({}, { message: 'La velocidad debe ser numérica' })
+  @IsNumber(
+    { allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 },
+    { message: 'La velocidad debe ser numérica (máximo 2 decimales)' },
+  )
   @IsPositive({ message: 'La velocidad debe ser mayor que 0' })
   @Max(1000, { message: 'Velocidad fuera de rango' })
   velocidadReal!: number;
 
   @ApiPropertyOptional({ maxLength: 200 })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @MaxLength(200, { message: 'Máximo 200 caracteres' })
   motivo?: string;
@@ -42,11 +47,18 @@ export class CreateVelocidadDto {
   @IsNotEmpty({ message: 'Selecciona un responsable' })
   responsableId!: string;
 
-  @ApiPropertyOptional({ default: 0, description: 'Segundos de registro — KPI TRI' })
+  @ApiPropertyOptional({
+    default: 0,
+    maximum: TIEMPO_REGISTRO_MAX_SEG,
+    description: 'Segundos de registro — KPI TRI',
+  })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
+  @IsInt({ message: 'El tiempo de registro debe ser un número entero de segundos' })
+  @Min(0, { message: 'El tiempo de registro no puede ser negativo' })
+  @Max(TIEMPO_REGISTRO_MAX_SEG, {
+    message: `El tiempo de registro no puede superar ${TIEMPO_REGISTRO_MAX_SEG} s`,
+  })
   tiempoRegistroSeg?: number;
 }
 

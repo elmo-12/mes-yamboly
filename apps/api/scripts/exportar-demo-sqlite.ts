@@ -190,6 +190,12 @@ async function main(): Promise<void> {
         consulta.where('t.fecha >= :desde', { desde });
       } else if (HIJAS_DE_ORDEN.has(tabla)) {
         consulta.where('t."ordenId" IN (SELECT id FROM orden_fabricacion WHERE fecha >= :desde)', { desde });
+      } else if (tabla === 'orden_sap') {
+        /* Pendientes siempre; consumidas, sólo si su orden entra en el recorte. */
+        consulta.where(
+          't."ordenId" IS NULL OR t."ordenId" IN (SELECT id FROM orden_fabricacion WHERE fecha >= :desde)',
+          { desde },
+        );
       } else if (tabla === 'deteccion_iot') {
         consulta.where('t."detectadaEn" >= :desde', { desde });
       }

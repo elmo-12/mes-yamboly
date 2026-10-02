@@ -1,5 +1,7 @@
 import { http, HttpResponse } from 'msw';
+import { ROLES_SUBIR_EVIDENCIA } from '@mes/types';
 import { API, errores, preludio } from './_utils';
+import { exigeRoles } from './auth';
 
 /**
  * Subida de fotos de evidencia en modo demostración.
@@ -16,6 +18,9 @@ export const attachmentsHandlers = [
   http.post(`${API}/evidencias`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
+
+    const { respuesta } = exigeRoles(request, ROLES_SUBIR_EVIDENCIA);
+    if (respuesta) return respuesta;
 
     const formData = await request.formData();
     const archivo = formData.get('archivo');

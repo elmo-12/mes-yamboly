@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import type { MermaListItem, Paginated } from '@mes/types';
+import { ROLES_CAPTURA_MERMA, type MermaListItem, type Paginated } from '@mes/types';
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user';
+import { Roles } from '../../common/decorators/roles';
 import { ApiErrorDto } from '../../common/dto/api-error.dto';
 import { CreateMermaDto, MermaQueryDto, UpdateMermaDto } from './dto/merma.dto';
 import { ScrapService } from './scrap.service';
@@ -19,6 +20,9 @@ export class ScrapController {
   }
 
   @Post()
+  @Roles(...ROLES_CAPTURA_MERMA)
+  @ApiResponse({ status: 403, description: 'Rol sin permiso, línea ajena u orden cerrada', type: ApiErrorDto })
+  @ApiResponse({ status: 409, description: 'Orden validada', type: ApiErrorDto })
   @ApiOperation({ summary: 'Registra una merma (MP · EP · PT)' })
   @ApiResponse({ status: 201, description: 'Merma creada' })
   @ApiResponse({ status: 422, description: 'Cantidad ≤ 0 o causa inválida', type: ApiErrorDto })
@@ -27,6 +31,9 @@ export class ScrapController {
   }
 
   @Patch(':id')
+  @Roles(...ROLES_CAPTURA_MERMA)
+  @ApiResponse({ status: 403, description: 'Rol sin permiso, línea ajena u orden cerrada', type: ApiErrorDto })
+  @ApiResponse({ status: 409, description: 'Orden validada', type: ApiErrorDto })
   @ApiOperation({ summary: 'Edita una merma' })
   @ApiResponse({ status: 404, description: 'No encontrada', type: ApiErrorDto })
   actualizar(

@@ -13,6 +13,7 @@ export * from './velocidad-estandar.entity';
 export * from './causa-parada.entity';
 export * from './causa-merma.entity';
 export * from './orden-fabricacion.entity';
+export * from './orden-sap.entity';
 export * from './parada.entity';
 export * from './merma.entity';
 export * from './registro-velocidad.entity';

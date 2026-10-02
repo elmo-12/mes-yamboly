@@ -6,7 +6,8 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import { Repository } from 'typeorm';
 import type { EnvVars } from '../../config/env.validation';
-import type { AuthUser, JwtPayload } from '../../common/decorators/current-user';
+import type { AuthUser } from '../../common/decorators/current-user';
+import type { JwtPayloadConVersion } from './auth.service';
 import { User } from '../../database/entities';
 
 /**
@@ -38,9 +39,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(payload: JwtPayload): Promise<AuthUser> {
+  async validate(payload: JwtPayloadConVersion): Promise<AuthUser> {
     const user = await this.usuarios.findOne({ where: { id: payload.sub } });
-    if (!user || !user.activo) {
+    /* `tv` distinto = sesión revocada (logout, contraseña nueva o baja). */
+    if (!user || !user.activo || (payload.tv ?? 0) !== (user.tokenVersion ?? 0)) {
       throw new UnauthorizedException('Credenciales inválidas o sesión expirada');
     }
     return {

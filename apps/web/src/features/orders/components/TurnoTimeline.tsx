@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import { Overline } from '@mes/ui';
-import type { ParadaListItem } from '@mes/types';
-import { formatNumber } from '@mes/shared';
+import type { ParadaListItem, Turno } from '@mes/types';
+import { finDeTurno, formatNumber } from '@mes/shared';
 import { hora } from '../format';
 
 type Tono = 'produccion' | 'planificada' | 'imprevista';
@@ -30,6 +30,9 @@ export interface TurnoTimelineProps {
   /** ISO-8601 de inicio y fin de la orden. */
   inicio: string;
   fin: string | null;
+  /** Fecha operativa y turno de la orden: acotan el eje mientras sigue en curso. */
+  fecha: string;
+  turno: Turno;
   paradas: readonly ParadaListItem[];
 }
 
@@ -38,11 +41,11 @@ export interface TurnoTimelineProps {
  * producción / paradas + eje de horas + leyenda. Va directamente sobre la
  * página, sin card (regla MDS: solo cards funcionales).
  */
-export function TurnoTimeline({ inicio, fin, paradas }: TurnoTimelineProps) {
+export function TurnoTimeline({ inicio, fin, fecha, turno, paradas }: TurnoTimelineProps) {
   const { segmentos, totalMin, etiquetas } = React.useMemo(() => {
     const t0 = new Date(inicio).getTime();
-    /* Turno D/N = 12 h: si aún no cierra, se estima el ancho del timeline sobre esa duración. */
-    const t1 = fin ? new Date(fin).getTime() : t0 + 12 * 3600_000;
+    /* Si aún no cierra, el eje llega hasta el fin de su turno (no 12 h desde el inicio). */
+    const t1 = new Date(fin ?? finDeTurno(fecha, turno)).getTime();
     const total = Math.max(1, Math.round((t1 - t0) / 60_000));
 
     const intervalos = [...paradas]
@@ -75,7 +78,7 @@ export function TurnoTimeline({ inicio, fin, paradas }: TurnoTimelineProps) {
     }
 
     return { segmentos: out, totalMin: total, etiquetas: marcas };
-  }, [fin, inicio, paradas]);
+  }, [fecha, fin, inicio, paradas, turno]);
 
   const porTono = (tono: Tono) =>
     segmentos.filter((s) => s.tono === tono).reduce((acc, s) => acc + s.minutos, 0);

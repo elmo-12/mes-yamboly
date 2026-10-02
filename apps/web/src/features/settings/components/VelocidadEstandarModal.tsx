@@ -7,6 +7,7 @@ import { Button, Input, Modal, ModalContent, Select, Switch, toast } from '@mes/
 import { velocidadEstandarSchema } from '@mes/types';
 import type { Producto, VelocidadEstandar, VelocidadEstandarInput } from '@mes/types';
 import { formatNumber } from '@mes/shared';
+import { esConflictoVersion, TOAST_CONFLICTO_VERSION } from '@/features/catalogs/errores';
 import {
   useActualizarVelocidadEstandar,
   useCrearVelocidadEstandar,
@@ -41,6 +42,7 @@ function valoresDesde(velocidad: VelocidadEstandar): VelocidadEstandarInput {
     cipMin: velocidad.cipMin,
     arranqueMin: velocidad.arranqueMin,
     estado: velocidad.estado,
+    version: velocidad.version,
   };
 }
 
@@ -124,6 +126,11 @@ export function VelocidadEstandarModal({
       }
       onOpenChange(false);
     } catch (error) {
+      if (esConflictoVersion(error)) {
+        toast.error(TOAST_CONFLICTO_VERSION.titulo, { description: TOAST_CONFLICTO_VERSION.descripcion });
+        onOpenChange(false);
+        return;
+      }
       /* 409: par producto × línea ya existe — el detalle del contrato solo trae
          los ids, así que el mensaje legible es `error.message`. */
       if (error instanceof ApiClientError && error.statusCode === 409) {
@@ -172,10 +179,14 @@ export function VelocidadEstandarModal({
                 label="Línea"
                 placeholder="Selecciona una línea"
                 disabled={lineaBloqueada}
-                options={(lineas?.data ?? []).map((l) => ({
-                  value: l.id,
-                  label: `${l.codigo} · ${l.nombre}`,
-                }))}
+                /* Sólo líneas activas (la API rechaza pares en líneas inactivas);
+                   la línea ya fijada se conserva para mostrarla en edición. */
+                options={(lineas?.data ?? [])
+                  .filter((l) => l.estado === 'activo' || l.id === field.value)
+                  .map((l) => ({
+                    value: l.id,
+                    label: `${l.codigo} · ${l.nombre}${l.estado === 'activo' ? '' : ' (inactiva)'}`,
+                  }))}
                 value={field.value}
                 onValueChange={field.onChange}
                 destructive={Boolean(errors.lineaId)}

@@ -8,10 +8,17 @@ import type {
   Predicciones,
   ReentrenamientoJob,
 } from '@mes/types';
+import { ROLES_GESTIONAR_MODELO, ROLES_VER_ANALITICA } from '@mes/types';
 import { Roles } from '../../common/decorators';
 import { AnalyticsService } from './analytics.service';
 
+/**
+ * Analítica IA. Por defecto solo la ven jefe, supervisor e investigador (lo
+ * mismo que muestra la web); las acciones sobre el modelo se restringen más en
+ * cada handler. Matriz completa en `@mes/types/permisos-alertas-analitica`.
+ */
 @ApiTags('analytics')
+@Roles(...ROLES_VER_ANALITICA)
 @Controller('analitica')
 export class AnalyticsController {
   constructor(private readonly analitica: AnalyticsService) {}
@@ -46,17 +53,19 @@ export class AnalyticsController {
     name: 'estado',
     required: false,
     enum: ['suficiente', 'insuficiente'],
-    description: 'Fuerza la variante mostrada (demo/QA); sin él se devuelve el estado calculado',
+    description:
+      'Fuerza la variante mostrada (solo demo/QA: se ignora con NODE_ENV=production); sin él se devuelve el estado calculado',
   })
   estadoDatos(@Query('estado') estado?: string): Promise<EstadoDatos> {
+    const forzable = process.env.NODE_ENV !== 'production';
     return this.analitica.estadoDatos(
-      estado === 'suficiente' || estado === 'insuficiente' ? estado : undefined,
+      forzable && (estado === 'suficiente' || estado === 'insuficiente') ? estado : undefined,
     );
   }
 
   @Post('reentrenar')
   @HttpCode(202)
-  @Roles('jefe', 'investigador')
+  @Roles(...ROLES_GESTIONAR_MODELO)
   @ApiOperation({ summary: 'Encola un reentrenamiento — sólo jefe e investigador' })
   reentrenar(): Promise<ReentrenamientoJob> {
     return this.analitica.reentrenar('manual');
@@ -99,7 +108,7 @@ export class AnalyticsController {
 
   @Post('modelo/:version/activar')
   @HttpCode(HttpStatus.OK)
-  @Roles('jefe', 'investigador')
+  @Roles(...ROLES_GESTIONAR_MODELO)
   @ApiOperation({ summary: 'Marca una versión como vigente y archiva la anterior' })
   activar(@Param('version') version: string): Promise<Modelo> {
     return this.analitica.activar(version);

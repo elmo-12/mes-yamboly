@@ -13,6 +13,14 @@ import {
 } from './dto/usuario.dto';
 import { UsersService } from './users.service';
 
+/** Vista sin datos personales sensibles (DNI, correo, último acceso). */
+export type UsuarioDirectorio = Omit<User, 'email' | 'dni' | 'ultimoAcceso'>;
+
+function aDirectorio(u: User): UsuarioDirectorio {
+  const { email: _email, dni: _dni, ultimoAcceso: _ultimo, ...resto } = u;
+  return resto;
+}
+
 @ApiTags('users')
 @ApiBearerAuth()
 @Controller()
@@ -20,15 +28,36 @@ export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   /**
-   * Directorio de personas. Lo consumen tanto Configuración → Usuarios
-   * (jefe) como los selectores de captura de paradas/mermas/órdenes, que usa
-   * cualquier rol autenticado: por eso el GET no lleva restricción de rol.
+   * Directorio de personas. Lo consumen Configuración → Usuarios (jefe) y los
+   * selectores de responsable/maquinista/invitado, que usan otros roles. Solo
+   * el jefe recibe la ficha completa; el resto recibe la vista reducida (sin
+   * DNI, correo ni último acceso), que es lo que necesitan esos selectores:
+   * el DNI es también identificador de inicio de sesión.
    */
   @Get('usuarios')
-  @ApiOperation({ summary: 'Directorio de usuarios (responsable, maquinista, supervisor)' })
-  @ApiResponse({ status: 200, description: '{ data: User[] }' })
-  async listar(@Query() query: UsuarioQueryDto): Promise<{ data: User[] }> {
-    return { data: await this.users.listar(query) };
+  @ApiOperation({ summary: 'Directorio de usuarios · ficha completa solo para el jefe' })
+  @ApiResponse({ status: 200, description: '{ data: User[] } (sin email/dni/ultimoAcceso si no eres jefe)' })
+  async listar(
+    @Query() query: UsuarioQueryDto,
+    @CurrentUser() usuario: AuthUser,
+  ): Promise<{ data: Array<User | UsuarioDirectorio> }> {
+    const esJefe = usuario?.rol === 'jefe';
+    /* Los selectores (otros roles) solo ven personas activas (M2): se fuerza,
+     * no es un valor por defecto, para que `?activo=false` no liste las bajas. */
+    const filas = await this.users.listar(esJefe ? query : { ...query, activo: true });
+    return { data: esJefe ? filas : filas.map(aDirectorio) };
+  }
+
+  @Get('usuarios/directorio')
+  @ApiOperation({ summary: 'Directorio reducido (id, nombre, rol, cargo, línea, iniciales, activo)' })
+  @ApiResponse({ status: 200, description: '{ data: UsuarioDirectorio[] }' })
+  async directorio(
+    @Query() query: UsuarioQueryDto,
+    @CurrentUser() usuario: AuthUser,
+  ): Promise<{ data: UsuarioDirectorio[] }> {
+    /* Solo el jefe puede pedir las bajas (`activo=false`); el resto, siempre activos. */
+    const activo = usuario?.rol === 'jefe' ? (query.activo ?? true) : true;
+    return { data: (await this.users.listar({ ...query, activo })).map(aDirectorio) };
   }
 
   @Post('usuarios')
@@ -46,8 +75,12 @@ export class UsersController {
   @ApiOperation({ summary: 'Edita un usuario (no acepta contraseña)' })
   @ApiResponse({ status: 404, description: 'No encontrado', type: ApiErrorDto })
   @ApiResponse({ status: 409, description: 'Correo o DNI duplicado', type: ApiErrorDto })
-  actualizar(@Param('id') id: string, @Body() dto: UpdateUsuarioDto): Promise<User> {
-    return this.users.actualizar(id, dto);
+  actualizar(
+    @Param('id') id: string,
+    @Body() dto: UpdateUsuarioDto,
+    @CurrentUser() usuario: AuthUser,
+  ): Promise<User> {
+    return this.users.actualizar(id, dto, usuario.id);
   }
 
   @Post('usuarios/:id/estado')

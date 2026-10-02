@@ -27,6 +27,7 @@ import {
   type FilterGroup,
 } from '@mes/ui';
 import { AppPageHeader } from '@/components/AppPageHeader';
+import { useSession } from '@/hooks/use-session';
 import {
   ESTADOS_ALERTA,
   ESTADO_ALERTA_LABEL,
@@ -34,6 +35,8 @@ import {
   SEVERIDAD_ALERTA_LABEL,
   TIPOS_ALERTA,
   TIPO_ALERTA_LABEL,
+  ROLES_CONFIRMAR_EP,
+  ROLES_EDITAR_UMBRALES,
   type Alerta,
   type AlertaListQuery,
   type EstadoAlerta,
@@ -50,7 +53,6 @@ import {
   AciertoMark,
   ESTADO_BADGE,
   SEVERIDAD_BADGE,
-  esperaConfirmacion,
   formatVentana,
   etiquetaLinea,
   toneProbabilidad,
@@ -105,10 +107,12 @@ export function AlertasPage() {
 
   const query: AlertaListQuery = React.useMemo(
     () => ({
-      page: vista === 'pendientes' ? 1 : page,
-      // "Pendientes de confirmar" no es un filtro de la API: se trae la bandeja
-      // completa y se acota en cliente (ver `filas`).
-      pageSize: vista === 'pendientes' ? 100 : PAGE_SIZE,
+      page,
+      /* "Pendientes de confirmar" se filtra y pagina en el API (`pendientes=true`):
+       * antes se traían 100 alertas y se acotaba en cliente, así que con más de
+       * 100 en la bandeja la vista se quedaba corta. */
+      pageSize: PAGE_SIZE,
+      pendientes: vista === 'pendientes' ? true : undefined,
       tipo: filtros.tipo.length ? (filtros.tipo as TipoAlerta[]) : undefined,
       severidad: filtros.severidad.length ? (filtros.severidad as SeveridadAlerta[]) : undefined,
       lineaId: filtros.lineaId.length ? filtros.lineaId : undefined,
@@ -120,22 +124,9 @@ export function AlertasPage() {
 
   const { data, isPending, isError, refetch } = useAlertas(query);
 
-  /** La vista "Pendientes de confirmar" no tiene filtro en la API: se acota aquí. */
-  const pendientesFiltradas: Alerta[] = React.useMemo(
-    () => (data?.data ?? []).filter(esperaConfirmacion),
-    [data],
-  );
-
-  const filas: Alerta[] =
-    vista === 'pendientes'
-      ? pendientesFiltradas.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-      : (data?.data ?? []);
-
-  const total = vista === 'pendientes' ? pendientesFiltradas.length : (data?.meta.total ?? 0);
-  const totalPaginas =
-    vista === 'pendientes'
-      ? Math.max(1, Math.ceil(pendientesFiltradas.length / PAGE_SIZE))
-      : (data?.meta.totalPages ?? 1);
+  const filas: Alerta[] = data?.data ?? [];
+  const total = data?.meta.total ?? 0;
+  const totalPaginas = data?.meta.totalPages ?? 1;
   const hayFiltros =
     filtros.tipo.length + filtros.severidad.length + filtros.lineaId.length + filtros.estado.length >
       0 || Boolean(params.get('search'));
@@ -176,7 +167,7 @@ export function AlertasPage() {
       {
         id: 'estado',
         label: 'Estado',
-        options: ESTADOS_ALERTA.filter((e) => e !== 'descartada').map((e) => ({
+        options: ESTADOS_ALERTA.map((e) => ({
           value: e,
           label: ESTADO_ALERTA_LABEL[e],
         })),
@@ -185,8 +176,13 @@ export function AlertasPage() {
     [lineas],
   );
 
-  const ep = resumen ? formatPct(resumen.epAcumulada) : '—';
+  /* Sin confirmaciones no hay EP que mostrar: «—», no un 0 % que parezca medido. */
+  const ep = resumen && (resumen.epConfirmadas ?? 1) > 0 ? formatPct(resumen.epAcumulada) : '—';
   const pendientes = resumen?.pendientesConfirmar ?? 0;
+  const { rol } = useSession();
+  const puedeConfirmar = rol !== null && ROLES_CONFIRMAR_EP.includes(rol);
+  /* `PUT /alertas/umbrales` es sólo de jefe y supervisor: al resto se le oculta el botón. */
+  const puedeUmbrales = rol !== null && ROLES_EDITAR_UMBRALES.includes(rol);
 
   return (
     <>
@@ -195,20 +191,24 @@ export function AlertasPage() {
         subtitle={`Generadas por el modelo de analítica y reglas de umbral · EP acumulada ${ep}`}
         actions={
           <>
-            <Button
-              variant="secondary"
-              icon={<Icon name="sliders" />}
-              onClick={() => setUmbralesAbierto(true)}
-            >
-              Configurar umbrales
-            </Button>
-            <Button
-              variant="primary"
-              disabled={pendientes === 0}
-              onClick={() => setLoteAbierto(true)}
-            >
-              Confirmar pendientes ({pendientes})
-            </Button>
+            {puedeUmbrales && (
+              <Button
+                variant="secondary"
+                icon={<Icon name="sliders" />}
+                onClick={() => setUmbralesAbierto(true)}
+              >
+                Configurar umbrales
+              </Button>
+            )}
+            {puedeConfirmar && (
+              <Button
+                variant="primary"
+                disabled={pendientes === 0}
+                onClick={() => setLoteAbierto(true)}
+              >
+                Confirmar pendientes ({pendientes})
+              </Button>
+            )}
           </>
         }
       />
@@ -336,15 +336,21 @@ export function AlertasPage() {
           <EmptyState
             icon={<Icon name="inbox" size={40} />}
             title="Sin alertas activas"
-            description="El modelo reevalúa cada 5 minutos. Puedes ajustar los umbrales si esperabas recibir avisos antes."
+            description={
+              puedeUmbrales
+                ? 'El modelo reevalúa cada 5 minutos. Puedes ajustar los umbrales si esperabas recibir avisos antes.'
+                : 'El modelo reevalúa cada 5 minutos.'
+            }
             action={
-              <Button
-                variant="secondary"
-                icon={<Icon name="sliders" />}
-                onClick={() => setUmbralesAbierto(true)}
-              >
-                Configurar umbrales
-              </Button>
+              puedeUmbrales ? (
+                <Button
+                  variant="secondary"
+                  icon={<Icon name="sliders" />}
+                  onClick={() => setUmbralesAbierto(true)}
+                >
+                  Configurar umbrales
+                </Button>
+              ) : undefined
             }
           />
         )
@@ -404,7 +410,9 @@ export function AlertasPage() {
       )}
 
       <AlertaDrawer alertaId={alertaId} onClose={() => actualizar({ id: null, page: String(page) })} />
-      <UmbralesDrawer open={umbralesAbierto} onOpenChange={setUmbralesAbierto} />
+      {puedeUmbrales && (
+        <UmbralesDrawer open={umbralesAbierto} onOpenChange={setUmbralesAbierto} />
+      )}
       {loteAbierto && <ConfirmarLoteModal open={loteAbierto} onOpenChange={setLoteAbierto} />}
     </>
   );
@@ -439,9 +447,9 @@ function FilaAlerta({ alerta, onAbrir }: { alerta: Alerta; onAbrir: () => void }
             value={alerta.probabilidad}
             tone={toneProbabilidad(alerta.probabilidad)}
             className="w-14 shrink-0"
-            label={`Probabilidad ${alerta.probabilidad} %`}
+            label={`Probabilidad ${formatPct(alerta.probabilidad)}`}
           />
-          <span className="shrink-0 font-medium tabular">{alerta.probabilidad} %</span>
+          <span className="shrink-0 font-medium tabular">{formatPct(alerta.probabilidad)}</span>
         </span>
       </TCell>
       <TCell muted className="whitespace-nowrap tabular">

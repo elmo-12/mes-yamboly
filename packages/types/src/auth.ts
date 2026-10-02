@@ -43,13 +43,21 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 /** Campos comunes al alta y a la edición de usuario. */
 const usuarioBaseShape = {
-  nombre: z.string().min(3, 'El nombre es obligatorio'),
-  email: z.string().email('Correo inválido'),
+  nombre: z.string().trim().min(3, 'El nombre es obligatorio').max(120, 'Máximo 120 caracteres'),
+  email: z.string().trim().toLowerCase().email('Correo inválido').max(120, 'Máximo 120 caracteres'),
   dni: z.string().regex(/^\d{8}$/, 'El DNI debe tener 8 dígitos'),
   rol: z.enum(ROLES, { errorMap: () => ({ message: 'Selecciona un rol' }) }),
-  cargo: z.string().min(2, 'El cargo es obligatorio'),
+  cargo: z.string().trim().min(2, 'El cargo es obligatorio').max(80, 'Máximo 80 caracteres'),
   lineaId: z.string().nullable().default(null),
 };
+
+/** Mensaje compartido por la web y la API: el maquinista trabaja en una línea. */
+export const MENSAJE_MAQUINISTA_SIN_LINEA = 'Asigna la línea del maquinista';
+
+/** Un maquinista sin línea no puede registrar nada (la captura se limita a su línea). */
+function maquinistaConLinea(v: { rol?: string; lineaId?: string | null }): boolean {
+  return v.rol !== 'maquinista' || (v.lineaId !== null && v.lineaId !== undefined && v.lineaId !== '');
+}
 
 /**
  * Alta de usuario (`POST /usuarios`).
@@ -68,11 +76,20 @@ export const crearUsuarioSchema = z
   .refine((v) => v.password === v.confirmacion, {
     message: 'Las contraseñas no coinciden',
     path: ['confirmacion'],
-  });
+  })
+  .refine(maquinistaConLinea, { message: MENSAJE_MAQUINISTA_SIN_LINEA, path: ['lineaId'] });
 export type CrearUsuarioInput = z.infer<typeof crearUsuarioSchema>;
 
 /** Edición de usuario (`PATCH /usuarios/:id`): mismos campos, sin contraseña. */
-export const actualizarUsuarioSchema = z.object(usuarioBaseShape).partial();
+export const actualizarUsuarioSchema = z
+  .object(usuarioBaseShape)
+  .partial()
+  /* En la edición parcial solo se puede comprobar si llegan rol y línea juntos;
+   * la API valida además el estado final del usuario. */
+  .refine((v) => v.rol === undefined || v.lineaId === undefined || maquinistaConLinea(v), {
+    message: MENSAJE_MAQUINISTA_SIN_LINEA,
+    path: ['lineaId'],
+  });
 export type ActualizarUsuarioInput = z.infer<typeof actualizarUsuarioSchema>;
 
 /** Restablecer contraseña (`POST /usuarios/:id/restablecer-password`). */

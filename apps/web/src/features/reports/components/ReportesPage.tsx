@@ -128,7 +128,12 @@ export function ReportesPage() {
           <TiemposEstandarTab query={query} onLimpiar={limpiar} />
         </TabsContent>
         <TabsContent value="exportar">
-          <ExportarTab desde={filtros.desde} hasta={filtros.hasta} />
+          <ExportarTab
+            desde={filtros.desde}
+            hasta={filtros.hasta}
+            lineaIds={filtros.lineaId}
+            turnos={filtros.turno}
+          />
         </TabsContent>
       </Tabs>
 

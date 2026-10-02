@@ -4,11 +4,7 @@ import type { AuditEvent, OrdenListItem, OrdenesResumen, Paginated } from '@mes/
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user';
 import { Roles } from '../../common/decorators/roles';
 import { ApiErrorDto } from '../../common/dto/api-error.dto';
-import {
-  CreateOrdenDto,
-  FinalizeOrdenDto,
-  ValidateOrdenDto,
-} from './dto/orden-mutations.dto';
+import { CreateOrdenDto, FinalizeOrdenDto, ValidateOrdenDto } from './dto/orden-mutations.dto';
 import { OrdenQueryDto } from './dto/orden-query.dto';
 import { OrdersService } from './orders.service';
 
@@ -40,17 +36,47 @@ export class OrdersController {
 
   @Post()
   @Roles('jefe', 'supervisor')
-  @ApiOperation({ summary: 'Crea una orden de fabricación' })
+  @ApiOperation({
+    summary: 'Inicia una orden de fabricación a partir de una orden SAP pendiente',
+    description:
+      'Línea, producto, turno, número (= número SAP), planificado (cajas × unidades por caja) y ' +
+      'velocidad estándar se derivan de la fila SAP; la fila queda consumida en la misma transacción.',
+  })
   @ApiResponse({ status: 201, description: 'Orden creada' })
-  @ApiResponse({ status: 409, description: 'Código duplicado', type: ApiErrorDto })
+  @ApiResponse({ status: 404, description: 'Orden SAP inexistente', type: ApiErrorDto })
+  @ApiResponse({
+    status: 409,
+    description: 'La orden SAP ya fue iniciada o la línea ya tiene una orden en curso',
+    type: ApiErrorDto,
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'Producto fuera del maestro o sin velocidad estándar (detalle en `ordenSapId`)',
+    type: ApiErrorDto,
+  })
   crear(@Body() dto: CreateOrdenDto, @CurrentUser() user: AuthUser): Promise<OrdenListItem> {
     return this.orders.crear(dto, user);
   }
 
   @Post(':id/finalizar')
+  @Roles('jefe', 'supervisor', 'maquinista')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Cierra la orden y la deja Por validar' })
-  @ApiResponse({ status: 409, description: 'La orden ya fue finalizada', type: ApiErrorDto })
+  @ApiOperation({
+    summary: 'Cierra la orden y la deja Por validar',
+    description:
+      'El maquinista sólo puede cerrar órdenes de su línea. Rechaza (422 en `producido`) una ' +
+      'producción mayor que velocidad estándar × duración × 1,5.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol sin permiso u orden de otra línea',
+    type: ApiErrorDto,
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'La orden ya fue finalizada o tiene una parada abierta',
+    type: ApiErrorDto,
+  })
   finalizar(
     @Param('id') id: string,
     @Body() dto: FinalizeOrdenDto,
@@ -63,7 +89,11 @@ export class OrdersController {
   @Roles('jefe', 'supervisor')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Valida la orden con el checklist de 4 puntos (RF12)' })
-  @ApiResponse({ status: 409, description: 'En curso o ya validada', type: ApiErrorDto })
+  @ApiResponse({
+    status: 409,
+    description: 'En curso, ya validada o con una parada abierta',
+    type: ApiErrorDto,
+  })
   validar(
     @Param('id') id: string,
     @Body() dto: ValidateOrdenDto,

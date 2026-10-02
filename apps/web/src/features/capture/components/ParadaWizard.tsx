@@ -19,10 +19,11 @@ import {
   TimerChip,
   toast,
 } from '@mes/ui';
-import { createParadaSchema, type CreateParadaInput } from '@mes/types';
+import { createParadaSchema, puedeCapturar, type CreateParadaInput } from '@mes/types';
 import { useCausasParada } from '@/features/catalogs/hooks';
 import { useCrearParada } from '@/features/downtimes/hooks';
 import { useSession } from '@/hooks/use-session';
+import { ApiClientError } from '@/services/api/client';
 import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
 import { causasEspecificasDe, etiquetaCausa, tiposDeParada } from '../causas';
 import { horaActual, isoDesdeHora, type ContextoLinea } from '../tipos';
@@ -33,8 +34,8 @@ import { ContextoCaptura } from './ContextoCaptura';
 const PASOS = [{ label: 'Causa' }, { label: 'Detalle' }, { label: 'Confirmar' }] as const;
 
 const CAMPOS_PASO: Record<number, (keyof CreateParadaInput)[]> = {
-  0: ['tipoCausaId', 'inicio'],
-  1: ['causaId', 'accionTomada', 'numeroSolicitud'],
+  0: ['ordenId', 'tipoCausaId', 'inicio'],
+  1: ['causaId', 'accionTomada', 'numeroSolicitud', 'evidenciaUrl'],
 };
 
 /** Paso al que hay que volver cuando el 422 del servidor señala un campo. */
@@ -60,6 +61,9 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
   const [paso, setPaso] = React.useState(0);
   /** Foto ya subida: `url` es lo que se guarda, `nombre` lo que se muestra. */
   const [foto, setFoto] = React.useState<{ url: string; nombre: string }>();
+  const [errorEvidencia, setErrorEvidencia] = React.useState<string>();
+  /* Bloquea el doble envío antes de que `isPending` llegue a re-renderizar. */
+  const enviandoRef = React.useRef(false);
   const tri = useTriTimer(abierto);
   const { user } = useSession();
   const { data: arbol } = useCausasParada(contexto.lineaId);
@@ -101,6 +105,7 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
     if (!abierto) return;
     setPaso(0);
     setFoto(undefined);
+    setErrorEvidencia(undefined);
     form.reset(valoresIniciales());
   }, [abierto, form, valoresIniciales]);
 
@@ -113,21 +118,43 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
   /* El catálogo marca qué causas exigen N.º de solicitud del CMMS; sin esto el
      campo se enviaba vacío y el backend devolvía 422 en el último paso. */
   const requiereSolicitud = Boolean(causaActual?.requiereSolicitud);
+  const requiereEvidencia = Boolean(causaActual?.requiereEvidencia);
+
+  /* Defensa en profundidad: el tablero ya oculta el botón a quien no puede
+     registrar, pero el asistente tampoco deja avanzar (la API devuelve 403). */
+  const permitido = puedeCapturar(user, 'parada', contexto.lineaId);
+  const sinOrden = !contexto.ordenId;
+  const bloqueo = sinOrden
+    ? 'Esta línea no tiene una orden en curso: inicia una orden para registrar paradas.'
+    : !permitido
+      ? 'Tu rol no permite registrar paradas en esta línea.'
+      : null;
 
   const siguiente = async () => {
+    if (bloqueo) return;
     const ok = await form.trigger(CAMPOS_PASO[paso] ?? []);
     if (!ok) return;
-    if (paso === 1 && requiereSolicitud && !valores.numeroSolicitud?.trim()) {
-      form.setError('numeroSolicitud', {
-        type: 'required',
-        message: 'Esta causa requiere un N.º de solicitud de mantenimiento',
-      });
-      return;
+    if (paso === 1) {
+      let faltan = false;
+      if (requiereSolicitud && !valores.numeroSolicitud?.trim()) {
+        form.setError('numeroSolicitud', {
+          type: 'required',
+          message: 'Esta causa requiere un N.º de solicitud de mantenimiento',
+        });
+        faltan = true;
+      }
+      if (requiereEvidencia && !foto) {
+        setErrorEvidencia('Esta causa exige una foto de evidencia');
+        faltan = true;
+      }
+      if (faltan) return;
     }
     setPaso((p) => p + 1);
   };
 
   const guardar = form.handleSubmit(async (values) => {
+    if (bloqueo || enviandoRef.current) return;
+    enviandoRef.current = true;
     const segundos = tri.detener();
     try {
       await crear.mutateAsync({
@@ -142,13 +169,24 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
     } catch (e) {
       /* 422: el backend detalla el campo (p. ej. `numeroSolicitud` obligatorio
          para PM-01); se pinta bajo el campo y se vuelve a su paso. */
+      const detalleEvidencia =
+        e instanceof ApiClientError && typeof e.details?.evidenciaUrl === 'string'
+          ? e.details.evidenciaUrl
+          : undefined;
+      if (detalleEvidencia) setErrorEvidencia(detalleEvidencia);
       const campos = aplicarErroresApi<CreateParadaInput>(e, form.setError);
       if (campos.length > 0) {
         setPaso(pasoDelCampo(campos[0] as string));
-        toast.error('Revisa los campos marcados', { description: 'La parada no se registró.' });
+        toast.error('Revisa los campos marcados', {
+          description: `${detalleEvidencia ?? Object.values((e as ApiClientError).details ?? {}).find((v) => typeof v === 'string') ?? ''} La parada no se registró.`.trim(),
+        });
       } else {
+        /* 403 (rol/línea), 409 (parada abierta, solape, orden validada)… el
+           mensaje de la API ya viene en español. */
         toast.error(mensajeDeError(e, 'No se pudo registrar la parada'));
       }
+    } finally {
+      enviandoRef.current = false;
     }
   });
 
@@ -164,6 +202,7 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
           variant="primary"
           icon={<Icon name="check" size={20} />}
           loading={crear.isPending}
+          disabled={Boolean(bloqueo) || crear.isPending}
           onClick={() => void guardar()}
         >
           Registrar parada
@@ -181,6 +220,7 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
           variant="primary"
           icon={<Icon name="arrow-right" size={20} />}
           iconPosition="trailing"
+          disabled={Boolean(bloqueo)}
           onClick={() => void siguiente()}
         >
           Siguiente
@@ -210,6 +250,13 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
                   user ? `${user.nombre} (${user.cargo})` : '',
                 ]}
               />
+              {bloqueo && (
+                <AlertCard
+                  variant="warning"
+                  title="No se puede registrar la parada"
+                  description={bloqueo}
+                />
+              )}
               <p className="text-h4 text-text-primary">¿Qué tipo de parada?</p>
               <div className="flex flex-wrap gap-2">
                 {tipos.map((t) => (
@@ -237,9 +284,10 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
                   wrapperClassName="w-[300px]"
                   label="Hora de inicio"
                   hint={
-                    contexto.deteccionHora
+                    errores.inicio?.message ??
+                    (contexto.deteccionHora
                       ? 'Detectada por el sensor · editable'
-                      : 'Hora actual del turno · editable'
+                      : 'Hora actual del turno (Lima) · si es posterior a la actual, se toma la de ayer')
                   }
                   destructive={Boolean(errores.inicio)}
                   {...form.register('inicio')}
@@ -298,12 +346,22 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
                   destructive={Boolean(errores.numeroSolicitud)}
                   {...form.register('numeroSolicitud')}
                 />
-                <AdjuntarFoto
-                  label="Evidencia (foto)"
-                  cta="Adjuntar foto"
-                  value={foto?.nombre}
-                  onChange={setFoto}
-                />
+                <div className="flex flex-col gap-1.5">
+                  <AdjuntarFoto
+                    label={requiereEvidencia ? 'Evidencia (foto) · obligatoria' : 'Evidencia (foto)'}
+                    cta="Adjuntar foto"
+                    value={foto?.nombre}
+                    onChange={(evidencia) => {
+                      setFoto(evidencia);
+                      setErrorEvidencia(undefined);
+                    }}
+                  />
+                  {(errorEvidencia || requiereEvidencia) && (
+                    <p className={errorEvidencia ? 'text-body-sm text-error-text' : 'text-body-sm text-text-secondary'}>
+                      {errorEvidencia ?? 'Obligatoria para esta causa'}
+                    </p>
+                  )}
+                </div>
               </div>
               <Controller
                 control={form.control}
@@ -361,7 +419,7 @@ export function ParadaWizard({ contexto, abierto, onOpenChange }: ParadaWizardPr
               )}
               <p className="text-body-sm text-text-disabled">
                 Se registrará con sello de tiempo{' '}
-                {`${valores.inicio}:${String(tri.segundos % 60).padStart(2, '0')}`} y quedará
+                {isoDesdeHora(valores.inicio).replace('T', ' ')} y quedará
                 disponible en el repositorio de evidencia.
               </p>
             </>

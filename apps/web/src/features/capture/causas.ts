@@ -1,14 +1,14 @@
 import type { CausaMermaNodo, CausaParada, CausaParadaNodo, NodoCausaBase } from '@mes/types';
 import { cadenaDeCausa, hojasDeTipo, todasLasHojas, type NodoArbol } from '@/features/catalogs/causas';
 
-/** Los tipos raíz del árbol de causas de parada (`PP-01` … `PS-05`). */
+/** Los tipos raíz **activos** del árbol de causas de parada (`PP-01` … `PS-05`). */
 export function tiposDeParada(arbol: readonly CausaParadaNodo[]): CausaParadaNodo[] {
-  return arbol.filter((c) => c.nivel === 'tipo');
+  return arbol.filter((c) => c.nivel === 'tipo' && c.estado === 'activo');
 }
 
-/** Los tipos raíz del árbol de causas de merma (`MP-01` … `MP-05`). */
+/** Los tipos raíz **activos** del árbol de causas de merma (`MP-01` … `MP-05`). */
 export function tiposDeMerma(arbol: readonly CausaMermaNodo[]): CausaMermaNodo[] {
-  return arbol.filter((c) => c.nivel === 'tipo');
+  return arbol.filter((c) => c.nivel === 'tipo' && c.estado === 'activo');
 }
 
 /** Hojas activas colgadas de un nodo raíz del árbol. */

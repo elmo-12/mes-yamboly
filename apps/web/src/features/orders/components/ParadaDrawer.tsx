@@ -7,11 +7,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AlertCard, Badge, Button, Drawer, DrawerContent, Overline, toast } from '@mes/ui';
 import type { CreateParadaInput, OrdenListItem, ParadaListItem, UpdateParadaInput } from '@mes/types';
 import { queryKeys } from '@/services/api/query-keys';
-import { useActualizarParada, useCrearParada, useFinalizarParada } from '@/features/downtimes/hooks';
+import { useActualizarParada, useCrearParada } from '@/features/downtimes/hooks';
 import { useCausasParada } from '@/features/catalogs/hooks';
 import {
   ParadaForm,
-  aIso,
+  isoDeHoraEnOrden,
   paradaFormSchema,
   valoresDeParada,
   type ParadaFormValues,
@@ -38,7 +38,6 @@ export function ParadaDrawer({ open, onOpenChange, orden, parada }: ParadaDrawer
   const { data: causas } = useCausasParada(orden.lineaId);
   const crear = useCrearParada();
   const actualizar = useActualizarParada();
-  const finalizar = useFinalizarParada();
 
   const form = useForm<ParadaFormValues>({
     resolver: zodResolver(paradaFormSchema),
@@ -80,8 +79,11 @@ export function ParadaDrawer({ open, onOpenChange, orden, parada }: ParadaDrawer
 
   const onSubmit = React.useCallback(
     async (valores: ParadaFormValues) => {
-      const inicio = aIso(orden.fecha, valores.horaInicio);
-      const fin = valores.horaFin ? aIso(orden.fecha, valores.horaFin) : null;
+      /* Conserva el día original de la parada; el fin nunca queda antes del inicio. */
+      const inicio = isoDeHoraEnOrden(valores.horaInicio, orden, parada?.inicio);
+      const fin = valores.horaFin
+        ? isoDeHoraEnOrden(valores.horaFin, orden, parada?.fin ?? null, inicio)
+        : null;
 
       try {
         if (parada) {
@@ -106,6 +108,10 @@ export function ParadaDrawer({ open, onOpenChange, orden, parada }: ParadaDrawer
             tipoCausaId: valores.tipoCausaId,
             causaId: valores.causaId,
             inicio,
+            /* Retroactiva: se crea ya cerrada en un solo POST (antes crear +
+               finalizar chocaba con la regla de una parada abierta por línea y
+               podía dejarla abierta si fallaba el segundo paso). */
+            ...(fin ? { fin } : {}),
             accionTomada: valores.accionTomada,
             numeroSolicitud: valores.numeroSolicitud || undefined,
             afectaOee: valores.afectaOee,
@@ -113,8 +119,7 @@ export function ParadaDrawer({ open, onOpenChange, orden, parada }: ParadaDrawer
             origen: 'manual',
             tiempoRegistroSeg: 0,
           };
-          const nueva = await crear.mutateAsync(input);
-          if (fin) await finalizar.mutateAsync({ id: nueva.id, input: { fin } });
+          await crear.mutateAsync(input);
           toast.success('Parada registrada', {
             description: `${valores.horaInicio}${valores.horaFin ? ` – ${valores.horaFin}` : ''} · ${orden.codigo}`,
           });
@@ -132,18 +137,14 @@ export function ParadaDrawer({ open, onOpenChange, orden, parada }: ParadaDrawer
       actualizar,
       crear,
       edicion,
-      finalizar,
       invalidarBitacora,
       onOpenChange,
-      orden.codigo,
-      orden.fecha,
-      orden.id,
-      orden.lineaId,
+      orden,
       parada,
     ],
   );
 
-  const guardando = crear.isPending || actualizar.isPending || finalizar.isPending;
+  const guardando = crear.isPending || actualizar.isPending;
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>

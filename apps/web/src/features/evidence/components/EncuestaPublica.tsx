@@ -28,6 +28,7 @@ export function EncuestaPublica({ token }: { token: string }) {
   const [comentario, setComentario] = React.useState('');
   const [errores, setErrores] = React.useState<number[]>([]);
   const [enviado, setEnviado] = React.useState(false);
+  const [errorEnvio, setErrorEnvio] = React.useState<string | null>(null);
 
   const estadoHttp = error instanceof ApiClientError ? error.statusCode : undefined;
 
@@ -82,6 +83,7 @@ export function EncuestaPublica({ token }: { token: string }) {
       return;
     }
     setErrores([]);
+    setErrorEnvio(null);
 
     const payload = encuestaRespuestaSchema.safeParse({
       token,
@@ -101,7 +103,13 @@ export function EncuestaPublica({ token }: { token: string }) {
         setEnviado(true);
         return;
       }
-      setErrores([]);
+      /* Antes un error del servidor se tragaba sin aviso y la persona creía
+         haber respondido. */
+      setErrorEnvio(
+        e instanceof ApiClientError && e.statusCode < 500
+          ? e.message
+          : 'No pudimos registrar tus respuestas. Revisa tu conexión y vuelve a pulsar «Enviar respuestas»; no se ha guardado nada todavía.',
+      );
     }
   };
 
@@ -174,6 +182,12 @@ export function EncuestaPublica({ token }: { token: string }) {
         onChange={(e) => setComentario(e.target.value)}
         placeholder="Escriba cualquier observación sobre el registro de producción, paradas o mermas"
       />
+
+      {errorEnvio && (
+        <p role="alert" className="rounded-md bg-error-subtle px-4 py-3 text-body-sm text-error-text">
+          {errorEnvio}
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-4">
         <Button variant="primary" type="submit" size="lg" loading={responder.isPending}>

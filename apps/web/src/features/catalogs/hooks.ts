@@ -15,6 +15,7 @@ import type {
   VelocidadEstandarInput,
 } from '@mes/types';
 import { queryKeys, type CatalogoFiltros } from '@/services/api/query-keys';
+import { esConflictoVersion } from './errores';
 import {
   catalogsApi,
   type CausaMermaFiltros,
@@ -103,7 +104,17 @@ export function useActualizarLinea() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: Partial<LineaInput> }) =>
       catalogsApi.actualizarLinea(id, input),
-    onSuccess: () => invalidar(queryClient, queryKeys.catalogs.lineas()),
+    /* Desactivar la línea da de baja sus pares (y cambia el filtro por línea). */
+    onSuccess: () =>
+      invalidar(
+        queryClient,
+        queryKeys.catalogs.lineas(),
+        queryKeys.catalogs.velocidades(),
+        queryKeys.catalogs.productos(),
+      ),
+    onError: (error) => {
+      if (esConflictoVersion(error)) invalidar(queryClient, queryKeys.catalogs.lineas());
+    },
   });
 }
 
@@ -111,7 +122,14 @@ export function useBajaLinea() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => catalogsApi.bajaLinea(id),
-    onSuccess: () => invalidar(queryClient, queryKeys.catalogs.lineas()),
+    /* La baja de la línea arrastra sus pares producto × línea. */
+    onSuccess: () =>
+      invalidar(
+        queryClient,
+        queryKeys.catalogs.lineas(),
+        queryKeys.catalogs.velocidades(),
+        queryKeys.catalogs.productos(),
+      ),
   });
 }
 
@@ -143,7 +161,15 @@ export function useActualizarProducto() {
       catalogsApi.actualizarProducto(id, input),
     /* La matriz de velocidades muestra código y nombre del producto. */
     onSuccess: () =>
-      invalidar(queryClient, queryKeys.catalogs.productos(), queryKeys.catalogs.velocidades()),
+      invalidar(
+        queryClient,
+        queryKeys.catalogs.productos(),
+        queryKeys.catalogs.velocidades(),
+        queryKeys.catalogs.lineas(),
+      ),
+    onError: (error) => {
+      if (esConflictoVersion(error)) invalidar(queryClient, queryKeys.catalogs.productos());
+    },
   });
 }
 
@@ -151,9 +177,14 @@ export function useBajaProducto() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => catalogsApi.bajaProducto(id),
-    /* Un producto inactivo deja de ofrecer sus pares producto × línea. */
+    /* Un producto inactivo da de baja sus pares producto × línea. */
     onSuccess: () =>
-      invalidar(queryClient, queryKeys.catalogs.productos(), queryKeys.catalogs.velocidades()),
+      invalidar(
+        queryClient,
+        queryKeys.catalogs.productos(),
+        queryKeys.catalogs.velocidades(),
+        queryKeys.catalogs.lineas(),
+      ),
   });
 }
 
@@ -206,6 +237,9 @@ export function useActualizarVelocidadEstandar() {
     mutationFn: ({ id, input }: { id: string; input: UpdateVelocidadEstandarInput }) =>
       catalogsApi.actualizarVelocidadEstandar(id, input),
     onSuccess: () => invalidarVelocidades(queryClient),
+    onError: (error) => {
+      if (esConflictoVersion(error)) invalidarVelocidades(queryClient);
+    },
   });
 }
 
@@ -245,6 +279,9 @@ export function useGuardarCausaParada() {
     mutationFn: ({ id, input }: { id?: string; input: CausaParadaInput }) =>
       id ? catalogsApi.actualizarCausaParada(id, input) : catalogsApi.crearCausaParada(input),
     onSuccess: () => invalidar(queryClient, queryKeys.catalogs.causasParada()),
+    onError: (error) => {
+      if (esConflictoVersion(error)) invalidar(queryClient, queryKeys.catalogs.causasParada());
+    },
   });
 }
 
@@ -286,6 +323,9 @@ export function useGuardarCausaMerma() {
     mutationFn: ({ id, input }: { id?: string; input: CausaMermaInput }) =>
       id ? catalogsApi.actualizarCausaMerma(id, input) : catalogsApi.crearCausaMerma(input),
     onSuccess: () => invalidar(queryClient, queryKeys.catalogs.causasMerma()),
+    onError: (error) => {
+      if (esConflictoVersion(error)) invalidar(queryClient, queryKeys.catalogs.causasMerma());
+    },
   });
 }
 

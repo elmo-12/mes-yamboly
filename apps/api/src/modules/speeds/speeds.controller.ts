@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import type { Paginated, RegistroVelocidadListItem } from '@mes/types';
+import { ROLES_CAPTURA_VELOCIDAD, type Paginated, type RegistroVelocidadListItem } from '@mes/types';
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user';
+import { Roles } from '../../common/decorators/roles';
 import { ApiErrorDto } from '../../common/dto/api-error.dto';
 import { CreateVelocidadDto, VelocidadQueryDto } from './dto/velocidad.dto';
 import { SpeedsService } from './speeds.service';
@@ -19,6 +20,9 @@ export class SpeedsController {
   }
 
   @Post()
+  @Roles(...ROLES_CAPTURA_VELOCIDAD)
+  @ApiResponse({ status: 403, description: 'Rol sin permiso, línea ajena u orden cerrada', type: ApiErrorDto })
+  @ApiResponse({ status: 409, description: 'Orden validada', type: ApiErrorDto })
   @ApiOperation({ summary: 'Registra una velocidad y calcula el desvío vs estándar' })
   @ApiResponse({ status: 201, description: 'Registro creado con desvioPct' })
   @ApiResponse({ status: 422, description: 'Velocidad ≤ 0', type: ApiErrorDto })

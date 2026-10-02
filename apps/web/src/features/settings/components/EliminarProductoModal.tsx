@@ -53,7 +53,7 @@ export function EliminarProductoModal({
   return (
     <Modal open={open} onOpenChange={onOpenChange}>
       <ModalContent
-        title={`¿Eliminar ${producto.codigo} · ${producto.nombre}?`}
+        title={`¿Dar de baja ${producto.codigo} · ${producto.nombre}?`}
         footer={
           <>
             <Button variant="secondary" onClick={() => onOpenChange(false)}>
@@ -66,11 +66,11 @@ export function EliminarProductoModal({
         }
       >
         <div className="flex flex-col gap-2">
-          <Overline>Esta acción no se puede deshacer</Overline>
+          <Overline>Baja lógica · podrás reactivarlo</Overline>
           <p className="text-body leading-[22px] text-neutral-text">
-            Sus velocidades estándar por línea y las órdenes que ya lo usaron conservan el código{' '}
-            {producto.codigo} para no romper la trazabilidad, pero el producto dejará de estar
-            disponible para nuevas velocidades y órdenes.
+            Las órdenes que ya lo usaron conservan el código {producto.codigo} para no romper la
+            trazabilidad, pero el producto dejará de estar disponible para nuevas velocidades y
+            órdenes. Sus velocidades estándar por línea también se dan de baja.
           </p>
         </div>
       </ModalContent>

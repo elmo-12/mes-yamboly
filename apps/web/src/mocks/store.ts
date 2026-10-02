@@ -13,6 +13,7 @@ import type {
   LineaEstado,
   Merma,
   OrdenFabricacion,
+  OrdenSap,
   Parada,
   Producto,
   RegistroEP,
@@ -157,6 +158,8 @@ export interface FuentesExternasMock {
 
 export interface MockStore {
   ordenes: OrdenFabricacion[];
+  /** Órdenes SAP (pendientes y consumidas): materia prima del alta de órdenes. */
+  ordenesSap: OrdenSap[];
   paradas: Parada[];
   mermas: Merma[];
   velocidades: RegistroVelocidad[];
@@ -199,22 +202,31 @@ export interface MockStore {
   seq: number;
 }
 
+/**
+ * Los catálogos arrancan en `version: 1`, como las filas sembradas de la API
+ * (columna `version` de la concurrencia optimista).
+ */
+function conVersion<T extends { version?: number }>(filas: T[]): T[] {
+  return filas.map((f) => ({ ...f, version: f.version ?? 1 }));
+}
+
 function crearStore(): MockStore {
   return {
     ordenes: clonar(data.ordenes),
+    ordenesSap: clonar(data.ordenesSap),
     paradas: clonar(data.paradas),
     mermas: clonar(data.mermas),
     velocidades: clonar(data.velocidades),
     alertas: clonar(data.alertas),
     detecciones: clonar(data.detecciones),
     bitacora: clonar(data.bitacora),
-    productos: clonar(data.productos),
-    velocidadesEstandar: clonar(data.velocidadesEstandar),
+    productos: conVersion(clonar(data.productos)),
+    velocidadesEstandar: conVersion(clonar(data.velocidadesEstandar)),
     sabores: clonar(data.sabores),
-    lineas: clonar(data.lineas),
+    lineas: conVersion(clonar(data.lineas)),
     usuarios: clonar(data.usuarios),
-    causasParada: clonar(data.causasParada),
-    causasMerma: clonar(data.causasMerma),
+    causasParada: conVersion(clonar(data.causasParada)),
+    causasMerma: conVersion(clonar(data.causasMerma)),
     umbrales: clonar(data.umbralesIniciales),
     exportaciones: clonar(data.exportacionesIniciales) as unknown as ExportJob[],
     verificacionesCfs: clonar(data.verificacionesCfs),

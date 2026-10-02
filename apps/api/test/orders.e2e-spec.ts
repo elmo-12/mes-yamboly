@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { ahoraPlanta, turnoDeInstante } from '@mes/shared';
 import { crearApp, login } from './app.factory';
 
 describe('ordenes (e2e)', () => {
@@ -178,41 +179,15 @@ describe('ordenes (e2e)', () => {
     expect(repetida.body.code).toBe('CONFLICT');
   });
 
-  it('exige un par producto×línea activo al crear una orden (422 en productoId)', async () => {
-    /* PRD-1120002 sólo tiene velocidad estándar en LIN-LLEN-A1 (VE-0070). */
+  it('crea una orden desde una orden SAP con el par activo y congela la velocidad estándar', async () => {
+    /* SAPD-010: Llenadora A1 · CORNELLO VAI 12X120ML (12 u/caja, par VE-0070). */
     const { body } = await request(app.getHttpServer())
       .post('/api/v1/ordenes')
       .set(auth())
       .send({
-        codigo: 'OF-2026-9001',
-        lineaId: 'LIN-EXTR-2',
-        productoId: 'PRD-1120002',
-        lote: 'L-TEST-9001',
-        vencimiento: '2027-02-28',
-        turno: 'D',
-        planificado: 1000,
-        maquinistaId: 'USR-02',
-        supervisorId: 'USR-03',
-        operarios: 4,
-      })
-      .expect(422);
-
-    expect(body.code).toBe('VALIDATION_ERROR');
-    expect(body.details).toHaveProperty('productoId');
-  });
-
-  it('crea una orden con el par activo y congela la velocidad estándar', async () => {
-    const { body } = await request(app.getHttpServer())
-      .post('/api/v1/ordenes')
-      .set(auth())
-      .send({
-        codigo: 'OF-2026-9002',
-        lineaId: 'LIN-LLEN-A1',
-        productoId: 'PRD-1120002',
+        ordenSapId: 'SAPD-010',
         lote: 'L-TEST-9002',
         vencimiento: '2027-02-28',
-        turno: 'D',
-        planificado: 1000,
         maquinistaId: 'USR-07',
         supervisorId: 'USR-03',
         operarios: 4,
@@ -221,19 +196,37 @@ describe('ordenes (e2e)', () => {
       .expect(201);
 
     expect(body).toMatchObject({
-      codigo: 'OF-2026-9002',
+      id: 'ORD-95101710',
+      codigo: '95101710',
       lineaId: 'LIN-LLEN-A1',
       productoId: 'PRD-1120002',
+      turno: turnoDeInstante(ahoraPlanta()),
+      planSap: { ordenSapId: 'SAPD-010', turno: 'D' },
+      planificado: 4900 * 12,
       velocidadEstandarId: 'VE-0070',
       velocidadEstandar: 133.3,
       estado: 'en_curso',
     });
 
     /* El cronómetro del wizard de inicio alimenta el postest del TRI. */
-    const tri = await request(app.getHttpServer()).get('/api/v1/evidencia/tri').set(auth()).expect(200);
+    const tri = await request(app.getHttpServer())
+      .get('/api/v1/evidencia/tri')
+      .set(auth())
+      .expect(200);
     const fila = tri.body.postest.find(
-      (r: { eventoRegistrado: string }) => r.eventoRegistrado === 'Inicio de OF-2026-9002',
+      (r: { eventoRegistrado: string }) => r.eventoRegistrado === 'Inicio de 95101710',
     );
-    expect(fila).toMatchObject({ id: 'TRI-PO-AUTO-ORD-9002-inicio', tiempoMin: 1.2, etapa: 'postest' });
+    expect(fila).toMatchObject({
+      id: 'TRI-PO-AUTO-ORD-95101710-inicio',
+      tiempoMin: 1.2,
+      etapa: 'postest',
+    });
+
+    /* La bitácora deja constancia de la orden SAP de origen. */
+    const { body: bitacora } = await request(app.getHttpServer())
+      .get('/api/v1/ordenes/ORD-95101710/bitacora?tipo=creacion')
+      .set(auth())
+      .expect(200);
+    expect(bitacora.data[0].texto).toContain('desde la orden SAP 95101710');
   });
 });

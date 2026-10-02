@@ -33,7 +33,14 @@ export class Linea {
   @Column('text', { default: 'activo' })
   estado!: EstadoCatalogo;
 
-  /** Máximo `velocidadUnidMin` de sus pares producto × línea activos. */
+  /** Capacidad nominal (u/min) capturada en el mantenedor; el OEE usa la del par producto × línea. */
   @Column('double precision', { default: 0 })
   capacidadUnidadesMin!: number;
+
+  /**
+   * Control de concurrencia optimista: sube en cada edición; el cliente
+   * reenvía la versión que leyó y la API responde 409 si otro la cambió.
+   */
+  @Column('integer', { default: 1 })
+  version!: number;
 }

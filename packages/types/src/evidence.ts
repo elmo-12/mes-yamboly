@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { PaginationMeta, PaginationQuery, Turno } from './common';
+import { TIEMPO_REGISTRO_MAX_SEG, type PaginationMeta, type PaginationQuery, type Turno } from './common';
 import { FORMATOS_EXPORT } from './reports';
 
 export const KPIS_TESIS = ['TRI', 'TCI', 'TSP', 'CFS', 'EP'] as const;
@@ -75,6 +75,11 @@ export interface EvidenciaTRI {
   promedioPretest: number;
   /** Reducción porcentual respecto al pretest (negativa = mejora); `null` sin postest. */
   reduccionPct: number | null;
+  /**
+   * Filas del postest que no entran en el promedio por tener una fecha que no
+   * existe o un tiempo fuera de `1 … TIEMPO_REGISTRO_MAX_SEG` segundos.
+   */
+  descartadosPostest: number;
   meta: string;
   estado: EstadoKpi;
 }
@@ -122,6 +127,8 @@ export interface CriterioTCI {
   detalle: string;
   /** Valor forzado a mano desde 09.C; `null`/ausente = manda la regla. */
   override?: boolean | null;
+  /** Resultado de la regla sin override (para «Volver a la regla» en 09.C). */
+  cumpleRegla?: boolean;
 }
 
 export interface EvaluacionTCI {
@@ -196,15 +203,37 @@ export interface EvaluacionTciQuery extends PaginationQuery {
 
 const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
+/** `true` si `YYYY-MM-DD` existe en el calendario (rechaza `2026-02-31`). */
+export function esFechaIsoReal(texto: string): boolean {
+  if (!FECHA_ISO.test(texto)) return false;
+  const [a, m, d] = texto.split('-').map(Number) as [number, number, number];
+  const fecha = new Date(Date.UTC(a, m - 1, d));
+  return fecha.getUTCFullYear() === a && fecha.getUTCMonth() === m - 1 && fecha.getUTCDate() === d;
+}
+
+/** `HH:mm` o `HH:mm:ss` dentro de 00:00:00–23:59:59. */
+export const HORA_REAL = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+
+const fechaReal = (campo = 'Fecha') =>
+  z
+    .string()
+    .regex(FECHA_ISO, `${campo} inválida (usa AAAA-MM-DD)`)
+    .refine(esFechaIsoReal, `${campo} inexistente en el calendario`);
+
 /**
  * Rango y tipos que recorre el motor de validación.
  * Sin `desde`/`hasta` la API usa la primera y la última captura del postest.
  */
-export const validarTciSchema = z.object({
-  desde: z.string().regex(FECHA_ISO, 'Fecha inválida').optional(),
-  hasta: z.string().regex(FECHA_ISO, 'Fecha inválida').optional(),
-  tipos: z.array(z.enum(TIPOS_REGISTRO_TCI)).min(1, 'Selecciona al menos un tipo').optional(),
-});
+export const validarTciSchema = z
+  .object({
+    desde: fechaReal().optional(),
+    hasta: fechaReal().optional(),
+    tipos: z.array(z.enum(TIPOS_REGISTRO_TCI)).min(1, 'Selecciona al menos un tipo').optional(),
+  })
+  .refine((v) => !v.desde || !v.hasta || v.desde <= v.hasta, {
+    message: 'La fecha inicial no puede ser posterior a la final',
+    path: ['hasta'],
+  });
 export type ValidarTciInput = z.infer<typeof validarTciSchema>;
 
 /** Override manual de criterios de una evaluación (vista 09.C). */
@@ -263,6 +292,11 @@ export interface RechazoFila {
   /** Número de fila del archivo (1 = cabecera). */
   fila: number;
   motivo: string;
+  /**
+   * `true` cuando la fila choca con otra (del archivo o ya importada) que
+   * tiene la misma clave pero **otros datos**: no se descarta en silencio.
+   */
+  conflicto?: boolean;
 }
 
 export interface ImportacionResultado {
@@ -273,6 +307,8 @@ export interface ImportacionResultado {
   filasRechazadas: number;
   /** Filas idénticas a algo ya importado; se ignoran sin ser un error. */
   filasDuplicadas: number;
+  /** Filas con la misma clave que otra pero datos distintos (incluidas en `filasRechazadas`). */
+  filasConflicto: number;
   rechazos: RechazoFila[];
   /** Periodo cubierto por las filas aceptadas. */
   periodo?: { desde: string; hasta: string };
@@ -373,6 +409,9 @@ export interface EncuestaPublica {
   respondida: boolean;
 }
 
+/** N.º de ítems Likert del cuestionario del Anexo 04. */
+export const ITEMS_ENCUESTA_TSP = 8;
+
 export const encuestaRespuestaSchema = z.object({
   token: z.string().min(6, 'Token inválido'),
   respuestas: z
@@ -418,10 +457,19 @@ export interface EvidenciaCFS {
   estado: EstadoKpi;
 }
 
-export const verificacionCfsSchema = z.object({
-  cumple: z.boolean(),
-  observacion: z.string().max(300, 'Máximo 300 caracteres').default(''),
-});
+/**
+ * `cumple` marca la funcionalidad como verificada (con fecha). Enviar sólo
+ * `observacion` guarda la nota **sin** verificarla; omitir `observacion`
+ * conserva la que había.
+ */
+export const verificacionCfsSchema = z
+  .object({
+    cumple: z.boolean().optional(),
+    observacion: z.string().max(300, 'Máximo 300 caracteres').optional(),
+  })
+  .refine((v) => v.cumple !== undefined || v.observacion !== undefined, {
+    message: 'Indica si cumple o escribe una observación',
+  });
 export type VerificacionCfsInput = z.infer<typeof verificacionCfsSchema>;
 
 /* ------------------------------------------------------------------ */
@@ -463,16 +511,24 @@ export const exportEvidenciaSchema = z.object({
 export type ExportEvidenciaInput = z.infer<typeof exportEvidenciaSchema>;
 export type ExportEvidencia = ExportEvidenciaInput;
 
+/** Mínimo y máximo de un tiempo de registro del pretest (min): 6 s – 60 min. */
+export const TIEMPO_PRETEST_MIN_MIN = 0.1;
+export const TIEMPO_PRETEST_MAX_MIN = TIEMPO_REGISTRO_MAX_SEG / 60;
+
 export const cargarPretestSchema = z.object({
   registros: z
     .array(
       z.object({
-        fecha: z.string().regex(FECHA_ISO, 'Fecha inválida'),
-        eventoRegistrado: z.string().min(3, 'Describe el evento'),
-        horaInicioRegistro: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Hora inválida'),
-        tiempoMin: z.coerce.number().positive('Debe ser mayor que 0'),
+        fecha: fechaReal(),
+        eventoRegistrado: z.string().trim().min(3, 'Describe el evento').max(200, 'Máximo 200 caracteres'),
+        horaInicioRegistro: z.string().regex(HORA_REAL, 'Hora inválida (usa HH:mm entre 00:00 y 23:59)'),
+        tiempoMin: z.coerce
+          .number({ invalid_type_error: 'El tiempo debe ser un número de minutos' })
+          .min(TIEMPO_PRETEST_MIN_MIN, `Debe ser de al menos ${TIEMPO_PRETEST_MIN_MIN} min`)
+          .max(TIEMPO_PRETEST_MAX_MIN, `No puede superar ${TIEMPO_PRETEST_MAX_MIN} min`),
       })
     )
-    .min(1, 'Carga al menos un registro'),
+    .min(1, 'Carga al menos un registro')
+    .max(500, 'Máximo 500 registros por hoja'),
 });
 export type CargarPretestInput = z.infer<typeof cargarPretestSchema>;

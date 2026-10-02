@@ -31,6 +31,7 @@ import {
   useProductos,
   useVelocidadesEstandar,
 } from '@/features/catalogs/hooks';
+import { useSession } from '@/hooks/use-session';
 import { EliminarProductoModal } from './EliminarProductoModal';
 import { ProductoDrawer } from './ProductoDrawer';
 import { VelocidadesModal } from './VelocidadesModal';
@@ -73,6 +74,9 @@ export function ProductosVelocidadesTab() {
   const velocidades = useVelocidadesEstandar();
   const { data: lineas } = useLineas();
   const actualizar = useActualizarProducto();
+  /* `DELETE /productos/:id` es sólo del jefe (B6: el supervisor veía la acción y recibía 403). */
+  const { user } = useSession();
+  const puedeDarDeBaja = user?.rol === 'jefe';
 
   const [busqueda, setBusqueda] = React.useState('');
   const [estado, setEstado] = React.useState<FiltroEstado>(TODOS);
@@ -83,6 +87,10 @@ export function ProductosVelocidadesTab() {
   const [eliminar, setEliminar] = React.useState<Producto>();
 
   const todos = React.useMemo(() => productos.data?.data ?? [], [productos.data]);
+  const lineasActivas = React.useMemo(
+    () => (lineas?.data ?? []).filter((l) => l.estado === 'activo'),
+    [lineas],
+  );
   const pares = React.useMemo(() => velocidades.data?.data ?? [], [velocidades.data]);
 
   /** Nº de líneas con par activo por producto (columna de la tabla). */
@@ -278,7 +286,7 @@ export function ProductosVelocidadesTab() {
                         </Badge>
                       </TCell>
                       <TCell numeric muted>
-                        {`${formatNumber(conVelocidad)} de ${formatNumber(lineas?.data.length ?? 0)}`}
+                        {`${formatNumber(conVelocidad)} de ${formatNumber(lineasActivas.length)}`}
                       </TCell>
                       <TCell>
                         <DropdownMenu>
@@ -302,12 +310,12 @@ export function ProductosVelocidadesTab() {
                                 <Icon name="play-circle" size={16} />
                                 Activar
                               </DropdownMenuItem>
-                            ) : (
+                            ) : puedeDarDeBaja ? (
                               <DropdownMenuItem danger onSelect={() => setEliminar(p)}>
                                 <Icon name="archive" size={16} />
                                 Dar de baja
                               </DropdownMenuItem>
-                            )}
+                            ) : null}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TCell>
@@ -353,7 +361,11 @@ export function ProductosVelocidadesTab() {
             if (!abierto) setVerVelocidadesId(undefined);
           }}
           producto={productoModal}
-          lineas={lineas?.data ?? []}
+          /* Columnas: líneas activas y, para no ocultar historia, las
+             inactivas donde el producto ya tiene par. */
+          lineas={(lineas?.data ?? []).filter(
+            (l) => l.estado === 'activo' || paresModal.some((par) => par.lineaId === l.id),
+          )}
           pares={paresModal}
           cargando={velocidades.isFetching && paresModal.length === 0}
           error={Boolean(velocidades.error)}

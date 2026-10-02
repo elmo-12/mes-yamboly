@@ -5,6 +5,7 @@ import { authHandlers } from './auth';
 import { catalogsHandlers } from './catalogs';
 import { downtimesHandlers } from './downtimes';
 import { evidenceHandlers } from './evidence';
+import { ordenesSapHandlers } from './ordenes-sap';
 import { ordersHandlers } from './orders';
 import { realtimeHandlers } from './realtime';
 import { reportsHandlers } from './reports';
@@ -23,6 +24,7 @@ export const handlers = [
   ...alertsHandlers,
   ...analyticsHandlers,
   ...evidenceHandlers,
+  ...ordenesSapHandlers,
   ...ordersHandlers,
   ...downtimesHandlers,
   ...scrapHandlers,
@@ -38,6 +40,7 @@ export {
   catalogsHandlers,
   downtimesHandlers,
   evidenceHandlers,
+  ordenesSapHandlers,
   ordersHandlers,
   realtimeHandlers,
   reportsHandlers,

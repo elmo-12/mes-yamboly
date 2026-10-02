@@ -16,6 +16,8 @@ const ERROR_CREDENCIALES = 'Correo o contraseña incorrectos';
 /** Mensaje bajo los campos: 401 → credenciales; el resto, error de servicio. */
 function mensajeDeError(error: unknown): string {
   if (error instanceof ApiClientError && error.statusCode === 401) return ERROR_CREDENCIALES;
+  /* 429: bloqueo temporal por intentos fallidos; el API dice cuánto esperar. */
+  if (error instanceof ApiClientError && error.statusCode === 429) return error.message;
   return 'No se pudo iniciar sesión. Reintenta en unos segundos.';
 }
 
@@ -53,8 +55,18 @@ export function LoginForm() {
   const emailInvalido = Boolean(errors.email) || Boolean(errorServidor);
   const passwordInvalido = Boolean(errors.password) || Boolean(errorServidor);
 
+  /* Un doble clic enviaba dos o tres POST /auth/login antes de que el botón se
+   * deshabilitara (y cada fallo cuenta para el bloqueo por intentos). */
+  const enviando = React.useRef(false);
   const onSubmit = handleSubmit((valores) => {
-    mutate(valores, { onSuccess: () => router.replace('/') });
+    if (enviando.current) return;
+    enviando.current = true;
+    mutate(valores, {
+      onSuccess: () => router.replace('/'),
+      onSettled: () => {
+        enviando.current = false;
+      },
+    });
   });
 
   return (

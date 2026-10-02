@@ -42,8 +42,17 @@ export class ExportJob {
   @Column('text', { nullable: true })
   hasta?: string | null;
 
+  /** Línea del filtro cuando hay una sola (FK); con varias, `lineaIds`. */
   @Column('text', { nullable: true })
   lineaId?: string | null;
+
+  /** Todas las líneas filtradas (`null` = todas). Los jobs antiguos solo tienen `lineaId`. */
+  @Column('simple-json', { nullable: true })
+  lineaIds?: string[] | null;
+
+  /** Turnos filtrados al exportar (`null` = todos). */
+  @Column('simple-json', { nullable: true })
+  turnos?: string[] | null;
 
   /** FK real sobre `lineaId` — no se carga (los servicios usan la columna escalar). */
   @Index()

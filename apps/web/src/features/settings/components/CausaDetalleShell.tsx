@@ -76,7 +76,7 @@ export function CausaDetalleShell({
           del par Secundario/Primario, y siempre pasa por el modal Danger. */}
       <div className="flex flex-wrap items-center justify-end gap-3">
         <Button variant="danger" className="mr-auto" onClick={() => setConfirmarBaja(true)}>
-          Eliminar causa
+          Dar de baja
         </Button>
         <Button
           variant="secondary"

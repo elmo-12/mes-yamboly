@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import * as ExcelJS from 'exceljs';
 import {
   COLUMNAS_FUENTE,
@@ -20,13 +20,14 @@ import type {
 } from '@mes/types';
 import { ValidationException } from '../../common/exceptions';
 import { LookupsService } from '../../common/mappers';
-import { ahoraIso, esXlsx, hoyIso, type ArchivoSubido } from '../../common/utils';
+import { ahoraIso, esClaveDuplicada, esXlsx, hoyIso, type ArchivoSubido } from '../../common/utils';
 import {
   ImportacionFuente,
   LecturaSensor,
   SolicitudExterna,
   TransferenciaSap,
 } from '../../database/entities';
+import { ColaSerial } from './cola-serial';
 import {
   aFecha,
   aNumero,
@@ -149,12 +150,15 @@ function instrucciones(tipo: TipoFuenteExterna): string[][] {
  */
 @Injectable()
 export class EvidenceImportService {
+  private readonly cola = new ColaSerial();
+
   constructor(
     @InjectRepository(ImportacionFuente) private readonly importaciones: Repository<ImportacionFuente>,
     @InjectRepository(LecturaSensor) private readonly lecturas: Repository<LecturaSensor>,
     @InjectRepository(SolicitudExterna) private readonly solicitudes: Repository<SolicitudExterna>,
     @InjectRepository(TransferenciaSap) private readonly transferencias: Repository<TransferenciaSap>,
     private readonly lookups: LookupsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /* ---------------------------------------------------------------- */
@@ -288,8 +292,7 @@ export class EvidenceImportService {
        fila daría N motivos «valor inválido» y ocultaría la causa real. */
     const faltantes = COLUMNAS_FUENTE[tipo].filter((columna) => {
       if (COLUMNAS_OPCIONALES_FUENTE[tipo].includes(columna)) return false;
-      const alias = mapeo[columna];
-      return !tabla.cabeceras.includes(alias ? normalizarCabecera(alias) : columna);
+      return this.cabeceraDe(tabla.cabeceras, columna, mapeo) === null;
     });
     if (faltantes.length > 0) {
       throw new ValidationException(
@@ -299,27 +302,99 @@ export class EvidenceImportService {
         'El archivo no tiene todas las columnas obligatorias',
       );
     }
+    /* El mapeo se resuelve una vez: alias del usuario si existe en el
+       archivo; si no, la cabecera estándar. */
+    const resuelto: Record<string, string> = {};
+    for (const columna of COLUMNAS_FUENTE[tipo]) {
+      const cabecera = this.cabeceraDe(tabla.cabeceras, columna, mapeo);
+      if (cabecera) resuelto[columna] = cabecera;
+    }
 
-    const id = await this.siguienteId(tipo);
+    const lookups = await this.lookups.load();
+    return this.cola.ejecutar(() => this.importarConReintento(tipo, archivo.originalname, tabla.filas, resuelto, usuario, lookups));
+  }
+
+  private async importarConReintento(
+    tipo: TipoFuenteExterna,
+    nombreArchivo: string,
+    filas: { numero: number; valores: FilaTabla }[],
+    resuelto: Record<string, string>,
+    usuario: string,
+    lookups: Awaited<ReturnType<LookupsService['load']>>,
+  ): Promise<ImportacionResultado> {
+    /* Todo o nada y sin carrera: cabecera y filas van en una transacción y, si
+       otra importación simultánea ocupa el mismo id o la misma clave natural,
+       se reintenta desde cero (releyendo lo ya importado). */
+    const MAX_INTENTOS = 5;
+    for (let intento = 1; ; intento += 1) {
+      try {
+        return await this.dataSource.transaction((manager) =>
+          this.importarEn(manager, tipo, nombreArchivo, filas, resuelto, usuario, lookups),
+        );
+      } catch (error) {
+        if (!esClaveDuplicada(error) || intento >= MAX_INTENTOS) throw error;
+      }
+    }
+  }
+
+  /** Cabecera normalizada del archivo para una columna esperada, o `null`. */
+  private cabeceraDe(cabeceras: string[], columna: string, mapeo: Record<string, string>): string | null {
+    const alias = mapeo[columna];
+    if (alias) {
+      const normal = normalizarCabecera(alias);
+      if (cabeceras.includes(normal)) return normal;
+    }
+    return cabeceras.includes(columna) ? columna : null;
+  }
+
+  private async importarEn(
+    manager: EntityManager,
+    tipo: TipoFuenteExterna,
+    nombreArchivo: string,
+    filas: { numero: number; valores: FilaTabla }[],
+    mapeo: Record<string, string>,
+    usuario: string,
+    lookups: Awaited<ReturnType<LookupsService['load']>>,
+  ): Promise<ImportacionResultado> {
+    const repoImportaciones = manager.getRepository(ImportacionFuente);
+    const id = `${PREFIJO[tipo]}-${String((await repoImportaciones.countBy({ tipo })) + 1).padStart(3, '0')}`;
     const rechazos: RechazoFila[] = [];
     const fechas: string[] = [];
     let duplicadas = 0;
+    let conflictos = 0;
 
-    const contexto = await this.contexto();
-    const vistos = new Set<string>();
+    const contexto = await this.contexto(manager, tipo, lookups);
+    const vistos = new Map<string, { firma: string; fila: number }>();
     const nuevos: (LecturaSensor | SolicitudExterna | TransferenciaSap)[] = [];
 
-    for (const { numero, valores } of tabla.filas) {
+    for (const { numero, valores } of filas) {
       const leido = this.leerFila(tipo, valores, mapeo, contexto, id);
       if ('motivo' in leido) {
         rechazos.push({ fila: numero, motivo: leido.motivo });
         continue;
       }
-      if (vistos.has(leido.clave) || contexto.clavesExistentes.has(leido.clave)) {
-        duplicadas += 1;
+      /* Misma clave natural: si los datos coinciden es un duplicado exacto y
+         se ignora; si difieren es un **conflicto** y se rechaza con su motivo
+         (nunca se descarta en silencio). */
+      const previaArchivo = vistos.get(leido.clave);
+      const previaBase = contexto.clavesExistentes.get(leido.clave);
+      const previa = previaArchivo?.firma ?? previaBase;
+      if (previa !== undefined) {
+        if (previa === leido.firma) {
+          duplicadas += 1;
+        } else {
+          conflictos += 1;
+          rechazos.push({
+            fila: numero,
+            conflicto: true,
+            motivo: previaArchivo
+              ? `Conflicto: ${leido.descripcion} ya aparece en la fila ${previaArchivo.fila} con otros datos`
+              : `Conflicto: ${leido.descripcion} ya fue importado con otros datos; no se sobrescribe`,
+          });
+        }
         continue;
       }
-      vistos.add(leido.clave);
+      vistos.set(leido.clave, { firma: leido.firma, fila: numero });
       nuevos.push(leido.entidad);
       fechas.push(leido.fecha);
     }
@@ -327,60 +402,57 @@ export class EvidenceImportService {
     fechas.sort();
     const periodo = fechas.length ? { desde: fechas[0]!, hasta: fechas[fechas.length - 1]! } : undefined;
 
-    /* La cabecera va **antes** que las filas: `importacionId` es una FK real. */
-    await this.importaciones.save(
-      this.importaciones.create({
-        id,
-        tipo,
-        archivo: archivo.originalname,
-        importadoEn: ahoraIso(),
-        importadoPor: usuario,
-        filasOk: nuevos.length,
-        filasRechazadas: rechazos.length,
-        filasDuplicadas: duplicadas,
-        desde: periodo?.desde ?? null,
-        hasta: periodo?.hasta ?? null,
-      }),
-    );
-    await this.guardar(tipo, nuevos);
+    /* La cabecera va **antes** que las filas: `importacionId` es una FK real.
+       `insert` (no `save`) para que un id ocupado falle en vez de pisar. */
+    await repoImportaciones.insert({
+      id,
+      tipo,
+      archivo: nombreArchivo,
+      importadoEn: ahoraIso(),
+      importadoPor: usuario,
+      filasOk: nuevos.length,
+      filasRechazadas: rechazos.length,
+      filasDuplicadas: duplicadas,
+      desde: periodo?.desde ?? null,
+      hasta: periodo?.hasta ?? null,
+    });
+    await this.guardar(manager, tipo, nuevos);
 
     return {
       id,
       tipo,
-      archivo: archivo.originalname,
+      archivo: nombreArchivo,
       filasOk: nuevos.length,
       filasRechazadas: rechazos.length,
       filasDuplicadas: duplicadas,
+      filasConflicto: conflictos,
       rechazos,
       ...(periodo ? { periodo } : {}),
     };
   }
 
   private async guardar(
+    manager: EntityManager,
     tipo: TipoFuenteExterna,
     filas: (LecturaSensor | SolicitudExterna | TransferenciaSap)[],
   ): Promise<void> {
-    if (filas.length === 0) return;
-    if (tipo === 'sensores') {
-      await this.lecturas.save(filas as LecturaSensor[], { chunk: 200 });
-    } else if (tipo === 'solicitudes') {
-      await this.solicitudes.save(filas as SolicitudExterna[], { chunk: 200 });
-    } else {
-      await this.transferencias.save(filas as TransferenciaSap[], { chunk: 200 });
+    /* Lotes pequeños: SQLite admite ~999 parámetros por sentencia. */
+    const LOTE = 100;
+    const entidad = tipo === 'sensores' ? LecturaSensor : tipo === 'solicitudes' ? SolicitudExterna : TransferenciaSap;
+    for (let i = 0; i < filas.length; i += LOTE) {
+      await manager.getRepository(entidad).insert(filas.slice(i, i + LOTE) as never);
     }
-  }
-
-  private async siguienteId(tipo: TipoFuenteExterna): Promise<string> {
-    const total = await this.importaciones.countBy({ tipo });
-    return `${PREFIJO[tipo]}-${String(total + 1).padStart(3, '0')}`;
   }
 
   /* ---------------------------------------------------------------- */
   /* Lectura de una fila                                               */
   /* ---------------------------------------------------------------- */
 
-  private async contexto(): Promise<ContextoImportacion> {
-    const lookups = await this.lookups.load();
+  private async contexto(
+    manager: EntityManager,
+    tipo: TipoFuenteExterna,
+    lookups: Awaited<ReturnType<LookupsService['load']>>,
+  ): Promise<ContextoImportacion> {
     const lineasPorCodigo = new Map<string, string>();
     for (const linea of lookups.lineas.values()) {
       lineasPorCodigo.set(linea.codigo.toUpperCase(), linea.id);
@@ -388,27 +460,28 @@ export class EvidenceImportService {
     const productos = new Set<string>();
     for (const producto of lookups.productos.values()) productos.add(producto.codigo);
 
-    const clavesExistentes = new Set<string>();
-    for (const l of await this.lecturas.find({ select: { lineaId: true, fechaHora: true } })) {
-      clavesExistentes.add(`${l.lineaId}|${l.fechaHora}`);
-    }
-    for (const s of await this.solicitudes.find({ select: { numero: true } })) {
-      clavesExistentes.add(`SOL|${s.numero.toUpperCase()}`);
-    }
-    for (const t of await this.transferencias.find({ select: { documento: true } })) {
-      clavesExistentes.add(`SAP|${t.documento.toUpperCase()}`);
+    /* Clave natural → firma de los datos, para distinguir duplicado de conflicto. */
+    const clavesExistentes = new Map<string, string>();
+    if (tipo === 'sensores') {
+      for (const l of await manager.getRepository(LecturaSensor).find()) {
+        clavesExistentes.set(`${l.lineaId}|${l.fechaHora}`, firmaSensor(l.estado, l.velocidadUnidMin));
+      }
+    } else if (tipo === 'solicitudes') {
+      for (const s of await manager.getRepository(SolicitudExterna).find()) {
+        clavesExistentes.set(`SOL|${s.numero.toUpperCase()}`, firmaSolicitud(s));
+      }
+    } else {
+      for (const t of await manager.getRepository(TransferenciaSap).find()) {
+        clavesExistentes.set(`SAP|${t.documento.toUpperCase()}`, firmaSap(t));
+      }
     }
     return { lineasPorCodigo, productos, clavesExistentes };
   }
 
   /** Resuelve el valor de una columna esperada, respetando el `mapeo` manual. */
   private celda(fila: FilaTabla, columna: string, mapeo: Record<string, string>): ValorCelda {
-    const alias = mapeo[columna];
-    if (alias) {
-      const clave = normalizarCabecera(alias);
-      if (clave in fila) return fila[clave] ?? null;
-    }
-    return fila[columna] ?? null;
+    const cabecera = mapeo[columna];
+    return cabecera ? (fila[cabecera] ?? null) : null;
   }
 
   private leerFila(
@@ -450,6 +523,7 @@ export class EvidenceImportService {
       if (velocidad === null) {
         return { motivo: `La velocidad «${textoBruto(brutoVelocidad)}» no es un número` };
       }
+      if (velocidad < 0) return { motivo: `La velocidad «${textoBruto(brutoVelocidad)}» no puede ser negativa` };
     }
 
     const fechaHora = isoLocal(fecha);
@@ -461,7 +535,13 @@ export class EvidenceImportService {
       estado,
       velocidadUnidMin: velocidad,
     });
-    return { entidad, clave: `${lineaId}|${fechaHora}`, fecha: fechaHora.slice(0, 10) };
+    return {
+      entidad,
+      clave: `${lineaId}|${fechaHora}`,
+      firma: firmaSensor(estado, velocidad),
+      descripcion: `la lectura de ${codigoLinea.toUpperCase()} del ${fechaHora.replace('T', ' ')}`,
+      fecha: fechaHora.slice(0, 10),
+    };
   }
 
   private leerSolicitud(
@@ -482,11 +562,13 @@ export class EvidenceImportService {
       if (!lineaId) return { motivo: `La línea «${codigoLinea}» no existe en el maestro` };
     }
 
-    const tipoBruto = aTexto(v('tipo'))?.toUpperCase() ?? 'MANTENIMIENTO';
+    const tipoBruto = aTexto(v('tipo'))?.toUpperCase();
+    if (!tipoBruto) return { motivo: 'Falta el tipo de solicitud' };
     if (!TIPOS_SOLICITUD.includes(tipoBruto as (typeof TIPOS_SOLICITUD)[number])) {
       return { motivo: `Tipo «${tipoBruto}» fuera de ${TIPOS_SOLICITUD.join(' | ')}` };
     }
-    const estadoBruto = aTexto(v('estado'))?.toUpperCase() ?? 'ABIERTA';
+    const estadoBruto = aTexto(v('estado'))?.toUpperCase();
+    if (!estadoBruto) return { motivo: 'Falta el estado de la solicitud' };
     if (!ESTADOS_SOLICITUD.includes(estadoBruto as (typeof ESTADOS_SOLICITUD)[number])) {
       return { motivo: `Estado «${estadoBruto}» fuera de ${ESTADOS_SOLICITUD.join(' | ')}` };
     }
@@ -502,7 +584,13 @@ export class EvidenceImportService {
       estado: estadoBruto,
       descripcion: aTexto(v('descripcion')) ?? '',
     });
-    return { entidad, clave: `SOL|${numero.toUpperCase()}`, fecha: fechaIso };
+    return {
+      entidad,
+      clave: `SOL|${numero.toUpperCase()}`,
+      firma: firmaSolicitud(entidad),
+      descripcion: `la solicitud ${numero}`,
+      fecha: fechaIso,
+    };
   }
 
   private leerTransferencia(
@@ -550,7 +638,13 @@ export class EvidenceImportService {
       tipoMerma: (tipoMermaBruto as TipoMermaCodigo | null) ?? null,
       motivo: aTexto(v('motivo')) ?? '',
     });
-    return { entidad, clave: `SAP|${documento.toUpperCase()}`, fecha: fechaIso };
+    return {
+      entidad,
+      clave: `SAP|${documento.toUpperCase()}`,
+      firma: firmaSap(entidad),
+      descripcion: `el documento SAP ${documento}`,
+      fecha: fechaIso,
+    };
   }
 }
 
@@ -559,14 +653,18 @@ interface ContextoImportacion {
   lineasPorCodigo: Map<string, string>;
   /** Códigos de producto de 7 dígitos del maestro. */
   productos: Set<string>;
-  /** Claves naturales ya presentes en la base (deduplicación). */
-  clavesExistentes: Set<string>;
+  /** Clave natural ya presente en la base → firma de sus datos. */
+  clavesExistentes: Map<string, string>;
 }
 
 interface FilaLeida {
   entidad: LecturaSensor | SolicitudExterna | TransferenciaSap;
   /** Clave natural para deduplicar. */
   clave: string;
+  /** Datos de la fila para distinguir duplicado exacto de conflicto. */
+  firma: string;
+  /** `la solicitud SM-0421`, para el motivo del conflicto. */
+  descripcion: string;
   /** `YYYY-MM-DD` de la fila, para el periodo cubierto. */
   fecha: string;
 }
@@ -576,4 +674,18 @@ function textoBruto(valor: ValorCelda): string {
   if (valor === null) return '';
   if (valor instanceof Date) return isoLocal(valor);
   return String(valor);
+}
+
+function firmaSensor(estado: string, velocidad: number | null): string {
+  return JSON.stringify([estado, velocidad ?? null]);
+}
+
+function firmaSolicitud(s: Pick<SolicitudExterna, 'fecha' | 'lineaId' | 'tipo' | 'estado' | 'descripcion'>): string {
+  return JSON.stringify([s.fecha, s.lineaId ?? null, s.tipo, s.estado, s.descripcion ?? '']);
+}
+
+function firmaSap(
+  t: Pick<TransferenciaSap, 'fecha' | 'lineaId' | 'productoCodigo' | 'cantidadKg' | 'tipoMerma' | 'motivo'>,
+): string {
+  return JSON.stringify([t.fecha, t.lineaId, t.productoCodigo, t.cantidadKg, t.tipoMerma ?? null, t.motivo ?? '']);
 }

@@ -1,6 +1,8 @@
 'use client';
 
+import type * as React from 'react';
 import {
+  Badge,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -10,8 +12,15 @@ import {
   LineCard,
   Skeleton,
 } from '@mes/ui';
-import type { LineaEstado, TiempoRealResumen } from '@mes/types';
-import { BOTON_FILA, BOTON_PRINCIPAL, lineCardAmpliaProps } from './linea-view';
+import {
+  puedeCapturar,
+  puedeFinalizarOrden,
+  puedeIniciarOrden,
+  type LineaEstado,
+  type TiempoRealResumen,
+} from '@mes/types';
+import { useSession } from '@/hooks/use-session';
+import { BOTON_FILA, BOTON_PRINCIPAL, indicadorSensores, lineCardAmpliaProps } from './linea-view';
 
 export type AccionLinea =
   | 'detalle'
@@ -39,24 +48,49 @@ export interface LineasGridProps {
 export function LineasGrid({ lineas, resumen, onAccion }: LineasGridProps) {
   return (
     <div className="grid w-full grid-cols-1 items-stretch gap-6 xl:grid-cols-2">
-      {lineas.map((linea) => (
-        <LineCard
-          key={linea.lineaId}
-          {...lineCardAmpliaProps(linea, resumen)}
-          className="h-full w-full cursor-pointer"
-          onClick={(e) => {
-            const el = e.target as HTMLElement;
-            /* Los menús/overlays se renderizan en un portal: en React los
-               eventos siguen burbujeando por el árbol de componentes, así que
-               se descartan los que no vienen del DOM de la tarjeta. */
-            if (!e.currentTarget.contains(el)) return;
-            if (el.closest('button, a, [role="menuitem"]')) return;
-            onAccion('detalle', linea);
-          }}
-          actions={<AccionesLinea linea={linea} onAccion={onAccion} />}
-        />
-      ))}
+      {lineas.map((linea) => {
+        const props = lineCardAmpliaProps(linea, resumen);
+        return (
+          <LineCard
+            key={linea.lineaId}
+            {...props}
+            meta={<MetaConSensores meta={props.meta} linea={linea} />}
+            className="h-full w-full cursor-pointer"
+            onClick={(e) => {
+              const el = e.target as HTMLElement;
+              /* Los menús/overlays se renderizan en un portal: en React los
+                 eventos siguen burbujeando por el árbol de componentes, así que
+                 se descartan los que no vienen del DOM de la tarjeta. */
+              if (!e.currentTarget.contains(el)) return;
+              if (el.closest('button, a, [role="menuitem"]')) return;
+              onAccion('detalle', linea);
+            }}
+            actions={<AccionesLinea linea={linea} onAccion={onAccion} />}
+          />
+        );
+      })}
     </div>
+  );
+}
+
+/**
+ * Fila de contexto de la orden + indicador de sensores IoT (`● 3/3 sensores`
+ * o `Sin sensores`). El detalle sensor a sensor va en el `title`.
+ */
+function MetaConSensores({ meta, linea }: { meta: React.ReactNode; linea: LineaEstado }) {
+  const indicador = indicadorSensores(linea);
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+      {meta ? <span>{meta}</span> : null}
+      <Badge
+        color={indicador.color}
+        dot={indicador.dot}
+        title={indicador.detalle}
+        aria-label={`${indicador.texto}. ${indicador.detalle}`}
+      >
+        {indicador.texto}
+      </Badge>
+    </span>
   );
 }
 
@@ -67,11 +101,18 @@ function AccionesLinea({
   linea: LineaEstado;
   onAccion: (accion: AccionLinea, linea: LineaEstado) => void;
 }) {
+  const { user } = useSession();
+  const puedeIniciar = puedeIniciarOrden(user);
+  /* Captura (matriz de `@mes/types/permisos-captura`): parada y detección IoT
+     para jefatura, supervisión y el maquinista de la línea; merma además para
+     mermas y calidad. El investigador no ve botones de captura. */
+  const puedeParada = puedeCapturar(user, 'parada', linea.lineaId);
+  const puedeMerma = puedeCapturar(user, 'merma', linea.lineaId);
   /* En la tarjeta ampliada toda la botonera es táctil `lg` (48), también la de
      `sugerida`: la fila es la misma para las 9 líneas del tablero. En tarjeta
      estrecha (móvil) el Primary ocupa la fila entera y la
      secundaria comparte la siguiente con el menú. */
-  if (linea.estado === 'sugerida') {
+  if (linea.estado === 'sugerida' && puedeParada) {
     return (
       <>
         <Button
@@ -101,16 +142,19 @@ function AccionesLinea({
   if (linea.estado === 'sin_orden') {
     return (
       <>
-        <Button
-          variant="primary"
-          size="lg"
-          block
-          className={BOTON_FILA}
-          icon={<Icon name="play-circle" size={20} />}
-          onClick={() => onAccion('iniciar-orden', linea)}
-        >
-          Iniciar orden
-        </Button>
+        {/* Iniciar orden: sólo jefatura y supervisión (`POST /ordenes`). */}
+        {puedeIniciar && (
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            className={BOTON_FILA}
+            icon={<Icon name="play-circle" size={20} />}
+            onClick={() => onAccion('iniciar-orden', linea)}
+          >
+            Iniciar orden
+          </Button>
+        )}
         <MenuLinea linea={linea} onAccion={onAccion} />
       </>
     );
@@ -119,25 +163,29 @@ function AccionesLinea({
   const enParada = linea.estado === 'parada';
   return (
     <>
-      <Button
-        variant="primary"
-        size="lg"
-        block
-        className={BOTON_PRINCIPAL}
-        icon={<Icon name={enParada ? 'check' : 'stop-circle'} size={20} />}
-        onClick={() => onAccion(enParada ? 'finalizar-parada' : 'parada', linea)}
-      >
-        {enParada ? 'Finalizar parada' : 'Parada'}
-      </Button>
-      <Button
-        variant="secondary"
-        size="lg"
-        block
-        className={BOTON_FILA}
-        onClick={() => onAccion('merma', linea)}
-      >
-        Merma
-      </Button>
+      {puedeParada && linea.estado !== 'sugerida' && (
+        <Button
+          variant="primary"
+          size="lg"
+          block
+          className={BOTON_PRINCIPAL}
+          icon={<Icon name={enParada ? 'check' : 'stop-circle'} size={20} />}
+          onClick={() => onAccion(enParada ? 'finalizar-parada' : 'parada', linea)}
+        >
+          {enParada ? 'Finalizar parada' : 'Parada'}
+        </Button>
+      )}
+      {puedeMerma && (
+        <Button
+          variant="secondary"
+          size="lg"
+          block
+          className={BOTON_FILA}
+          onClick={() => onAccion('merma', linea)}
+        >
+          Merma
+        </Button>
+      )}
       <MenuLinea linea={linea} onAccion={onAccion} />
     </>
   );
@@ -150,7 +198,15 @@ function MenuLinea({
   linea: LineaEstado;
   onAccion: (accion: AccionLinea, linea: LineaEstado) => void;
 }) {
-  const conOrden = Boolean(linea.orden);
+  const { user } = useSession();
+  /* «Finalizar orden» sólo con una orden en curso (una línea `sin_orden` puede
+     mostrar la última orden ya cerrada) y para quien puede cerrarla; «Iniciar
+     orden» sólo para jefatura y supervisión. */
+  const ordenEnCurso = Boolean(linea.orden) && linea.estado !== 'sin_orden';
+  const puedeFinalizar = ordenEnCurso && puedeFinalizarOrden(user, linea.lineaId);
+  const puedeIniciar = !ordenEnCurso && puedeIniciarOrden(user);
+  const puedeVelocidad = ordenEnCurso && puedeCapturar(user, 'velocidad', linea.lineaId);
+  const puedeParada = puedeCapturar(user, 'parada', linea.lineaId);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -168,22 +224,25 @@ function MenuLinea({
           <Icon name="eye" size={16} />
           Ver detalle
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => onAccion('velocidad', linea)}>
-          <Icon name="gauge" size={16} />
-          Registrar velocidad
-        </DropdownMenuItem>
-        {linea.estado === 'parada' && (
+        {puedeVelocidad && (
+          <DropdownMenuItem onSelect={() => onAccion('velocidad', linea)}>
+            <Icon name="gauge" size={16} />
+            Registrar velocidad
+          </DropdownMenuItem>
+        )}
+        {linea.estado === 'parada' && puedeParada && (
           <DropdownMenuItem onSelect={() => onAccion('finalizar-parada', linea)}>
             <Icon name="check" size={16} />
             Finalizar parada
           </DropdownMenuItem>
         )}
-        {conOrden ? (
+        {puedeFinalizar && (
           <DropdownMenuItem onSelect={() => onAccion('finalizar-orden', linea)}>
             <Icon name="stop-circle" size={16} />
             Finalizar orden
           </DropdownMenuItem>
-        ) : (
+        )}
+        {puedeIniciar && (
           <DropdownMenuItem onSelect={() => onAccion('iniciar-orden', linea)}>
             <Icon name="play-circle" size={16} />
             Iniciar orden

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Delta, Periodo, Turno } from './common';
+import type { Delta, Periodo, Role, Turno } from './common';
 import type { TipoMermaCodigo } from './catalogs';
 
 export interface KpiValor {
@@ -10,6 +10,11 @@ export interface KpiValor {
   delta?: Delta;
   /** Meta de referencia (línea punteada en los gráficos). */
   meta?: number;
+  /**
+   * `true` cuando la ventana no tiene datos: `valor` llega a 0 pero la UI debe
+   * mostrar «—» / «Sin datos», no un 0 % que parezca una medición real.
+   */
+  sinDatos?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -148,6 +153,8 @@ export interface ReporteQuery {
   lineaId?: string | string[];
   turno?: Turno | Turno[];
   comparar?: 'periodo_anterior' | 'anio_anterior';
+  /** Solo `/reportes/paradas`: `imprevista` = paradas no programadas. */
+  clasificacion?: 'programada' | 'imprevista';
 }
 
 /* ------------------------------------------------------------------ */
@@ -174,6 +181,16 @@ export const DATASET_EXPORT_LABEL: Record<DatasetExport, string> = {
   alertas: 'Alertas',
   evidencia: 'Evidencia TRI/TCI',
 };
+
+/** Conjuntos que solo pueden exportar estos roles (la evidencia de tesis es del jefe y del investigador). */
+export const DATASETS_EXPORT_RESTRINGIDOS: readonly DatasetExport[] = ['evidencia'];
+export const ROLES_EXPORT_EVIDENCIA: readonly Role[] = ['jefe', 'investigador'];
+
+/** Conjuntos que `rol` puede exportar. */
+export function datasetsExportablesPara(rol: Role | null | undefined): DatasetExport[] {
+  const ve = !!rol && ROLES_EXPORT_EVIDENCIA.includes(rol);
+  return DATASETS_EXPORT.filter((d) => ve || !DATASETS_EXPORT_RESTRINGIDOS.includes(d));
+}
 
 export const FORMATOS_EXPORT = ['xlsx', 'csv', 'pdf'] as const;
 export type FormatoExport = (typeof FORMATOS_EXPORT)[number];
@@ -204,12 +221,36 @@ export interface ExportJob {
   url?: string;
 }
 
-export const exportRequestSchema = z.object({
-  datasets: z.array(z.enum(DATASETS_EXPORT)).min(1, 'Selecciona al menos un dataset'),
-  formato: z.enum(FORMATOS_EXPORT).default('xlsx'),
-  desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida'),
-  hasta: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida'),
-  lineaId: z.string().optional(),
-});
+/** `true` si `AAAA-MM-DD` es una fecha de calendario real (`2026-02-30` no). */
+export function esFechaCalendario(valor: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
+  const [a, m, d] = valor.split('-').map(Number) as [number, number, number];
+  const fecha = new Date(Date.UTC(a, m - 1, d));
+  return fecha.getUTCFullYear() === a && fecha.getUTCMonth() === m - 1 && fecha.getUTCDate() === d;
+}
+
+const fechaExport = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida')
+  .refine(esFechaCalendario, 'Fecha inválida');
+
+export const exportRequestSchema = z
+  .object({
+    datasets: z
+      .array(z.enum(DATASETS_EXPORT))
+      .min(1, 'Selecciona al menos un dataset')
+      .refine((l) => new Set(l).size === l.length, 'Hay conjuntos repetidos'),
+    formato: z.enum(FORMATOS_EXPORT).default('xlsx'),
+    desde: fechaExport,
+    hasta: fechaExport,
+    /** Línea filtrada en la página (vacío = todas). */
+    lineaId: z.string().optional(),
+    /** Turnos filtrados en la página (vacío = todos). */
+    turno: z.array(z.enum(['D', 'N'])).optional(),
+  })
+  .refine((v) => v.desde <= v.hasta, {
+    message: 'La fecha final debe ser igual o posterior a la inicial',
+    path: ['hasta'],
+  });
 export type ExportRequestInput = z.infer<typeof exportRequestSchema>;
 export type ExportRequest = ExportRequestInput;

@@ -35,7 +35,7 @@ export interface ImportarFuenteModalProps {
 }
 
 /** Extensiones aceptadas por la API (`xlsx`/`csv`, máximo 5 MB). */
-const EXTENSIONES = ['.xlsx', '.xls', '.csv'];
+const EXTENSIONES = ['.xlsx', '.csv'];
 const MAX_BYTES = 5 * 1024 * 1024;
 /** Filas de datos que se muestran en la vista previa. */
 const FILAS_PREVIA = 5;
@@ -64,6 +64,9 @@ export function ImportarFuenteModal({ tipo, onOpenChange }: ImportarFuenteModalP
   const [leyendo, setLeyendo] = React.useState(false);
   const [resultado, setResultado] = React.useState<ImportacionResultado | null>(null);
   const [rechazosAbiertos, setRechazosAbiertos] = React.useState(false);
+  /* Candado síncrono: un doble clic dispara `onClick` dos veces antes de que
+     React pinte el estado `loading` del botón. */
+  const enviando = React.useRef(false);
 
   const abierto = tipo !== null;
 
@@ -120,12 +123,13 @@ export function ImportarFuenteModal({ tipo, onOpenChange }: ImportarFuenteModalP
   };
 
   const enviar = async () => {
-    if (!tipo || !archivo) return;
+    if (!tipo || !archivo || enviando.current) return;
     if (faltantes.length > 0) {
       setError(`Asigna una columna a: ${faltantes.join(', ')}.`);
       return;
     }
     setError(null);
+    enviando.current = true;
     try {
       const respuesta = await importar.mutateAsync({ tipo, archivo, mapeo });
       setResultado(respuesta);
@@ -139,6 +143,8 @@ export function ImportarFuenteModal({ tipo, onOpenChange }: ImportarFuenteModalP
       toast.error('No se pudo importar el archivo', {
         description: e instanceof Error ? e.message : 'Reintenta en unos segundos.',
       });
+    } finally {
+      enviando.current = false;
     }
   };
 
@@ -176,7 +182,7 @@ export function ImportarFuenteModal({ tipo, onOpenChange }: ImportarFuenteModalP
               <Button
                 variant="primary"
                 onClick={enviar}
-                disabled={!archivo || !previa || leyendo}
+                disabled={!archivo || !previa || leyendo || importar.isPending}
                 loading={importar.isPending}
               >
                 Importar
@@ -287,6 +293,11 @@ export function ImportarFuenteModal({ tipo, onOpenChange }: ImportarFuenteModalP
                     {formatNumber(resultado.filasRechazadas)} rechazadas
                   </Badge>
                 )}
+                {(resultado.filasConflicto ?? 0) > 0 && (
+                  <Badge color="warning">
+                    {formatNumber(resultado.filasConflicto)} en conflicto con datos ya importados
+                  </Badge>
+                )}
               </div>
 
               <p className="text-body-sm text-text-secondary">
@@ -321,7 +332,14 @@ export function ImportarFuenteModal({ tipo, onOpenChange }: ImportarFuenteModalP
                             <TCell muted className="tabular">
                               {rechazo.fila}
                             </TCell>
-                            <TCell>{rechazo.motivo}</TCell>
+                            <TCell>
+                              {rechazo.conflicto && (
+                                <Badge color="warning" className="mr-2">
+                                  Conflicto
+                                </Badge>
+                              )}
+                              {rechazo.motivo}
+                            </TCell>
                           </TRow>
                         ))}
                       </TBody>
@@ -349,7 +367,17 @@ export function ImportarFuenteModal({ tipo, onOpenChange }: ImportarFuenteModalP
 async function leerCabeceras(archivo: File): Promise<VistaPrevia> {
   const XLSX = await import('xlsx');
   const buffer = await archivo.arrayBuffer();
-  const libro = XLSX.read(buffer, { type: 'array', sheetRows: FILAS_PREVIA + 1 });
+  /* Un CSV se decodifica como UTF-8 (igual que la API) y se lee en crudo: sin
+     esto SheetJS lo trataba como Latin-1 y convertía `12/09/2026` en una fecha
+     m/d/aa, así que la vista previa no mostraba lo que se iba a importar. */
+  const esCsv = archivo.name.toLowerCase().endsWith('.csv');
+  const libro = esCsv
+    ? XLSX.read(new TextDecoder('utf-8').decode(buffer).replace(/^\uFEFF/, ''), {
+        type: 'string',
+        raw: true,
+        sheetRows: FILAS_PREVIA + 1,
+      })
+    : XLSX.read(buffer, { type: 'array', sheetRows: FILAS_PREVIA + 1 });
   const nombreHoja = libro.SheetNames[0];
   if (!nombreHoja) return { cabeceras: [], filas: [] };
   const hoja = libro.Sheets[nombreHoja];

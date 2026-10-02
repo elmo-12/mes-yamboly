@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { RiesgoLinea, Turno } from '@mes/types';
-import { hoyIso } from '../../../common/utils';
+import { ahoraIso, sumarDiasLocal } from '../../../common/utils';
 import {
   Alerta,
   CausaParada,
@@ -65,14 +65,15 @@ export class RiesgoService {
 
   /** Turno siguiente al que corre ahora: Día 06–18, Noche 18–06. */
   turnoObjetivo(ahora = new Date()): TurnoObjetivo {
-    const hora = ahora.getHours();
+    /* Hora de planta explícita: `getHours()` daría la del proceso (UTC en el despliegue). */
+    const local = ahoraIso(ahora);
+    const hora = Number(local.slice(11, 13));
     const esDia = hora >= 6 && hora < 18;
     const turno: Turno = esDia ? 'N' : 'D';
     /* Entre medianoche y las 06:00 corre el turno Noche del día anterior, así
      * que el Día objetivo es el de hoy; a partir de las 18:00, el de mañana. */
-    const fecha = new Date(ahora);
-    if (!esDia && hora >= 18) fecha.setDate(fecha.getDate() + 1);
-    const dia = hoyIso(fecha);
+    const hoy = local.slice(0, 10);
+    const dia = !esDia && hora >= 18 ? sumarDiasLocal(hoy, 1) : hoy;
     return { fecha: dia, turno, inicio: inicioDeTurno(dia, turno), fin: finDeTurno(dia, turno) };
   }
 
@@ -87,7 +88,13 @@ export class RiesgoService {
     const generarAlertas = opciones.generarAlertas ?? true;
     const persistir = opciones.persistir ?? true;
     const objetivo = this.turnoObjetivo();
-    const lineas = await this.lineas.find({ where: { estado: 'activo' }, order: { codigo: 'ASC' } });
+    /* Solo líneas activas **con historial** (M6): una línea recién creada no
+     * tiene datos que puntuar y el modelo le devolvía un riesgo genérico
+     * (≈ 60 %, justo el umbral) que la UI pintaba como si fuera una predicción. */
+    const conHistorial = await this.lineasConHistorial();
+    const lineas = (
+      await this.lineas.find({ where: { estado: 'activo' }, order: { codigo: 'ASC' } })
+    ).filter((l) => conHistorial.has(l.id));
     const version = await this.versiones.findOne({ where: { estado: 'vigente' } });
     const muestras = await this.dataset.construirVivoLote(
       lineas.map((l) => l.id),
@@ -219,8 +226,11 @@ export class RiesgoService {
     }
     const lineas = await this.lineas.find({ where: { estado: 'activo' } });
     const porId = new Map(lineas.map((l) => [l.id, l]));
+    const conHistorial = await this.lineasConHistorial();
     const ventana = `${objetivo.inicio.slice(11, 16)}–${objetivo.fin.slice(11, 16)}`;
     return guardadas
+      /* Una predicción guardada de una línea que luego se desactivó no se muestra. */
+      .filter((p) => porId.has(p.lineaId ?? '') && conHistorial.has(p.lineaId ?? ''))
       .map((p) => {
         const linea = porId.get(p.lineaId ?? '');
         return {
@@ -234,6 +244,15 @@ export class RiesgoService {
         };
       })
       .sort((a, b) => b.riesgo - a.riesgo);
+  }
+
+  /** Ids de línea con al menos una orden registrada. */
+  private async lineasConHistorial(): Promise<Set<string>> {
+    const filas = await this.ordenes
+      .createQueryBuilder('o')
+      .select('DISTINCT o.lineaId', 'lineaId')
+      .getRawMany<{ lineaId: string }>();
+    return new Set(filas.map((f) => f.lineaId));
   }
 
   /**

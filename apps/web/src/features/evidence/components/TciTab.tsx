@@ -385,6 +385,7 @@ export function TciTab() {
           onOpenChange={setValidarAbierto}
           desdeSugerido={resumen.ultimaValidacion?.desde}
           hastaSugerido={toIsoDate(new Date())}
+          hayFuentes={hayFuentes}
         />
         <RevisarEvaluacionDrawer
           evaluacion={evaluacion}

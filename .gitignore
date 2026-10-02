@@ -7,13 +7,16 @@ dist
 .env
 .env.local
 .DS_Store
-apps/api/data/exports/*.xlsx
+# Exportaciones generadas (xlsx de reportes, csv/sav/docx de evidencia)
+apps/api/data/exports/
 # Fotos de evidencia subidas desde los asistentes de captura
 apps/api/data/evidencias/
 # Valores originales de las órdenes que toca el simulador de conteo
 apps/api/data/simulacion-sensores.json
 
 .next-qa
+# Builds de Next con NEXT_DIST_DIR (QA, integración…)
+.next-*/
 
 # Volcados de base de datos (el volumen mes_pgdata vive en Docker, nunca en el repo)
 *.dump

@@ -82,6 +82,7 @@ function evidenciaTri(): EvidenciaTRI {
     promedioPostest,
     promedioPretest,
     reduccionPct: calcTriReduccion(promedioPretest, promedioPostest),
+    descartadosPostest: 0,
     meta: `Reducción ≥ ${METAS_TESIS.TRI_REDUCCION_PCT} % vs pretest`,
     estado: estadoTri(calcTriReduccion(promedioPretest, promedioPostest)),
   };
@@ -538,15 +539,13 @@ export const evidenceHandlers = [
       return errores.conflicto(`${usuario.nombre} ya tiene una invitación`, { usuarioId });
     }
 
-    const prefijo = `tsp-${new Date().getFullYear()}-`;
-    const usados = store.invitacionesTsp
-      .filter((s) => s.token.startsWith(prefijo))
-      .map((s) => Number(s.token.slice(prefijo.length)))
-      .filter((n) => Number.isFinite(n));
-    const siguiente = (usados.length ? Math.max(...usados) : 0) + 1;
+    /* Igual que la API: token aleatorio, no adivinable. */
+    const aleatorio = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+      b.toString(16).padStart(2, '0'),
+    ).join('');
 
     const invitacion: InvitacionTSP = {
-      token: `${prefijo}${String(siguiente).padStart(2, '0')}`,
+      token: `tsp-${aleatorio}`,
       usuarioId,
       invitado: usuario.nombre,
       rol: ROLE_LABEL[usuario.rol] ?? usuario.rol,
@@ -579,16 +578,21 @@ export const evidenceHandlers = [
     const item = getStore().verificacionesCfs.find((v) => v.id === params.id);
     if (!item) return errores.noEncontrado('Verificación funcional');
     const body = (await request.json()) as Record<string, unknown>;
-    if (typeof body.cumple !== 'boolean') {
+    if (body.cumple !== undefined && typeof body.cumple !== 'boolean') {
       return errores.validacion({ cumple: 'cumple debe ser booleano' });
+    }
+    if (body.cumple === undefined && body.observacion === undefined) {
+      return errores.validacion({ cumple: 'Indica si cumple o escribe una observación' });
     }
     if (typeof body.observacion === 'string' && body.observacion.length > 300) {
       return errores.validacion({ observacion: 'Máximo 300 caracteres' });
     }
-    item.cumple = body.cumple;
     if (typeof body.observacion === 'string') item.observacion = body.observacion;
-    /* Marcarla desde la ficha ya cuenta como verificada, cumpla o no. */
-    item.verificadaEn = ahoraIso();
+    /* Sólo Cumple Sí/No verifica; una nota sola no. */
+    if (typeof body.cumple === 'boolean') {
+      item.cumple = body.cumple;
+      item.verificadaEn = ahoraIso();
+    }
     return HttpResponse.json({ item, resumen: evidenciaCfs() });
   }),
 
@@ -656,7 +660,7 @@ export const evidenceHandlers = [
     }
     const body = (await request.json()) as { respuestas?: number[]; comentario?: string };
     const respuestas = body.respuestas ?? [];
-    if (respuestas.length < ITEMS_TSP.length) {
+    if (respuestas.length !== ITEMS_TSP.length) {
       return errores.validacion({ respuestas: 'Responde los 8 ítems' });
     }
     if (respuestas.some((r) => !Number.isInteger(r) || r < 1 || r > 5)) {

@@ -11,8 +11,8 @@ export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: LoginInput) => authApi.login(input),
-    onSuccess: (data) => {
-      login(data.accessToken, data.user);
+    onSuccess: (data, input) => {
+      login(data.accessToken, data.user, input.recordarme ?? false);
       void queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
     },
   });

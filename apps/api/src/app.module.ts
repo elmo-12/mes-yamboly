@@ -11,6 +11,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CatalogsModule } from './modules/catalogs/catalogs.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { OrdenesSapModule } from './modules/ordenes-sap/ordenes-sap.module';
 import { DowntimesModule } from './modules/downtimes/downtimes.module';
 import { ScrapModule } from './modules/scrap/scrap.module';
 import { SpeedsModule } from './modules/speeds/speeds.module';
@@ -32,6 +33,7 @@ import { EvidenceModule } from './modules/evidence/evidence.module';
     UsersModule,
     CatalogsModule,
     OrdersModule,
+    OrdenesSapModule,
     DowntimesModule,
     ScrapModule,
     SpeedsModule,

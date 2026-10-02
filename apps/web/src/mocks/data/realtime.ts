@@ -1,4 +1,4 @@
-import type { LineaEstado } from '@mes/types';
+import type { LineaEstado, SensoresLinea } from '@mes/types';
 import { detecciones } from './downtimes';
 import { HOY } from './seed';
 
@@ -10,6 +10,29 @@ import { HOY } from './seed';
  */
 
 const deteccionExtr2 = detecciones.find((d) => d.id === 'IOT-EXTR2-01');
+
+/**
+ * Sensores IoT simulados (paridad con `SensoresIotService` de la API cuando
+ * `IOT_API_URL`/`IOT_API_KEY` están definidas): las tres lineales del IoT con
+ * sensores asignados. Ids de sensor inventados; el resto de líneas, sin sensores.
+ */
+function sensoresMock(
+  lineal: string,
+  ids: string[],
+  caidos: string[] = [],
+  estado: SensoresLinea['estado'] = 'ok',
+): SensoresLinea {
+  const sensores = ids.map((id) => ({ id, enLinea: !caidos.includes(id) }));
+  return {
+    lineal,
+    consultado: true,
+    total: sensores.length,
+    enLinea: sensores.filter((x) => x.enLinea).length,
+    sensores,
+    estado,
+    ultimaLectura: `${HOY}T14:04:55`,
+  };
+}
 
 export const lineaEstadosBase: LineaEstado[] = [
   {
@@ -38,6 +61,10 @@ export const lineaEstadosBase: LineaEstado[] = [
     velocidadEstandar: 255,
     tiempoEnEstadoMin: 214,
     maquinistaNombre: 'Elena Ramos',
+    /* Una de las dos salidas sin señal: el conteo sigue con la otra. */
+    sensores: sensoresMock('EXTRUSORA 3', ['SIM_I', 'SIM_J'], ['SIM_J']),
+    fuenteProduccion: 'sensores',
+    fuenteVelocidad: 'sensores',
   },
   {
     lineaId: 'LIN-LLEN-A1',
@@ -60,6 +87,7 @@ export const lineaEstadosBase: LineaEstado[] = [
     },
     alerta: {
       id: 'ALE-001',
+      tipo: 'parada_prevista',
       riesgo: 78,
       texto: 'Riesgo de parada en 40 min',
       generadaEn: `${HOY}T14:40:00`,
@@ -104,6 +132,7 @@ export const lineaEstadosBase: LineaEstado[] = [
     maquinistaNombre: 'Luis Vargas',
     alerta: {
       id: 'ALE-003',
+      tipo: 'velocidad_baja',
       riesgo: 42,
       texto: 'Velocidad 6 % bajo estándar',
       generadaEn: `${HOY}T13:20:00`,
@@ -121,6 +150,9 @@ export const lineaEstadosBase: LineaEstado[] = [
     velocidadEstandar: 300,
     tiempoEnEstadoMin: 198,
     maquinistaNombre: 'Pedro Ccahuana',
+    sensores: sensoresMock('MOLDEADORA A2', ['SIM_C', 'SIM_D'], [], 'parcial'),
+    fuenteProduccion: 'sensores',
+    fuenteVelocidad: 'sensores',
   },
   {
     lineaId: 'LIN-MOLD-A3',
@@ -134,6 +166,10 @@ export const lineaEstadosBase: LineaEstado[] = [
     velocidadEstandar: 350,
     tiempoEnEstadoMin: 18,
     maquinistaNombre: 'Pedro Ccahuana',
+    /* En parada: los sensores miden 0 u/min, que es lo que hace la máquina. */
+    sensores: sensoresMock('MOLDEADORA A3', ['SIM_E', 'SIM_F', 'SIM_G']),
+    fuenteProduccion: 'sensores',
+    fuenteVelocidad: 'sensores',
     ultimaParada: {
       causaCodigo: 'PN-02',
       causaNombre: 'Paro por fallas',
@@ -143,6 +179,7 @@ export const lineaEstadosBase: LineaEstado[] = [
     },
     alerta: {
       id: 'ALE-002',
+      tipo: 'parada_prevista',
       riesgo: 91,
       texto: 'En parada 18 min · PN-02 Paro por fallas',
       generadaEn: `${HOY}T13:47:00`,

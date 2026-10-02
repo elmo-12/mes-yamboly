@@ -4,3 +4,4 @@ export * from './format';
 export * from './oee';
 export * from './kpis-tesis';
 export * from './dates';
+export * from './orden';

@@ -24,6 +24,8 @@ import {
 import type { EstadoFase, Modelo, VersionModelo } from '@mes/types';
 import { formatDate, formatNumber } from '@mes/shared';
 import { useActivarVersionModelo } from '../hooks';
+import { useSession } from '@/hooks/use-session';
+import { ROLES_GESTIONAR_MODELO } from '@mes/types';
 
 export interface ModeloTabProps {
   modelo: Modelo;
@@ -46,6 +48,9 @@ const ESTADO_FASE_LABEL: Record<EstadoFase, string> = {
 /** `Analítica / Modelo` (Figma 2156:4634 + Stepper CRISP-DM 2163:16124). */
 export function ModeloTab({ modelo, entrenando = false }: ModeloTabProps) {
   const activar = useActivarVersionModelo();
+  const { rol } = useSession();
+  /* Activar una versión es gestión del modelo: jefe e investigador (como el API). */
+  const puedeActivar = rol !== null && ROLES_GESTIONAR_MODELO.includes(rol);
   const [aActivar, setAActivar] = React.useState<VersionModelo | null>(null);
 
   const fases = [...modelo.fasesCrispDm].sort((a, b) => a.orden - b.orden);
@@ -64,7 +69,10 @@ export function ModeloTab({ modelo, entrenando = false }: ModeloTabProps) {
         toast.success(`Modelo ${version} activado`, {
           description: 'Las nuevas predicciones se generarán con esta versión.',
         }),
-      onError: () => toast.error('No se pudo activar la versión'),
+      onError: (error) =>
+        toast.error('No se pudo activar la versión', {
+          description: error instanceof Error ? error.message : 'Reintenta en unos segundos.',
+        }),
     });
   };
 
@@ -156,6 +164,8 @@ export function ModeloTab({ modelo, entrenando = false }: ModeloTabProps) {
               <TCell>
                 {v.estado === 'vigente' ? (
                   <span className="text-body-sm text-text-secondary">Versión en producción</span>
+                ) : !puedeActivar ? (
+                  <span className="text-body-sm text-text-disabled">—</span>
                 ) : (
                   <Button
                     variant="secondary"

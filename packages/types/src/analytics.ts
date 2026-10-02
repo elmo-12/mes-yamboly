@@ -54,6 +54,8 @@ export interface AnaliticaResumen {
   variablesModelo?: number;
   kpis: {
     ep: number;
+    /** Predicciones confirmadas (Anexo 06). Con 0 la EP aún no se ha medido: la UI muestra «—». */
+    epConfirmadas?: number;
     precision: number;
     recall: number;
     alertas30d: number;

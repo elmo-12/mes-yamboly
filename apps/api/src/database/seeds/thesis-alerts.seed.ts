@@ -5,8 +5,11 @@ import { fechaMenos, hoy, iso, pad, rng } from './thesis-seed.util';
 import type { Seeder } from './seeder.interface';
 
 /**
- * 24 alertas deterministas (spec 07): 6 activas · 9 atendidas hoy · 2 vencidas ·
- * 7 confirmadas de días anteriores. 4 quedan pendientes de confirmar (`acierto = null`).
+ * 24 alertas deterministas (spec 07): 6 activas · 9 atendidas hoy · 9 vencidas
+ * (2 de hoy y 7 de días anteriores). Ninguna lleva `acierto`: el acierto solo
+ * lo fija la confirmación del evento real (`POST /alertas/:id/confirmar`), que
+ * además escribe la fila EP del Anexo 06. Así el KPI EP arranca en «sin datos»
+ * hasta su uso real (QA M5: había atendidas con acierto y confirmadas sin fila EP).
  */
 
 interface SemillaAlerta {
@@ -90,7 +93,7 @@ const ACTIVAS_Y_ATENDIDAS: SemillaAlerta[] = [
   /* --- Atendidas hoy (9) ----------------------------------------- */
   {
     tipo: 'parada_prevista', severidad: 'alta', lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1',
-    prediccion: 'Parada PN-02 en LLEN-A1 antes de las 11:30', probabilidad: 81, estado: 'atendida', acierto: true,
+    prediccion: 'Parada PN-02 en LLEN-A1 antes de las 11:30', probabilidad: 81, estado: 'atendida', acierto: null,
     ventana: ['11:00', '11:40'], dias: 0,
     factores: [
       { texto: 'Vibración por encima del umbral en la línea', contribucion: 52 },
@@ -102,7 +105,7 @@ const ACTIVAS_Y_ATENDIDAS: SemillaAlerta[] = [
   },
   {
     tipo: 'velocidad_baja', severidad: 'media', lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2',
-    prediccion: 'Velocidad 8 % bajo estándar en EXTR-2', probabilidad: 75, estado: 'atendida', acierto: true,
+    prediccion: 'Velocidad 8 % bajo estándar en EXTR-2', probabilidad: 75, estado: 'atendida', acierto: null,
     ventana: ['09:00', '10:00'], dias: 0,
     factores: [
       { texto: 'EXTR-2 por debajo del set point', contribucion: 46 },
@@ -113,7 +116,7 @@ const ACTIVAS_Y_ATENDIDAS: SemillaAlerta[] = [
   },
   {
     tipo: 'merma_prevista', severidad: 'media', lineaId: 'LIN-LLEN-M2', lineaCodigo: 'LLEN-M2', lineaNombre: 'Llenadora M2',
-    prediccion: 'Merma PT por desvío del proceso sobre 1,5 % en LLEN-M2', probabilidad: 71, estado: 'atendida', acierto: false,
+    prediccion: 'Merma PT por desvío del proceso sobre 1,5 % en LLEN-M2', probabilidad: 71, estado: 'atendida', acierto: null,
     ventana: ['08:00', '11:00'], dias: 0,
     factores: [
       { texto: 'Peso medio 2 g por encima del objetivo', contribucion: 49 },
@@ -147,7 +150,7 @@ const ACTIVAS_Y_ATENDIDAS: SemillaAlerta[] = [
   },
   {
     tipo: 'velocidad_baja', severidad: 'media', lineaId: 'LIN-MOLD-A3', lineaCodigo: 'MOLD-A3', lineaNombre: 'Moldeadora A3',
-    prediccion: 'Velocidad 7 % bajo estándar en MOLD-A3', probabilidad: 76, estado: 'atendida', acierto: true,
+    prediccion: 'Velocidad 7 % bajo estándar en MOLD-A3', probabilidad: 76, estado: 'atendida', acierto: null,
     ventana: ['09:30', '11:00'], dias: 0,
     factores: [
       { texto: 'MOLD-A3 con ciclo lento', contribucion: 45 },
@@ -158,7 +161,7 @@ const ACTIVAS_Y_ATENDIDAS: SemillaAlerta[] = [
   },
   {
     tipo: 'merma_prevista', severidad: 'alta', lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1',
-    prediccion: 'Merma EP sobre 3 kg en el arranque de LLEN-A1', probabilidad: 79, estado: 'atendida', acierto: true,
+    prediccion: 'Merma EP sobre 3 kg en el arranque de LLEN-A1', probabilidad: 79, estado: 'atendida', acierto: null,
     ventana: ['06:00', '07:30'], dias: 0,
     factores: [
       { texto: 'Arranques de LLEN-A1 generan 3,1 kg de media', contribucion: 48 },
@@ -169,7 +172,7 @@ const ACTIVAS_Y_ATENDIDAS: SemillaAlerta[] = [
   },
   {
     tipo: 'parada_prevista', severidad: 'alta', lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2',
-    prediccion: 'Parada PN-02 por falla de mantto en EXTR-2', probabilidad: 84, estado: 'atendida', acierto: true,
+    prediccion: 'Parada PN-02 por falla de mantto en EXTR-2', probabilidad: 84, estado: 'atendida', acierto: null,
     ventana: ['10:00', '11:00'], dias: 0,
     factores: [
       { texto: 'EXTR-2 en mantenimiento correctivo', contribucion: 53 },
@@ -180,7 +183,7 @@ const ACTIVAS_Y_ATENDIDAS: SemillaAlerta[] = [
   },
   {
     tipo: 'oee_bajo', severidad: 'media', lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2',
-    prediccion: 'OEE bajo 75 % en EXTR-2 en el turno Día', probabilidad: 72, estado: 'atendida', acierto: false,
+    prediccion: 'OEE bajo 75 % en EXTR-2 en el turno Día', probabilidad: 72, estado: 'atendida', acierto: null,
     ventana: ['06:00', '14:00'], dias: 0,
     factores: [
       { texto: 'Disponibilidad afectada por mantenimiento', contribucion: 47 },
@@ -213,8 +216,11 @@ const ACTIVAS_Y_ATENDIDAS: SemillaAlerta[] = [
   },
 ];
 
-/** 7 alertas confirmadas de días anteriores — histórico del KPI EP. */
-function confirmadas(): SemillaAlerta[] {
+/**
+ * 7 alertas de días anteriores que nadie confirmó: quedan `vencida` y sin
+ * `acierto`. Antes eran `confirmada` sin fila EP en el Anexo 06 (QA M5).
+ */
+function vencidasAnteriores(): SemillaAlerta[] {
   const r = rng(505);
   const lineas = [
     { lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2' },
@@ -234,10 +240,9 @@ function confirmadas(): SemillaAlerta[] {
     velocidad_baja: 'Velocidad por debajo del estándar',
     oee_bajo: 'OEE del turno bajo el umbral',
   };
-  const aciertos = [true, true, false, true, true, true, false];
   const severidades: SeveridadAlerta[] = ['alta', 'media', 'critica'];
 
-  return aciertos.map((acierto, i) => {
+  return Array.from({ length: 7 }, (_, i) => {
     const linea = lineas[i % lineas.length]!;
     const tipo = tipos[i % tipos.length]!;
     return {
@@ -246,8 +251,8 @@ function confirmadas(): SemillaAlerta[] {
       ...linea,
       prediccion: `${textos[tipo]} en ${linea.lineaCodigo} ${linea.lineaNombre}`,
       probabilidad: r.int(70, 93),
-      estado: 'confirmada' as EstadoAlerta,
-      acierto,
+      estado: 'vencida' as EstadoAlerta,
+      acierto: null,
       ventana: ['09:00', '12:00'] as [string, string],
       dias: i + 1,
       factores: [
@@ -255,8 +260,6 @@ function confirmadas(): SemillaAlerta[] {
         { texto: 'Desviación de velocidad sostenida', contribucion: r.int(25, 35) },
         { texto: 'Cambio de producto reciente', contribucion: r.int(15, 25) },
       ],
-      accionTomada: 'Se aplicó la acción preventiva indicada por el supervisor',
-      observacion: acierto ? 'El evento ocurrió dentro de la ventana prevista' : 'El evento no se materializó',
     };
   });
 }
@@ -267,7 +270,7 @@ export class ThesisAlertsSeeder implements Seeder {
   async run(dataSource: DataSource): Promise<void> {
     const repo = dataSource.getRepository(Alerta);
     if (!(await repo.count())) {
-      const semillas = [...ACTIVAS_Y_ATENDIDAS, ...confirmadas()];
+      const semillas = [...ACTIVAS_Y_ATENDIDAS, ...vencidasAnteriores()];
       await repo.save(
         semillas.map((s, i) => {
           const fecha = s.dias === 0 ? hoy() : fechaMenos(s.dias);

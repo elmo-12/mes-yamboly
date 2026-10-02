@@ -15,7 +15,7 @@ import {
   Producto,
   VelocidadEstandar,
 } from '../../../database/entities';
-import { ahoraIso } from '../../../common/utils';
+import { ahoraIso, sumarDiasLocal } from '../../../common/utils';
 import {
   type DefinicionFeature,
   construirCatalogo,
@@ -118,9 +118,7 @@ interface Grano {
 }
 
 function fechaMas(fecha: string, dias: number): string {
-  const d = new Date(`${fecha}T00:00:00`);
-  d.setDate(d.getDate() + dias);
-  return ahoraIso(d).slice(0, 10);
+  return sumarDiasLocal(fecha, dias);
 }
 
 /** Turno `D` arranca 06:00 del día operativo; `N`, 18:00 del mismo día. */

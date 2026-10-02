@@ -13,7 +13,12 @@ import {
   TabsTrigger,
 } from '@mes/ui';
 import { AppPageHeader } from '@/components/AppPageHeader';
-import { ESTADO_ORDEN_LABEL, TURNO_LABEL } from '@mes/types';
+import {
+  ESTADO_ORDEN_LABEL,
+  TURNO_LABEL,
+  puedeFinalizarOrden,
+  puedeValidarOrden,
+} from '@mes/types';
 import { formatDateLong } from '@mes/shared';
 import { useSession } from '@/hooks/use-session';
 import { PageSkeleton } from '@/components/PageSkeleton';
@@ -47,9 +52,6 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number];
 
-/** Solo jefatura y supervisión pueden validar una OF (RF5). */
-const ROLES_VALIDACION = ['jefe', 'supervisor'] as const;
-
 export interface OrdenDetallePageProps {
   /** Segmento de la ruta: id (`ORD-0815`) o código (`OF-2026-0815`). */
   id: string;
@@ -60,7 +62,9 @@ export function OrdenDetallePage({ id }: OrdenDetallePageProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const { tieneRol } = useSession();
+  const { user } = useSession();
+  /* Solo jefatura y supervisión pueden validar una OF (RF5). */
+  const rolValida = puedeValidarOrden(user);
 
   const orden = useOrden(id);
   const paradas = useOrdenParadas(id);
@@ -93,8 +97,9 @@ export function OrdenDetallePage({ id }: OrdenDetallePageProps) {
   const abrirValidar = params.get('validar') === '1';
   const porValidar = orden.data?.estado === 'por_validar';
   React.useEffect(() => {
-    if (abrirValidar && porValidar) setValidar(true);
-  }, [abrirValidar, porValidar]);
+    /* `?validar=1` sólo abre el modal a quien puede validar. */
+    if (abrirValidar && porValidar && rolValida) setValidar(true);
+  }, [abrirValidar, porValidar, rolValida]);
 
   /* `?print=1` lanza el diálogo de impresión del navegador. */
   const imprimirAuto = params.get('print') === '1';
@@ -122,7 +127,9 @@ export function OrdenDetallePage({ id }: OrdenDetallePageProps) {
   }
 
   const of = orden.data;
-  const puedeValidar = of.estado === 'por_validar' && tieneRol(...ROLES_VALIDACION);
+  const puedeValidar = of.estado === 'por_validar' && rolValida;
+  /* «Editar» cierra la orden (`POST /finalizar`): sólo en curso y para quien puede cerrarla. */
+  const puedeEditar = of.estado === 'en_curso' && puedeFinalizarOrden(user, of.lineaId);
   const editable = of.estado !== 'validada';
 
   return (
@@ -137,9 +144,11 @@ export function OrdenDetallePage({ id }: OrdenDetallePageProps) {
             <Button variant="secondary" icon={<Icon name="printer" />} onClick={() => window.print()}>
               Imprimir
             </Button>
-            <Button variant="secondary" icon={<Icon name="edit" />} onClick={() => setEditar(true)}>
-              Editar
-            </Button>
+            {puedeEditar && (
+              <Button variant="secondary" icon={<Icon name="edit" />} onClick={() => setEditar(true)}>
+                Editar
+              </Button>
+            )}
             {puedeValidar && (
               <Button
                 variant="primary"
@@ -207,7 +216,12 @@ export function OrdenDetallePage({ id }: OrdenDetallePageProps) {
         </TabsContent>
 
         <TabsContent value="evidencias">
-          <OrdenEvidenciasTab paradas={paradas.data?.data ?? []} cargando={paradas.isPending} />
+          <OrdenEvidenciasTab
+            orden={of}
+            paradas={paradas.data?.data ?? []}
+            mermas={mermas.data?.data ?? []}
+            cargando={paradas.isPending}
+          />
         </TabsContent>
 
         <TabsContent value="bitacora">
@@ -216,7 +230,7 @@ export function OrdenDetallePage({ id }: OrdenDetallePageProps) {
       </Tabs>
 
       <EditarOrdenModal open={editar} onOpenChange={setEditar} orden={of} />
-      <ValidarOrdenModal open={validar} onOpenChange={setValidar} orden={of} />
+      {puedeValidar && <ValidarOrdenModal open={validar} onOpenChange={setValidar} orden={of} />}
     </>
   );
 }

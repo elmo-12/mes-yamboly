@@ -3,7 +3,13 @@ import { HOY, fechaMenos, iso, pad4, rng } from './seed';
 
 /**
  * 24 alertas deterministas (spec 07). Composición: 6 activas · 9 atendidas hoy ·
- * 2 vencidas · 7 confirmadas; 4 quedan pendientes de confirmar (acierto = null).
+ * 9 vencidas (2 de hoy y 7 de días anteriores).
+ *
+ * Decisión de tesis (Anexo 06): el acierto sólo existe cuando un jefe o
+ * supervisor confirma el evento real, y cada confirmación deja su fila EP. Por
+ * eso las atendidas llevan `acierto: null`, no hay ninguna `confirmada` sin su
+ * fila (el store arranca con `registrosEp` vacío) y la EP arranca en «sin
+ * datos». Las 18 atendidas/vencidas quedan pendientes de confirmar.
  */
 
 interface AlertaSemilla {
@@ -87,7 +93,7 @@ const SEMILLAS: AlertaSemilla[] = [
   /* Atendidas hoy (9) --------------------------------------------- */
   {
     tipo: 'parada_prevista', severidad: 'alta', lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1',
-    prediccion: 'Parada PN-02 en LLEN-A1 antes de las 11:30', probabilidad: 81, estado: 'atendida', acierto: true,
+    prediccion: 'Parada PN-02 en LLEN-A1 antes de las 11:30', probabilidad: 81, estado: 'atendida', acierto: null,
     ventana: ['11:00', '11:40'], dias: 0,
     factores: [
       { texto: 'Vibración por encima del umbral en la línea', contribucion: 52 },
@@ -95,11 +101,10 @@ const SEMILLAS: AlertaSemilla[] = [
       { texto: 'Velocidad descendente en los últimos 20 min', contribucion: 19 },
     ],
     accionTomada: 'Se detuvo la línea de forma preventiva y se cambió el retén del cabezal de tapado',
-    observacion: 'La parada ocurrió a las 11:18 tal como se predijo',
   },
   {
     tipo: 'velocidad_baja', severidad: 'media', lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2',
-    prediccion: 'Velocidad 8 % bajo estándar en EXTR-2', probabilidad: 75, estado: 'atendida', acierto: true,
+    prediccion: 'Velocidad 8 % bajo estándar en EXTR-2', probabilidad: 75, estado: 'atendida', acierto: null,
     ventana: ['09:00', '10:00'], dias: 0,
     factores: [
       { texto: 'EXTR-2 por debajo del set point', contribucion: 46 },
@@ -110,7 +115,7 @@ const SEMILLAS: AlertaSemilla[] = [
   },
   {
     tipo: 'merma_prevista', severidad: 'media', lineaId: 'LIN-LLEN-M2', lineaCodigo: 'LLEN-M2', lineaNombre: 'Llenadora M2',
-    prediccion: 'Merma PT por desvío del proceso sobre 1,5 % en LLEN-M2', probabilidad: 71, estado: 'atendida', acierto: false,
+    prediccion: 'Merma PT por desvío del proceso sobre 1,5 % en LLEN-M2', probabilidad: 71, estado: 'atendida', acierto: null,
     ventana: ['08:00', '11:00'], dias: 0,
     factores: [
       { texto: 'Peso medio 2 g por encima del objetivo', contribucion: 49 },
@@ -118,7 +123,6 @@ const SEMILLAS: AlertaSemilla[] = [
       { texto: 'Cambio de formato reciente', contribucion: 21 },
     ],
     accionTomada: 'Se recalibró la balanza al inicio del turno',
-    observacion: 'La merma se mantuvo en 1,1 %; no se materializó el evento',
   },
   {
     tipo: 'oee_bajo', severidad: 'media', lineaId: 'LIN-MOLD-A4', lineaCodigo: 'MOLD-A4', lineaNombre: 'Moldeadora A4',
@@ -144,7 +148,7 @@ const SEMILLAS: AlertaSemilla[] = [
   },
   {
     tipo: 'velocidad_baja', severidad: 'media', lineaId: 'LIN-MOLD-A3', lineaCodigo: 'MOLD-A3', lineaNombre: 'Moldeadora A3',
-    prediccion: 'Velocidad 7 % bajo estándar en MOLD-A3', probabilidad: 76, estado: 'atendida', acierto: true,
+    prediccion: 'Velocidad 7 % bajo estándar en MOLD-A3', probabilidad: 76, estado: 'atendida', acierto: null,
     ventana: ['09:30', '11:00'], dias: 0,
     factores: [
       { texto: 'MOLD-A3 con ciclo lento', contribucion: 45 },
@@ -155,7 +159,7 @@ const SEMILLAS: AlertaSemilla[] = [
   },
   {
     tipo: 'merma_prevista', severidad: 'alta', lineaId: 'LIN-LLEN-A1', lineaCodigo: 'LLEN-A1', lineaNombre: 'Llenadora A1',
-    prediccion: 'Merma EP sobre 3 kg en el arranque de LLEN-A1', probabilidad: 79, estado: 'atendida', acierto: true,
+    prediccion: 'Merma EP sobre 3 kg en el arranque de LLEN-A1', probabilidad: 79, estado: 'atendida', acierto: null,
     ventana: ['06:00', '07:30'], dias: 0,
     factores: [
       { texto: 'Arranques de LLEN-A1 generan 3,1 kg de media', contribucion: 48 },
@@ -166,7 +170,7 @@ const SEMILLAS: AlertaSemilla[] = [
   },
   {
     tipo: 'parada_prevista', severidad: 'alta', lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2',
-    prediccion: 'Parada PN-02 por falla de mantto en EXTR-2', probabilidad: 84, estado: 'atendida', acierto: true,
+    prediccion: 'Parada PN-02 por falla de mantto en EXTR-2', probabilidad: 84, estado: 'atendida', acierto: null,
     ventana: ['10:00', '11:00'], dias: 0,
     factores: [
       { texto: 'EXTR-2 en mantenimiento correctivo', contribucion: 53 },
@@ -177,7 +181,7 @@ const SEMILLAS: AlertaSemilla[] = [
   },
   {
     tipo: 'oee_bajo', severidad: 'media', lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2',
-    prediccion: 'OEE bajo 75 % en EXTR-2 en el turno Día', probabilidad: 72, estado: 'atendida', acierto: false,
+    prediccion: 'OEE bajo 75 % en EXTR-2 en el turno Día', probabilidad: 72, estado: 'atendida', acierto: null,
     ventana: ['06:00', '14:00'], dias: 0,
     factores: [
       { texto: 'Disponibilidad afectada por mantenimiento', contribucion: 47 },
@@ -185,7 +189,6 @@ const SEMILLAS: AlertaSemilla[] = [
       { texto: 'Dos cambios de sabor programados', contribucion: 23 },
     ],
     accionTomada: 'Se reprogramó el segundo cambio de sabor al turno Noche',
-    observacion: 'El OEE cerró en 74,2 %, por debajo del umbral pero dentro de lo previsto',
   },
   /* Vencidas (2) --------------------------------------------------- */
   {
@@ -210,8 +213,12 @@ const SEMILLAS: AlertaSemilla[] = [
   },
 ];
 
-/** Alertas confirmadas de días anteriores (7) — alimentan el histórico de EP. */
-function generarConfirmadas(): AlertaSemilla[] {
+/**
+ * Alertas vencidas de días anteriores (7). Antes eran `confirmada` con su
+ * acierto, pero sin fila en el Anexo 06: la EP mostraba un valor que no salía
+ * de ninguna confirmación. Ahora esperan confirmación como las de hoy.
+ */
+function generarVencidasAnteriores(): AlertaSemilla[] {
   const r = rng(505);
   const lineasRef = [
     { lineaId: 'LIN-EXTR-2', lineaCodigo: 'EXTR-2', lineaNombre: 'Extrusora 2' },
@@ -231,9 +238,8 @@ function generarConfirmadas(): AlertaSemilla[] {
     velocidad_baja: 'Velocidad por debajo del estándar',
     oee_bajo: 'OEE del turno bajo el umbral',
   };
-  const aciertos = [true, true, false, true, true, true, false];
 
-  return aciertos.map((acierto, i) => {
+  return Array.from({ length: 7 }, (_, i) => {
     const linea = lineasRef[i % lineasRef.length]!;
     const tipo = tipos[i % tipos.length]!;
     return {
@@ -244,8 +250,8 @@ function generarConfirmadas(): AlertaSemilla[] {
       lineaNombre: linea.lineaNombre,
       prediccion: `${textos[tipo]} en ${linea.lineaCodigo} ${linea.lineaNombre}`,
       probabilidad: r.int(70, 93),
-      estado: 'confirmada' as EstadoAlerta,
-      acierto,
+      estado: 'vencida' as EstadoAlerta,
+      acierto: null,
       ventana: ['09:00', '12:00'] as [string, string],
       dias: i + 1,
       factores: [
@@ -253,8 +259,6 @@ function generarConfirmadas(): AlertaSemilla[] {
         { texto: 'Desviación de velocidad sostenida', contribucion: r.int(25, 35) },
         { texto: 'Cambio de producto reciente', contribucion: r.int(15, 25) },
       ],
-      accionTomada: 'Se aplicó la acción preventiva indicada por el supervisor',
-      observacion: acierto ? 'El evento ocurrió dentro de la ventana prevista' : 'El evento no se materializó',
     };
   });
 }
@@ -285,7 +289,7 @@ function construir(semillas: AlertaSemilla[]): Alerta[] {
   });
 }
 
-export const alertas: Alerta[] = construir([...SEMILLAS, ...generarConfirmadas()]);
+export const alertas: Alerta[] = construir([...SEMILLAS, ...generarVencidasAnteriores()]);
 
 export const umbralesIniciales: Umbrales = {
   velocidadBajoEstandarPct: 5,
@@ -299,4 +303,5 @@ export const umbralesIniciales: Umbrales = {
   tciToleranciaDiasSap: 1,
   actualizadoEn: iso(fechaMenos(3), '09:14'),
   actualizadoPor: 'Carlos Mendoza',
+  version: 1,
 };

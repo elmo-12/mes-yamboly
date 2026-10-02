@@ -49,7 +49,7 @@ const STATE_META: Record<LineState, { badge: BadgeColor; label: string }> = {
   produciendo: { badge: 'success', label: 'Produciendo' },
   parada: { badge: 'critical', label: 'En parada' },
   'sin-orden': { badge: 'neutral', label: 'Sin orden' },
-  alerta: { badge: 'warning', label: 'Riesgo de parada' },
+  alerta: { badge: 'warning', label: 'En riesgo' },
   sugerida: { badge: 'warning', label: 'Parada detectada por sensor' },
 };
 

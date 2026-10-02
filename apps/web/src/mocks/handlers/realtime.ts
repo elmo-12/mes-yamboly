@@ -1,6 +1,14 @@
 import { http, HttpResponse } from 'msw';
-import type { LineaTimeline, TiempoRealResumen, TimelineEvento, TvResumen, TvRow } from '@mes/types';
-import { ESTADO_LINEA_LABEL } from '@mes/types';
+import type {
+  EstadoSensoresIot,
+  LineaEstado,
+  LineaTimeline,
+  TiempoRealResumen,
+  TimelineEvento,
+  TvResumen,
+  TvRow,
+} from '@mes/types';
+import { ESTADOS_SENSORES_IOT, ESTADO_LINEA_LABEL, TIPO_ALERTA_LABEL } from '@mes/types';
 import {
   AHORA_ISO,
   lineaPorId,
@@ -11,15 +19,59 @@ import {
 import { buscarCausaMerma, getStore } from '../store';
 import { API, ahoraIso, errores, listaQuery, preludio } from './_utils';
 
-function resumen(): TiempoRealResumen {
+/**
+ * Fuerza el estado de los sensores IoT de las líneas instrumentadas, para
+ * revisar en modo mock cómo pinta el tablero cada caso de
+ * {@link ESTADOS_SENSORES_IOT} (`?__iot=api_caida`, `sin_conteo`…). Espejo de
+ * `calcularLecturaLinea`: sin conteo de fiar el producido vuelve al registro
+ * manual; sin respuesta del IoT tampoco hay velocidad medida ni recuentos.
+ */
+function forzarSensores(linea: LineaEstado, estado: EstadoSensoresIot): LineaEstado {
+  if (!linea.sensores) return linea;
+  const caida = estado === 'api_caida';
+  const sinSenal = estado === 'sensor_offline';
+  const sensores = caida
+    ? []
+    : linea.sensores.sensores.map((x) => ({ ...x, enLinea: sinSenal ? false : x.enLinea }));
+  const conConteo = estado === 'ok' || estado === 'parcial' || estado === 'sensor_offline';
+  const conVelocidad = !caida && estado !== 'sin_orden';
+  return {
+    ...linea,
+    sensores: {
+      ...linea.sensores,
+      consultado: !caida,
+      sensores,
+      total: sensores.length,
+      enLinea: sensores.filter((x) => x.enLinea).length,
+      estado,
+      ...(caida ? { ultimaLectura: undefined } : {}),
+    },
+    fuenteProduccion: conConteo ? 'sensores' : 'manual',
+    fuenteVelocidad: conVelocidad ? 'sensores' : 'manual',
+  };
+}
+
+function resumen(estadoIot?: EstadoSensoresIot | null): TiempoRealResumen {
+  const store = getStore();
+  /* Igual que la API: las líneas dadas de baja en Configuración no se muestran en planta. */
+  const activas = new Set(store.lineas.filter((l) => l.estado === 'activo').map((l) => l.id));
+  const lineas = store.lineaEstados
+    .filter((l) => activas.has(l.lineaId))
+    .map((l) => (estadoIot ? forzarSensores(l, estadoIot) : l));
   return {
     actualizadoEn: ahoraIso(),
     diaOperativo: AHORA_ISO.slice(0, 10),
     turno: TURNO_ACTUAL,
     turnoLabel: TURNO_ACTUAL_LABEL,
     turnoRango: TURNO_ACTUAL_RANGO,
-    lineas: getStore().lineaEstados,
+    lineas,
   };
+}
+
+/** `?__iot=<estado>` válido o `null`. */
+function estadoIotForzado(url: URL): EstadoSensoresIot | null {
+  const valor = url.searchParams.get('__iot');
+  return ESTADOS_SENSORES_IOT.includes(valor as EstadoSensoresIot) ? (valor as EstadoSensoresIot) : null;
 }
 
 function timeline(lineaId: string): LineaTimeline | null {
@@ -88,7 +140,7 @@ function timeline(lineaId: string): LineaTimeline | null {
         id: `EV-${estado.alerta.id}`,
         hora: estado.alerta.generadaEn.slice(11, 16),
         tipo: 'alerta',
-        titulo: `Alerta · ${estado.alerta.riesgo} %`,
+        titulo: `Alerta · ${TIPO_ALERTA_LABEL[estado.alerta.tipo]} · ${estado.alerta.riesgo} %`,
         detalle: estado.alerta.texto,
       });
     }
@@ -119,7 +171,7 @@ export const realtimeHandlers = [
     const url = new URL(request.url);
     const lineaIds = listaQuery(url, 'lineaId');
     const estados = listaQuery(url, 'estado');
-    const base = resumen();
+    const base = resumen(estadoIotForzado(url));
     let lineas = base.lineas;
     if (lineaIds.length > 0) lineas = lineas.filter((l) => lineaIds.includes(l.lineaId));
     if (estados.length > 0) lineas = lineas.filter((l) => estados.includes(l.estado));
@@ -129,7 +181,7 @@ export const realtimeHandlers = [
   http.get(`${API}/tiempo-real/tv`, async ({ request }) => {
     const simulado = await preludio(request);
     if (simulado) return simulado;
-    const filas: TvRow[] = getStore().lineaEstados.map((l) => ({
+    const filas: TvRow[] = resumen().lineas.map((l) => ({
       lineaId: l.lineaId,
       lineaCodigo: l.lineaCodigo,
       lineaNombre: l.lineaNombre,
@@ -165,7 +217,7 @@ export const realtimeHandlers = [
           const payload = JSON.stringify({
             tipo: 'estado',
             emitidoEn: ahoraIso(),
-            payload: resumen(),
+            payload: resumen(estadoIotForzado(new URL(request.url))),
           });
           controller.enqueue(encoder.encode(`event: estado\ndata: ${payload}\n\n`));
           enviados += 1;

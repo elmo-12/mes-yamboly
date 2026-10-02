@@ -77,11 +77,12 @@ export function EvidenciaPage() {
     try {
       const respuesta = await exportar.mutateAsync({
         kpis: ['TRI', 'TCI', 'TSP', 'CFS', 'EP'],
-        formato: 'csv',
+        /* El generador sólo escribe XLSX; «SPSS» cambia la codificación (1/0). */
+        formato: 'xlsx',
         destino: 'spss',
       });
       toast.success('Exportación para SPSS solicitada', {
-        description: `Archivo ${respuesta.id} · CSV plano con codificación numérica de los 5 anexos.`,
+        description: `Archivo ${respuesta.id} · XLSX con codificación numérica (1/0) de los 5 anexos. Descárgalo desde la pestaña Exportar.`,
       });
     } catch (e) {
       toast.error('No se pudo exportar para SPSS', {
@@ -98,7 +99,7 @@ export function EvidenciaPage() {
         destino: 'informe',
       });
       toast.success('Informe en preparación', {
-        description: `Archivo ${respuesta.id} · XLSX con una hoja por instrumento.`,
+        description: `Archivo ${respuesta.id} · XLSX con una hoja por instrumento. Descárgalo desde la pestaña Exportar.`,
       });
     } catch (e) {
       toast.error('No se pudo generar el informe', {

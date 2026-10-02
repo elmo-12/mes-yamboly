@@ -59,23 +59,23 @@ export function EliminarCausaModal({
   return (
     <Modal open={open} onOpenChange={onOpenChange}>
       <ModalContent
-        title={titulo ?? `¿Eliminar ${causa.codigo} · ${causa.nombre}?`}
+        title={titulo ?? `¿Dar de baja ${causa.codigo} · ${causa.nombre}?`}
         footer={
           <>
             <Button variant="secondary" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button variant="danger" loading={enviando} onClick={confirmar}>
-              Eliminar causa
+              Dar de baja
             </Button>
           </>
         }
       >
         <div className="flex flex-col gap-2">
-          <Overline>Esta acción no se puede deshacer</Overline>
+          <Overline>Baja lógica · podrás reactivarla</Overline>
           <p className="text-body leading-[22px] text-neutral-text">
             {descripcion ??
-              `Hay ${formatNumber(conservados)} ${etiquetaConservados} registradas con esta causa; se conservarán con el código ${causa.codigo} para no romper la trazabilidad, pero la causa dejará de estar disponible para nuevos registros.`}
+              `Hay ${formatNumber(conservados)} ${etiquetaConservados} registradas con esta causa; se conservarán con el código ${causa.codigo} para no romper la trazabilidad, pero la causa dejará de estar disponible para nuevos registros. Las causas que dependen de ella también se dan de baja.`}
           </p>
         </div>
       </ModalContent>

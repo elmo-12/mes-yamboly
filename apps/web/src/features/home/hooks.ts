@@ -43,7 +43,8 @@ const LABEL_OEE: Record<string, string> = {
 export function useResumenJefe() {
   const tiempoReal = useTiempoReal();
   const indicadores = useIndicadores({ periodo: PERIODO_HOY });
-  const paradasHoy = useReporteParadas({ periodo: PERIODO_HOY });
+  /* «Paradas no programadas» = solo las imprevistas (C1); antes contaba todas. */
+  const paradasHoy = useReporteParadas({ periodo: PERIODO_HOY, clasificacion: 'imprevista' });
   const paradasSemana = useReporteParadas({ periodo: PERIODO_SEMANA });
   const mermas = useReporteMermas({ periodo: PERIODO_HOY });
   const evidencia = useEvidenciaResumen();
@@ -160,7 +161,11 @@ const MAX_TRAMOS = 6;
  * timeline de la Line card, la alerta abierta de su línea y sus últimos
  * registros (paradas + mermas + velocidades combinadas).
  */
-export function useResumenMaquinista(lineaId: string | undefined, limiteRegistros = 3) {
+export function useResumenMaquinista(
+  lineaId: string | undefined,
+  usuarioId?: string,
+  limiteRegistros = 3,
+) {
   const habilitado = Boolean(lineaId);
   const tiempoReal = useTiempoReal();
 
@@ -271,8 +276,11 @@ export function useResumenMaquinista(lineaId: string | undefined, limiteRegistro
   const registros = React.useMemo<RegistroPropio[]>(() => {
     if (!habilitado) return [];
     const filas: RegistroPropio[] = [];
+    /* «Mis últimos registros»: solo los que firmó el usuario, no los de toda
+     * la línea (antes salían los del compañero del otro turno). */
+    const esMio = (responsableId: string) => !usuarioId || responsableId === usuarioId;
 
-    for (const p of listaParadas) {
+    for (const p of listaParadas.filter((x) => esMio(x.responsableId))) {
       filas.push({
         id: p.id,
         fechaIso: p.inicio,
@@ -284,7 +292,7 @@ export function useResumenMaquinista(lineaId: string | undefined, limiteRegistro
       });
     }
 
-    for (const m of mermas.data?.data ?? []) {
+    for (const m of (mermas.data?.data ?? []).filter((x) => esMio(x.responsableId))) {
       filas.push({
         id: m.id,
         fechaIso: m.registradaEn,
@@ -296,7 +304,7 @@ export function useResumenMaquinista(lineaId: string | undefined, limiteRegistro
       });
     }
 
-    for (const v of velocidades.data?.data ?? []) {
+    for (const v of (velocidades.data?.data ?? []).filter((x) => esMio(x.responsableId))) {
       filas.push({
         id: v.id,
         fechaIso: v.registradaEn,
@@ -311,7 +319,7 @@ export function useResumenMaquinista(lineaId: string | undefined, limiteRegistro
     return filas
       .sort((a, b) => new Date(b.fechaIso).getTime() - new Date(a.fechaIso).getTime())
       .slice(0, limiteRegistros);
-  }, [habilitado, listaParadas, mermas.data, velocidades.data, limiteRegistros]);
+  }, [habilitado, listaParadas, mermas.data, velocidades.data, limiteRegistros, usuarioId]);
 
   const consultas = [tiempoReal, alertas, paradas, mermas, velocidades];
 

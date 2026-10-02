@@ -164,7 +164,8 @@ describe('tiempo real y catálogos (e2e)', () => {
   });
 
   it('exige el número de solicitud cuando la causa de merma lo requiere (422)', async () => {
-    /* MP-04-01 «Falla palera» exige N.º de solicitud en el árbol real. */
+    /* MP-04-04 exige N.º de solicitud en el árbol real y aplica a LLEN-M2
+     * (MP-04-01 no: su `lineasAplicables` excluye la línea → 422 causaId). */
     const { body } = await request(app.getHttpServer())
       .post('/api/v1/mermas')
       .set(auth())
@@ -175,7 +176,7 @@ describe('tiempo real y catálogos (e2e)', () => {
         cantidadKg: 1.2,
         sabor: 'Chocolate',
         tipoCausaId: 'CME-MP-04',
-        causaId: 'CME-MP-04-01',
+        causaId: 'CME-MP-04-04',
         responsableId: 'USR-04',
         tiempoRegistroSeg: 40,
       })

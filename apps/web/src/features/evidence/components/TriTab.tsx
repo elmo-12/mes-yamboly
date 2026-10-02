@@ -90,7 +90,11 @@ export function TriTab({ tri }: { tri: EvidenciaTRI }) {
               (postest.page - 1) * postest.pageSize + postest.filas.length
             } de ${postest.total} eventos · ΣTR = ${formatNumber(sumaPostest, 1)} min · n = ${
               tri.postest.length
-            } · TRI = ${formatNumber(tri.promedioPostest ?? 0, 2)} min`}
+            } · TRI = ${formatNumber(tri.promedioPostest ?? 0, 2)} min${
+              (tri.descartadosPostest ?? 0) > 0
+                ? ` · ${tri.descartadosPostest} capturas descartadas por fecha inválida o tiempo fuera de 1 s–60 min`
+                : ''
+            }`}
             actions={
               <>
                 <Button
@@ -131,7 +135,7 @@ export function TriTab({ tri }: { tri: EvidenciaTRI }) {
         titulo={`${tri.pretest.length} eventos cargados desde la hoja física digitalizada`}
         detalle={`ΣTR pretest = ${formatNumber(sumaPretest, 1)} min · n = ${
           tri.pretest.length
-        } · TRI pretest = ${formatNumber(tri.promedioPretest, 2)} min · Formato: Anexo 02 (CSV / XLSX)`}
+        } · TRI pretest = ${formatNumber(tri.promedioPretest, 2)} min · Formato: filas pegadas desde la hoja del Anexo 02`}
         actions={
           <Button
             variant="secondary"
@@ -185,7 +189,11 @@ export function TriTab({ tri }: { tri: EvidenciaTRI }) {
         />
       )}
 
-      <CargarPretestModal open={modalAbierto} onOpenChange={setModalAbierto} />
+      <CargarPretestModal
+        open={modalAbierto}
+        onOpenChange={setModalAbierto}
+        existentes={tri.pretest.length}
+      />
     </div>
   );
 }

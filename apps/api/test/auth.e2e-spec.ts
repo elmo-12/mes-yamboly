@@ -70,4 +70,36 @@ describe('auth (e2e)', () => {
       .set('Authorization', `Bearer ${sesion.accessToken}`)
       .expect(204);
   });
+
+  describe('límite por IP con trust proxy', () => {
+    const fallo = (a: INestApplication, xff?: string) => {
+      const r = request(a.getHttpServer()).post('/api/v1/auth/login');
+      if (xff) r.set('X-Forwarded-For', xff);
+      return r.send({ email: `nadie-${Math.random()}@x.lat`, password: 'mala-clave-1' });
+    };
+
+    it('con 1 salto de confianza una XFF rotativa no evita el bloqueo por IP', async () => {
+      const a = await crearApp();
+      a.getHttpAdapter().getInstance().set('trust proxy', 1);
+      try {
+        let estado = 0;
+        for (let i = 0; i < 25; i++) estado = (await fallo(a, `10.9.${i}.1, 203.0.113.7`)).status;
+        expect(estado).toBe(429);
+      } finally {
+        await a.close();
+      }
+    });
+
+    it('con saltos de confianza y sin X-Forwarded-For no limita por IP', async () => {
+      const a = await crearApp();
+      a.getHttpAdapter().getInstance().set('trust proxy', 1);
+      try {
+        let estado = 0;
+        for (let i = 0; i < 25; i++) estado = (await fallo(a)).status;
+        expect(estado).toBe(401);
+      } finally {
+        await a.close();
+      }
+    });
+  });
 });

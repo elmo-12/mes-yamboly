@@ -89,7 +89,11 @@ function ContenidoRevision({
     setError(null);
   };
 
+  /* Vuelve al resultado de la regla: la API lo envía en `cumpleRegla` (el
+     `cumple` de un criterio forzado ya trae el override aplicado). */
   const volverALaRegla = (clave: ClaveCriterioTci) => {
+    const criterio = evaluacion.criterios.find((c) => c.clave === clave);
+    setValores((prev) => ({ ...prev, [clave]: criterio?.cumpleRegla ?? criterio?.cumple ?? false }));
     setManuales((prev) => ({ ...prev, [clave]: false }));
     setError(null);
   };

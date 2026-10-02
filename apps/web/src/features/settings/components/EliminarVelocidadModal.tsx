@@ -69,7 +69,7 @@ export function EliminarVelocidadModal({
         }
       >
         <div className="flex flex-col gap-2">
-          <Overline>Esta acción no se puede deshacer</Overline>
+          <Overline>Baja lógica · podrás reactivarla desde «Editar velocidad»</Overline>
           <p className="text-body leading-[22px] text-neutral-text">
             {velocidad.lineaNombre} dejará de ofrecer este producto al iniciar una orden. Las
             órdenes ya fabricadas conservan la velocidad congelada (

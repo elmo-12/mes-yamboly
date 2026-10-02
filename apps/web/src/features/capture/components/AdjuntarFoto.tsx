@@ -6,6 +6,10 @@ import { Button, Icon, Overline } from '@mes/ui';
 import { mensajeDeError } from '@/services/api';
 import { subirEvidencia } from '../api';
 
+/** Igual que la API (`MAX_BYTES_IMAGEN`): se avisa antes de subir. */
+const MAX_BYTES_FOTO = 8 * 1024 * 1024;
+const EXTENSIONES = ['.jpg', '.jpeg', '.png', '.webp', '.heic'];
+
 export interface AdjuntarFotoProps {
   /** Overline de la zona (`EVIDENCIA (FOTO)`). */
   label: string;
@@ -37,6 +41,21 @@ export function AdjuntarFoto({ label, cta, value, onChange, disabled }: Adjuntar
   const elegir = async (archivo: File | undefined) => {
     if (!archivo) {
       onChange(undefined);
+      return;
+    }
+    const nombre = archivo.name.toLowerCase();
+    if (!EXTENSIONES.some((ext) => nombre.endsWith(ext))) {
+      toast.error('No se pudo subir la foto', {
+        description: 'Sube una foto .jpg, .png, .webp o .heic.',
+      });
+      if (inputRef.current) inputRef.current.value = '';
+      return;
+    }
+    if (archivo.size > MAX_BYTES_FOTO) {
+      toast.error('No se pudo subir la foto', {
+        description: `La foto pesa ${(archivo.size / 1024 / 1024).toFixed(1)} MB; el máximo es 8 MB.`,
+      });
+      if (inputRef.current) inputRef.current.value = '';
       return;
     }
     setSubiendo(true);

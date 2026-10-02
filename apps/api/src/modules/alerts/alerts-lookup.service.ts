@@ -63,6 +63,7 @@ export class AlertsLookupService implements AlertsLookup {
         lineaId,
         {
           id: a.id,
+          tipo: a.tipo,
           riesgo: a.probabilidad,
           texto: a.prediccion,
           generadaEn: a.generadaEn,

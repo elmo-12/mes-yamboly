@@ -1,10 +1,12 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { LoginResponse, User as UserDto } from '@mes/types';
 import { CurrentUser, type AuthUser } from '../../common/decorators/current-user';
 import { Public } from '../../common/decorators/public';
 import { ApiErrorDto } from '../../common/dto/api-error.dto';
 import { AuthService } from './auth.service';
+import { ipCliente } from './ip-cliente';
 import { LoginResponseDto, UserDto as UserSchema } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -20,8 +22,13 @@ export class AuthController {
   @ApiResponse({ status: 200, type: LoginResponseDto })
   @ApiResponse({ status: 401, description: 'Credenciales inválidas', type: ApiErrorDto })
   @ApiResponse({ status: 400, description: 'Validación', type: ApiErrorDto })
-  login(@Body() dto: LoginDto): Promise<LoginResponse> {
-    return this.auth.login(dto);
+  @ApiResponse({
+    status: 429,
+    description: 'Demasiados intentos fallidos (por cuenta o por IP); `details.reintentarEnSeg`',
+    type: ApiErrorDto,
+  })
+  login(@Body() dto: LoginDto, @Req() req: Request): Promise<LoginResponse> {
+    return this.auth.login(dto, ipCliente(req));
   }
 
   @Get('me')
@@ -36,9 +43,9 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Cierra la sesión (el cliente descarta el token)' })
+  @ApiOperation({ summary: 'Cierra la sesión y revoca los tokens emitidos al usuario' })
   @ApiResponse({ status: 204, description: 'Sesión cerrada' })
-  logout(): void {
-    /* JWT sin estado: el cliente descarta el token. */
+  async logout(@CurrentUser() user: AuthUser): Promise<void> {
+    await this.auth.revocarSesiones(user.id);
   }
 }

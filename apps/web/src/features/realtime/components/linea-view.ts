@@ -1,5 +1,11 @@
-import type { LineCardProps, LineSegment, LineState } from '@mes/ui';
-import type { EstadoLinea, LineaEstado, TiempoRealResumen } from '@mes/types';
+import type { BadgeColor, LineCardProps, LineSegment, LineState } from '@mes/ui';
+import type {
+  EstadoLinea,
+  EstadoSensoresIot,
+  LineaEstado,
+  TiempoRealResumen,
+  TipoAlerta,
+} from '@mes/types';
 import { TURNO_LABEL } from '@mes/types';
 import { formatDelta, formatDurationMin, formatNumber, formatPct, formatTime } from '@mes/shared';
 
@@ -44,12 +50,25 @@ const SEGMENTOS: Record<EstadoLinea, readonly LineSegment[]> = {
 export const BOTON_PRINCIPAL = 'basis-full @sm/line-card:flex-1 @sm/line-card:basis-0';
 export const BOTON_FILA = 'flex-1 basis-0';
 
+/**
+ * Rótulo del badge en estado `alerta` según lo que predice la alerta: la
+ * probabilidad de una alerta de velocidad no es un «riesgo de parada».
+ */
+const RIESGO_POR_TIPO: Record<TipoAlerta, string> = {
+  parada_prevista: 'Riesgo de parada',
+  merma_prevista: 'Riesgo de merma',
+  velocidad_baja: 'Riesgo de velocidad baja',
+  oee_bajo: 'Riesgo de OEE bajo',
+};
+
 export function badgeLinea(linea: LineaEstado): string {
   switch (linea.estado) {
     case 'parada':
       return `En parada · ${formatDurationMin(linea.tiempoEnEstadoMin)}`;
     case 'alerta':
-      return `Riesgo de parada ${formatNumber(linea.alerta?.riesgo ?? 0)} %`;
+      return linea.alerta
+        ? `${RIESGO_POR_TIPO[linea.alerta.tipo] ?? 'Riesgo'} ${formatNumber(linea.alerta.riesgo)} %`
+        : 'En riesgo';
     case 'sugerida':
       return 'Parada detectada por sensor';
     case 'sin_orden':
@@ -96,6 +115,66 @@ function mensajeLinea(linea: LineaEstado): string | undefined {
   }
 }
 
+/** Marca la métrica cuando la cifra sale de los sensores IoT y no de un registro. */
+function sufijoSensores(fuente: LineaEstado['fuenteProduccion']): string {
+  return fuente === 'sensores' ? ' · sensores' : '';
+}
+
+/** Por qué el conteo IoT de una línea instrumentada vale lo que vale. */
+const DETALLE_ESTADO_IOT: Record<EstadoSensoresIot, string> = {
+  ok: 'conteo en vivo',
+  parcial: 'conteo en vivo sin algún sensor (sin referencia al inicio de la orden)',
+  sensor_offline: 'sin señal: se muestra el último conteo',
+  sin_conteo: 'el IoT no dio el conteo de la orden: producido manual',
+  inconsistente: 'contador reiniciado: producido manual',
+  sin_orden: 'sin orden en curso',
+  api_caida: 'el servicio IoT no responde: producido manual',
+};
+
+export interface IndicadorSensores {
+  texto: string;
+  color: BadgeColor;
+  /** Punto de estado: sólo cuando hay sensores que contar. */
+  dot: boolean;
+  /** Detalle para el `title`: sensor a sensor y salud del conteo. */
+  detalle: string;
+}
+
+/**
+ * Indicador de sensores IoT de la tarjeta: `3/3 sensores` en verde, ámbar si
+ * falta alguno y rojo si no queda ninguno en línea. El "en línea" ya llega con
+ * la ventana de gracia de la API, así que no parpadea con cada reconexión WiFi.
+ */
+export function indicadorSensores(linea: LineaEstado): IndicadorSensores {
+  const s = linea.sensores;
+  if (!s) {
+    return {
+      texto: 'Sin sensores',
+      color: 'neutral',
+      dot: false,
+      detalle: 'Línea sin sensores IoT: datos de los registros manuales',
+    };
+  }
+  if (!s.consultado) {
+    return {
+      texto: 'Sensores sin respuesta',
+      color: 'warning',
+      dot: false,
+      detalle: `${s.lineal}: ${DETALLE_ESTADO_IOT.api_caida}`,
+    };
+  }
+  const color: BadgeColor =
+    s.enLinea === 0 ? 'critical' : s.enLinea < s.total ? 'warning' : 'success';
+  const lista = s.sensores.map((x) => `${x.id} ${x.enLinea ? 'en línea' : 'sin señal'}`).join(', ');
+  const ultima = s.ultimaLectura ? ` · última lectura ${formatTime(s.ultimaLectura)}` : '';
+  return {
+    texto: `${s.enLinea}/${s.total} sensores`,
+    color,
+    dot: true,
+    detalle: `${s.lineal}: ${lista} · ${DETALLE_ESTADO_IOT[s.estado]}${ultima}`,
+  };
+}
+
 /** Nota de la métrica de tiempo, según el estado de la línea. */
 const NOTA_TIEMPO: Record<EstadoLinea, string> = {
   produciendo: 'en producción',
@@ -124,13 +203,15 @@ function metricasLinea(linea: LineaEstado): LineCardProps['metrics'] {
     {
       label: 'Producido',
       value: conOrden ? `${formatNumber(linea.producido)} u` : '—',
-      note: conOrden ? `${formatPct(avance, 0)} de ${formatNumber(linea.plan)} u` : 'sin producción',
+      note: conOrden
+        ? `${formatPct(avance, 0)} de ${formatNumber(linea.plan)} u${sufijoSensores(linea.fuenteProduccion)}`
+        : 'sin producción',
     },
     {
       label: 'Velocidad',
       value: conOrden ? `${formatNumber(linea.velocidad)} u/min` : '—',
       note: conOrden
-        ? `objetivo ${formatNumber(linea.velocidadEstandar, 1)} · ${formatDelta(desvio, '%', 0)}`
+        ? `objetivo ${formatNumber(linea.velocidadEstandar, 1)} · ${formatDelta(desvio, '%', 0)}${sufijoSensores(linea.fuenteVelocidad)}`
         : `objetivo ${formatNumber(linea.velocidadEstandar, 1)} u/min`,
     },
     {

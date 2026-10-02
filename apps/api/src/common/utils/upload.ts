@@ -117,3 +117,33 @@ export const OPCIONES_SUBIDA_TABLA: MulterOptions = {
     callback(null, true);
   },
 };
+
+/**
+ * Comprueba la firma real del archivo (magic bytes) y que coincida con la
+ * extensión: un HTML o un PDF renombrado a `.png` no pasa.
+ */
+export function firmaImagenValida(buffer: Buffer, nombre: string): boolean {
+  if (!buffer || buffer.length < 12) return false;
+  const ext = nombre.toLowerCase().slice(nombre.lastIndexOf('.'));
+  const esJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  const esPng = buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  const esWebp =
+    buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+  const marca = buffer.subarray(8, 12).toString('ascii');
+  const esHeic =
+    buffer.subarray(4, 8).toString('ascii') === 'ftyp' &&
+    ['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1', 'heif'].includes(marca);
+  switch (ext) {
+    case '.jpg':
+    case '.jpeg':
+      return esJpeg;
+    case '.png':
+      return esPng;
+    case '.webp':
+      return esWebp;
+    case '.heic':
+      return esHeic;
+    default:
+      return false;
+  }
+}

@@ -17,6 +17,8 @@ export interface ValidarTciModalProps {
   /** `YYYY-MM-DD` del primer registro del postest; por defecto el rango completo. */
   desdeSugerido?: string;
   hastaSugerido: string;
+  /** `false` si ninguna fuente externa tiene filas: la validación saldría 0 %. */
+  hayFuentes?: boolean;
 }
 
 /**
@@ -29,6 +31,7 @@ export function ValidarTciModal({
   onOpenChange,
   desdeSugerido,
   hastaSugerido,
+  hayFuentes = true,
 }: ValidarTciModalProps) {
   const validar = useValidarTci();
   const [desde, setDesde] = React.useState(desdeSugerido ?? '');
@@ -70,14 +73,15 @@ export function ValidarTciModal({
 
     try {
       const resumen = await validar.mutateAsync(validado.data);
+      const evaluados = resumen.ultimaValidacion?.evaluados ?? 0;
       toast.success('Validación ejecutada', {
         description:
-          resumen.registrosTotales === 0
+          evaluados === 0
             ? 'No había registros del postest en el rango indicado.'
-            : `${resumen.registrosCorrectos} de ${resumen.registrosTotales} registros válidos · TCI ${formatNumber(
+            : `${formatNumber(evaluados)} registros evaluados en el rango · TCI acumulado ${formatNumber(
                 resumen.porcentaje ?? 0,
                 1,
-              )} %.`,
+              )} % (${resumen.registrosCorrectos} de ${resumen.registrosTotales}).`,
       });
       onOpenChange(false);
     } catch (e) {
@@ -142,9 +146,16 @@ export function ValidarTciModal({
 
           {error && <p className="text-body-sm text-error-text">{error}</p>}
 
+          {!hayFuentes && (
+            <p className="rounded-md bg-warning-subtle px-4 py-3 text-body-sm text-warning-text">
+              Todavía no se importó ninguna fuente externa: los criterios de sensor, solicitud y SAP
+              saldrán como no cumplidos y el TCI quedará cerca de 0 %. Importa las fuentes antes de
+              validar.
+            </p>
+          )}
           <p className="rounded-md bg-warning-subtle px-4 py-3 text-body-sm text-warning-text">
-            La validación reemplaza las evaluaciones que ya existan en este rango, incluidos los
-            criterios revisados a mano.
+            La validación recalcula las evaluaciones que ya existan en este rango. Los criterios
+            revisados a mano y sus justificaciones se conservan.
           </p>
         </div>
       </ModalContent>

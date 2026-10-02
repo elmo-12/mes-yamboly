@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, IntersectionType, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsIn,
@@ -8,10 +8,12 @@ import {
   IsPositive,
   IsString,
   Matches,
+  Max,
   Min,
   MinLength,
 } from 'class-validator';
 import { ESTADOS_CATALOGO, type EstadoCatalogo } from '@mes/types';
+import { ConVersionDto, Recortar } from './comunes.dto';
 
 /**
  * Alta de producto (`POST /productos`) — espejo de `productoSchema`.
@@ -20,37 +22,44 @@ import { ESTADOS_CATALOGO, type EstadoCatalogo } from '@mes/types';
  */
 export class CreateProductoDto {
   @ApiProperty({ example: '1110001', description: 'Código de 7 dígitos del maestro' })
+  @Recortar()
   @IsString()
   @Matches(/^\d{7}$/, { message: 'Formato esperado 1110001 (7 dígitos)' })
   codigo!: string;
 
   @ApiProperty({ example: 'CUBETA YAMBOLY HELADO CREMA CAPUCCINO 1 X 5 L' })
+  @Recortar()
   @IsString()
   @MinLength(3, { message: 'La descripción larga es obligatoria' })
   descripcionLarga!: string;
 
   @ApiProperty({ example: 'CUB-YAM-CAPUCCINO 1X5L' })
+  @Recortar()
   @IsString()
   @MinLength(3, { message: 'La descripción corta es obligatoria' })
   descripcionCorta!: string;
 
   @ApiProperty({ example: 'CUB-YAM-CAPUCCINO 1X5L', description: 'Nombre mostrado en la UI' })
+  @Recortar()
   @IsString()
   @MinLength(3, { message: 'El nombre es obligatorio' })
   nombre!: string;
 
   @ApiPropertyOptional({ nullable: true, example: null })
   @IsOptional()
+  @Recortar()
   @IsString()
   alias?: string | null;
 
   @ApiPropertyOptional({ nullable: true, example: 'YAMBOLY' })
   @IsOptional()
+  @Recortar()
   @IsString()
   marca?: string | null;
 
   @ApiPropertyOptional({ nullable: true, example: '2.54 kg(5L)' })
   @IsOptional()
+  @Recortar()
   @IsString()
   presentacion?: string | null;
 
@@ -65,6 +74,7 @@ export class CreateProductoDto {
   @Type(() => Number)
   @IsNumber({}, { message: 'El peso debe ser numérico' })
   @IsPositive({ message: 'El peso debe ser mayor que 0' })
+  @Max(10_000, { message: 'Peso fuera de rango' })
   pesoKg!: number;
 
   @ApiPropertyOptional({ nullable: true, example: 'SAB-2110124' })
@@ -83,8 +93,14 @@ export class CreateProductoDto {
   estado?: EstadoCatalogo;
 }
 
-/** Edición parcial (`PATCH /productos/:id`). */
-export class UpdateProductoDto extends PartialType(CreateProductoDto) {}
+/**
+ * Edición parcial (`PATCH /productos/:id`). `codigo` se acepta sólo si no
+ * cambia (422 si cambia): el id `PRD-<codigo>` lo referencian las órdenes.
+ */
+export class UpdateProductoDto extends IntersectionType(
+  PartialType(CreateProductoDto),
+  ConVersionDto,
+) {}
 
 export class ProductoQueryDto {
   @ApiPropertyOptional({

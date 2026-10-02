@@ -8,7 +8,8 @@ import { AlertCard, Badge, Button, Input, Modal, ModalContent, Textarea, toast }
 import { finalizeOrdenSchema } from '@mes/types';
 import type { FinalizeOrdenInput, OrdenListItem } from '@mes/types';
 import { queryKeys } from '@/services/api/query-keys';
-import { useFinalizarOrden } from '../hooks';
+import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
+import { useFinalizarOrden, useOrdenParadas } from '../hooks';
 
 export interface EditarOrdenModalProps {
   open: boolean;
@@ -25,11 +26,16 @@ export function EditarOrdenModal({ open, onOpenChange, orden }: EditarOrdenModal
   const enCurso = orden.estado === 'en_curso';
   const finalizar = useFinalizarOrden(orden.id);
   const queryClient = useQueryClient();
+  const paradas = useOrdenParadas(open && enCurso ? orden.id : undefined);
+  const paradaAbierta = paradas.data?.data.find((p) => p.fin === null) ?? null;
+  /* Bloqueo síncrono del envío: el doble clic llega antes que `isSubmitting`. */
+  const enviando = React.useRef(false);
 
   const {
     register,
     handleSubmit,
     reset,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<FinalizeOrdenInput>({
     resolver: zodResolver(finalizeOrdenSchema),
@@ -51,6 +57,8 @@ export function EditarOrdenModal({ open, onOpenChange, orden }: EditarOrdenModal
   }, [open, orden.conteoCodificadora, orden.observacion, orden.producido, reset]);
 
   const onSubmit = handleSubmit(async (valores) => {
+    if (enviando.current) return;
+    enviando.current = true;
     try {
       await finalizar.mutateAsync(valores);
       void queryClient.invalidateQueries({ queryKey: queryKeys.orders.bitacora(orden.codigo) });
@@ -59,9 +67,15 @@ export function EditarOrdenModal({ open, onOpenChange, orden }: EditarOrdenModal
       });
       onOpenChange(false);
     } catch (error) {
+      /* 422 (p. ej. producción imposible para la duración) bajo su campo; 409
+         (ya cerrada, parada abierta) como mensaje general. */
+      const campos = aplicarErroresApi<FinalizeOrdenInput>(error, setError);
       toast.error('No se pudo guardar el cierre', {
-        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        description:
+          campos.length > 0 ? 'Revisa los campos marcados.' : mensajeDeError(error, 'Inténtalo de nuevo.'),
       });
+    } finally {
+      enviando.current = false;
     }
   });
 
@@ -79,7 +93,7 @@ export function EditarOrdenModal({ open, onOpenChange, orden }: EditarOrdenModal
               variant="primary"
               type="submit"
               form="form-editar-orden"
-              disabled={!enCurso}
+              disabled={!enCurso || isSubmitting || Boolean(paradaAbierta)}
               loading={isSubmitting}
             >
               Guardar y cerrar orden
@@ -88,6 +102,13 @@ export function EditarOrdenModal({ open, onOpenChange, orden }: EditarOrdenModal
         }
       >
         <div className="flex flex-col gap-4">
+          {enCurso && paradaAbierta && (
+            <AlertCard
+              variant="warning"
+              title="Cierra la parada abierta antes de finalizar"
+              description={`La parada iniciada a las ${paradaAbierta.inicio.slice(11, 16)} sigue abierta.`}
+            />
+          )}
           {!enCurso && (
             <AlertCard
               variant="info"

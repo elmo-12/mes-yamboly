@@ -1,14 +1,19 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { crearApp, CREDENCIALES, login } from './app.factory';
+import { crearApp, login } from './app.factory';
+
+const MAQUINISTA_LLEN_M2 = { email: 'luis.vargas@yamboly.lat', password: 'Yamboly2026' };
 
 describe('paradas y detecciones IoT (e2e)', () => {
   let app: INestApplication;
   let token: string;
+  let tokenJefe: string;
 
   beforeAll(async () => {
     app = await crearApp();
-    token = await login(app, CREDENCIALES.maquinista);
+    /* Luis Vargas es el maquinista de la Llenadora M2 (ORD-0814). */
+    token = await login(app, MAQUINISTA_LLEN_M2);
+    tokenJefe = await login(app);
   });
 
   afterAll(async () => {
@@ -16,6 +21,7 @@ describe('paradas y detecciones IoT (e2e)', () => {
   });
 
   const auth = () => ({ Authorization: `Bearer ${token}` });
+  const authJefe = () => ({ Authorization: `Bearer ${tokenJefe}` });
 
   it('crea una parada (201) y la deja abierta', async () => {
     /* ORD-0814 corre en la Llenadora M2. */
@@ -116,10 +122,11 @@ describe('paradas y detecciones IoT (e2e)', () => {
   });
 
   it('registra en bitácora el cambio de causa al editar', async () => {
-    /* PAR-0815-02 nace con causaId CPA-PN-04-01 (PN-04-01) en el seed. */
+    /* PAR-0815-02 nace con causaId CPA-PN-04-01 (PN-04-01) en el seed. La
+     * OF-0815 está por validar: solo jefe o supervisor pueden corregirla. */
     const { body: editada } = await request(app.getHttpServer())
       .patch('/api/v1/paradas/PAR-0815-02')
-      .set(auth())
+      .set(authJefe())
       .send({ causaId: 'CPA-PP-01-01', motivoEdicion: 'Reclasificada tras revisión' })
       .expect(200);
 
@@ -146,7 +153,7 @@ describe('paradas y detecciones IoT (e2e)', () => {
 
     const { body: descartada } = await request(app.getHttpServer())
       .post('/api/v1/detecciones-iot/IOT-EXTR2-01/descartar')
-      .set(auth())
+      .set(authJefe())
       .expect(200);
     expect(descartada.estado).toBe('descartada');
   });

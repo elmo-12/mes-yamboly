@@ -12,8 +12,9 @@ import { useSession } from './use-session';
  * no se haya publicado. Evita además el desajuste de hidratación en SSR.
  */
 export function useHidratado(): boolean {
-  const { hidratado } = useSession();
+  const { hidratado, sincronizando } = useSession();
   const [montado, setMontado] = React.useState(false);
   React.useEffect(() => setMontado(true), []);
-  return hidratado || montado;
+  /* Una pestaña nueva espera unos ms el token de las demás antes de ir a /login. */
+  return (hidratado || montado) && !sincronizando;
 }

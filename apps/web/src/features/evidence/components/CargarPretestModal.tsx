@@ -9,6 +9,8 @@ import { useCargarPretest } from '../hooks';
 export interface CargarPretestModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Filas del pretest ya cargadas: si hay, se pide confirmación antes de reemplazarlas. */
+  existentes?: number;
 }
 
 const EJEMPLO = `2026-08-24;Registro de producción OF-2026-0812 · Llenadora M2;08:12;3,1
@@ -18,28 +20,44 @@ const EJEMPLO = `2026-08-24;Registro de producción OF-2026-0812 · Llenadora M2
  * Carga de la hoja de observación del pretest (TRI, Anexo 02). Acepta el CSV
  * pegado desde la hoja digitalizada: `fecha;evento;hora;minutos` por línea.
  */
-export function CargarPretestModal({ open, onOpenChange }: CargarPretestModalProps) {
+export function CargarPretestModal({ open, onOpenChange, existentes = 0 }: CargarPretestModalProps) {
   const cargar = useCargarPretest();
   const [texto, setTexto] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
+  /* La carga **reemplaza** la línea base de la tesis: con filas previas se
+     pide una segunda confirmación explícita. */
+  const [confirmando, setConfirmando] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open) setConfirmando(false);
+  }, [open]);
 
   const enviar = async () => {
     const registros = parsear(texto);
     const validado = cargarPretestSchema.safeParse({ registros });
     if (!validado.success) {
+      const issue = validado.error.issues[0];
+      const linea = issue?.path[0] === 'registros' && typeof issue.path[1] === 'number' ? issue.path[1] + 1 : null;
       setError(
-        validado.error.issues[0]?.message ??
-          'Revisa el formato: fecha;evento;hora;minutos por línea.',
+        issue
+          ? `${linea !== null ? `Línea ${linea}: ` : ''}${issue.message}`
+          : 'Revisa el formato: fecha;evento;hora;minutos por línea.',
       );
+      setConfirmando(false);
       return;
     }
     setError(null);
+    if (existentes > 0 && !confirmando) {
+      setConfirmando(true);
+      return;
+    }
     try {
       const respuesta = await cargar.mutateAsync(validado.data);
       toast.success(`${registros.length} eventos del pretest cargados`, {
         description: `TRI pretest recalculado: ${formatMinutes(respuesta.promedioPretest, 2)}.`,
       });
       setTexto('');
+      setConfirmando(false);
       onOpenChange(false);
     } catch (e) {
       toast.error('No se pudo cargar la hoja', {
@@ -60,8 +78,13 @@ export function CargarPretestModal({ open, onOpenChange }: CargarPretestModalPro
                 Cancelar
               </Button>
             </ModalClose>
-            <Button variant="primary" onClick={enviar} loading={cargar.isPending}>
-              Cargar hoja
+            <Button
+              variant={confirmando ? 'danger' : 'primary'}
+              onClick={enviar}
+              loading={cargar.isPending}
+              disabled={cargar.isPending}
+            >
+              {confirmando ? `Reemplazar las ${existentes} filas` : 'Cargar hoja'}
             </Button>
           </>
         }
@@ -71,11 +94,20 @@ export function CargarPretestModal({ open, onOpenChange }: CargarPretestModalPro
           required
           rows={8}
           value={texto}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={(e) => {
+            setTexto(e.target.value);
+            setConfirmando(false);
+          }}
           destructive={Boolean(error)}
           hint={error ?? 'Formato por línea: fecha;evento registrado;hora inicio;tiempo (min).'}
           placeholder={EJEMPLO}
         />
+        {confirmando && (
+          <p role="alert" className="mt-4 rounded-md bg-warning-subtle px-4 py-3 text-body-sm text-warning-text">
+            Esta carga reemplaza las {existentes} filas actuales del pretest (línea base de la tesis).
+            Las anteriores no se pueden recuperar desde la web. Pulsa «Reemplazar» para confirmar.
+          </p>
+        )}
       </ModalContent>
     </Modal>
   );

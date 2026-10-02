@@ -18,16 +18,21 @@ import {
   Table,
   toast,
 } from '@mes/ui';
-import { KPIS_TESIS, type FormatoExport, type KpiTesisId, type KpiTesis } from '@mes/types';
+import { KPIS_TESIS, type ExportJob, type FormatoExport, type KpiTesisId, type KpiTesis } from '@mes/types';
+import { formatDateTime } from '@mes/shared';
+import { useExportaciones } from '@/features/reports/hooks';
+import { descargarArchivo } from '@/services/api/client';
+import { mensajeDeError } from '@/services/api/form-errors';
 import { useExportarEvidencia } from '../hooks';
 
-interface ArchivoGenerado {
-  id: string;
-  estado: string;
-  kpis: KpiTesisId[];
-  formato: FormatoExport;
-  solicitadoEn: string;
-}
+/** Nombre que pone la API a los paquetes de evidencia: `Evidencia TRI, TCI · SPSS`. */
+const NOMBRE_EVIDENCIA = /^Evidencia (.+) · (SPSS|informe)$/;
+
+const ESTADO_BADGE: Record<ExportJob['estado'], { label: string; color: 'success' | 'informational' | 'critical' }> = {
+  listo: { label: 'Listo', color: 'success' },
+  generando: { label: 'Generando', color: 'informational' },
+  error: { label: 'Error', color: 'critical' },
+};
 
 /**
  * Pestaña "Exportar" de Evidencia: selección de anexos, formato y generación
@@ -40,7 +45,23 @@ export function ExportarTab({ kpis }: { kpis: readonly KpiTesis[] }) {
      usuario es el destino, que cambia cómo se codifican los booleanos. */
   const formato: FormatoExport = 'xlsx';
   const [destino, setDestino] = React.useState<'spss' | 'informe'>('spss');
-  const [archivos, setArchivos] = React.useState<ArchivoGenerado[]>([]);
+  /* El historial vive en el servidor (sobrevive a recargas) y se sondea cada
+     2 s mientras haya algún archivo «generando». */
+  const historial = useExportaciones();
+  const archivos = (historial.data?.data ?? []).filter(
+    (job) => job.datasets.includes('evidencia') && NOMBRE_EVIDENCIA.test(job.nombre),
+  );
+
+  const descargar = async (job: ExportJob) => {
+    if (!job.url) return;
+    try {
+      await descargarArchivo(job.url, `${job.id} ${job.nombre}.${job.formato}`);
+    } catch (error) {
+      toast.error('No se pudo descargar el archivo', {
+        description: mensajeDeError(error, 'El archivo ya no está disponible en el servidor.'),
+      });
+    }
+  };
 
   const anexoDe = (id: KpiTesisId) => kpis.find((k) => k.id === id)?.anexo ?? '';
   const nombreDe = (id: KpiTesisId) => kpis.find((k) => k.id === id)?.nombre ?? id;
@@ -59,21 +80,8 @@ export function ExportarTab({ kpis }: { kpis: readonly KpiTesis[] }) {
         formato,
         destino,
       });
-      setArchivos((prev) => [
-        {
-          id: respuesta.id,
-          estado: respuesta.estado,
-          kpis: [...seleccion],
-          formato,
-          solicitadoEn: new Date().toLocaleString('es-PE', {
-            dateStyle: 'short',
-            timeStyle: 'short',
-          }),
-        },
-        ...prev,
-      ]);
       toast.success('Exportación en preparación', {
-        description: `${seleccion.length} instrumentos en XLSX para ${destino === 'spss' ? 'SPSS' : 'informe'}. Te avisamos cuando el archivo esté listo.`,
+        description: `${respuesta.id} · ${seleccion.length} instrumentos en XLSX para ${destino === 'spss' ? 'SPSS' : 'informe'}. Aparecerá como «Listo» en la tabla para descargarlo.`,
       });
     } catch (e) {
       toast.error('No se pudo generar la exportación', {
@@ -148,24 +156,35 @@ export function ExportarTab({ kpis }: { kpis: readonly KpiTesis[] }) {
               <TH className="w-25">Formato</TH>
               <TH className="w-40">Solicitado</TH>
               <TH className="w-30">Estado</TH>
+              <TH className="w-30">Descarga</TH>
             </tr>
           </THead>
           <TBody>
-            {archivos.map((archivo) => (
-              <TRow key={archivo.id} plain>
-                <TCell className="font-medium">{archivo.id}</TCell>
-                <TCell muted>{archivo.kpis.join(' · ')}</TCell>
-                <TCell muted>{archivo.formato.toUpperCase()}</TCell>
-                <TCell muted className="tabular">
-                  {archivo.solicitadoEn}
-                </TCell>
-                <TCell>
-                  <Badge color={archivo.estado === 'listo' ? 'success' : 'informational'}>
-                    {archivo.estado === 'listo' ? 'Listo' : 'Generando'}
-                  </Badge>
-                </TCell>
-              </TRow>
-            ))}
+            {archivos.map((archivo) => {
+              const estado = ESTADO_BADGE[archivo.estado];
+              return (
+                <TRow key={archivo.id} plain>
+                  <TCell className="font-medium">{archivo.id}</TCell>
+                  <TCell muted>{NOMBRE_EVIDENCIA.exec(archivo.nombre)?.[1]?.split(', ').join(' · ')}</TCell>
+                  <TCell muted>{archivo.formato.toUpperCase()}</TCell>
+                  <TCell muted className="tabular">
+                    {formatDateTime(archivo.solicitadoEn)}
+                  </TCell>
+                  <TCell>
+                    <Badge color={estado.color}>{estado.label}</Badge>
+                  </TCell>
+                  <TCell>
+                    {archivo.estado === 'listo' && archivo.url ? (
+                      <Button variant="link" size="sm" onClick={() => void descargar(archivo)}>
+                        Descargar
+                      </Button>
+                    ) : (
+                      '—'
+                    )}
+                  </TCell>
+                </TRow>
+              );
+            })}
           </TBody>
         </Table>
       )}

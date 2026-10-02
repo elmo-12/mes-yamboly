@@ -72,6 +72,7 @@ export const evidenciaTri: EvidenciaTRI = {
   promedioPostest: null,
   promedioPretest: calcTri(triPretest.map((r) => r.tiempoMin)),
   reduccionPct: null,
+  descartadosPostest: 0,
   meta: META_TRI,
   estado: 'sin_datos',
 };
@@ -168,8 +169,8 @@ export const evidenciaCfs: EvidenciaCFS = {
 export const META_EP = `≥ ${METAS_TESIS.EP_PCT} %`;
 
 /**
- * El Anexo 06 se llena confirmando alertas en `/alertas`. Las alertas del seed
- * marcadas como «confirmadas» son demo operativa y no cuentan como evidencia.
+ * El Anexo 06 se llena confirmando alertas en `/alertas`: el seed no trae
+ * ninguna alerta `confirmada` (sin su fila aquí la EP saldría de la nada).
  */
 export const evidenciaEp: EvidenciaEP = {
   registros: [],

@@ -5,6 +5,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { ZodType, ZodTypeDef } from 'zod';
 import { Button, Input, Modal, ModalContent, Select, toast } from '@mes/ui';
+import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
 
 /** Los 4 campos comunes al alta de cualquier causa (parada o merma). */
 export interface NuevaCausaValores {
@@ -21,6 +22,8 @@ export interface PosiblePadre {
   codigo: string;
   nombre: string;
   nivel: string;
+  /** Si viene, sólo se ofrecen los activos. */
+  estado?: string;
 }
 
 export interface NivelOption {
@@ -77,6 +80,8 @@ export function NuevaCausaModal({
     handleSubmit,
     watch,
     reset,
+    setError,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<NuevaCausaValores>({
     resolver: zodResolver(schema),
@@ -90,11 +95,37 @@ export function NuevaCausaModal({
   const nivel = watch('nivel');
   const nivelPadre = niveles.find((n) => n.value === nivel)?.nivelPadre ?? null;
 
-  const padres = posiblesPadres
-    .filter((c) => c.nivel === nivelPadre)
-    .map((c) => ({ value: c.id, label: `${c.codigo} · ${c.nombre}` }));
+  /* Sólo padres activos: la API rechaza colgar una causa de un nodo dado de baja. */
+  const candidatos = posiblesPadres.filter(
+    (c) => c.nivel === nivelPadre && (c.estado === undefined || c.estado === 'activo'),
+  );
+  const padres = candidatos.map((c) => ({ value: c.id, label: `${c.codigo} · ${c.nombre}` }));
+
+  /* Cambiar de nivel invalida el padre elegido (era de otro nivel). */
+  React.useEffect(() => {
+    setValue('parentId', null);
+  }, [nivel, setValue]);
 
   const onSubmit = handleSubmit(async (valores) => {
+    /* Coherencia del árbol (misma regla que la API): el tipo es raíz con dos
+       segmentos; los niveles 2 y 3 llevan padre y comparten su prefijo XX-NN. */
+    const segmentos = valores.codigo.split('-');
+    if (nivelPadre === null && segmentos.length !== 2) {
+      setError('codigo', { message: 'El código de un tipo tiene dos segmentos (p. ej. PN-02)' });
+      return;
+    }
+    if (nivelPadre !== null) {
+      const padre = candidatos.find((c) => c.id === valores.parentId);
+      if (!padre) {
+        setError('parentId', { message: 'Selecciona el nodo padre' });
+        return;
+      }
+      const prefijo = padre.codigo.split('-').slice(0, 2).join('-');
+      if (segmentos.length !== 3 || segmentos.slice(0, 2).join('-') !== prefijo) {
+        setError('codigo', { message: `El código debe ser ${prefijo}-… (el prefijo de su tipo)` });
+        return;
+      }
+    }
     try {
       await onGuardar(valores);
       toast.success(`Causa ${valores.codigo} creada`, {
@@ -102,8 +133,12 @@ export function NuevaCausaModal({
       });
       onOpenChange(false);
     } catch (error) {
+      if (aplicarErroresApi<NuevaCausaValores>(error, setError).length > 0) {
+        toast.error('Revisa los campos marcados', { description: 'La causa no se creó.' });
+        return;
+      }
       toast.error('No se pudo crear la causa', {
-        description: error instanceof Error ? error.message : 'Revisa el código y el nombre.',
+        description: mensajeDeError(error, 'Revisa el código y el nombre.'),
       });
     }
   });

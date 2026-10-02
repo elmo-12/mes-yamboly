@@ -25,6 +25,7 @@ import {
   TIPOS_MERMA,
   TIPO_MERMA_LABEL,
   createMermaSchema,
+  puedeCapturar,
   type CausaMermaNodo,
   type CreateMermaInput,
   type TipoMermaCodigo,
@@ -33,9 +34,10 @@ import { formatNumber } from '@mes/shared';
 import { useCausasMermaArbol, usePersonas, useSabores } from '@/features/catalogs/hooks';
 import { useCrearMerma } from '@/features/scrap/hooks';
 import { useSession } from '@/hooks/use-session';
+import { ApiClientError } from '@/services/api/client';
 import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
 import { etiquetaCausa, tiposDeMerma } from '../causas';
-import type { ContextoLinea } from '../tipos';
+import { normalizarDecimal, numeroDesdeDecimal, type ContextoLinea } from '../tipos';
 import { formatTriCorto, useTriTimer } from '../use-tri-timer';
 import { AdjuntarFoto } from './AdjuntarFoto';
 import { ContextoCaptura } from './ContextoCaptura';
@@ -44,8 +46,17 @@ import { TecladoNumerico } from './TecladoNumerico';
 const PASOS = [{ label: 'Tipo' }, { label: 'Causa' }, { label: 'Confirmar' }] as const;
 
 const CAMPOS_PASO: Record<number, (keyof CreateMermaInput)[]> = {
-  0: ['tipo', 'cantidadKg', 'sabor'],
-  1: ['tipoCausaId', 'clasificacionId', 'causaId', 'responsableId'],
+  0: ['ordenId', 'lineaId', 'tipo', 'cantidadKg', 'sabor'],
+  1: [
+    'tipoCausaId',
+    'clasificacionId',
+    'causaId',
+    'responsableId',
+    'codigoBalde',
+    'observacion',
+    'numeroSolicitud',
+    'evidenciaUrl',
+  ],
 };
 
 /** Paso al que hay que volver cuando el 422 del servidor señala un campo. */
@@ -115,6 +126,8 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
   /** Foto ya subida: `url` es lo que viaja a la API, `nombre` lo que se muestra. */
   const [foto, setFoto] = React.useState<{ url: string; nombre: string }>();
   const [errorEvidencia, setErrorEvidencia] = React.useState<string>();
+  /* Bloquea el doble envío antes de que `isPending` llegue a re-renderizar. */
+  const enviandoRef = React.useRef(false);
   const tri = useTriTimer(abierto);
   const { user } = useSession();
   /* El árbol llega ya filtrado por `lineasAplicables` de la línea del contexto. */
@@ -186,12 +199,22 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
     [tipoActual, valores.tipo],
   );
   const clasificacionActual = clasificaciones.find((c) => c.id === valores.clasificacionId);
+  /* Causas colgadas directamente del tipo (sin clasificación intermedia): el
+     árbol lo admite y la API también; antes eran inalcanzables desde aquí. */
+  const causasDirectas = React.useMemo(
+    () =>
+      (tipoActual?.hijos ?? []).filter((c) => c.nivel === 'causa' && aplicaAlTipo(c, valores.tipo)),
+    [tipoActual, valores.tipo],
+  );
+  const sinClasificacion = Boolean(tipoActual) && clasificaciones.length === 0 && causasDirectas.length > 0;
   const causasHoja = React.useMemo(
     () =>
-      (clasificacionActual?.hijos ?? []).filter(
-        (c) => c.nivel === 'causa' && aplicaAlTipo(c, valores.tipo),
-      ),
-    [clasificacionActual, valores.tipo],
+      sinClasificacion
+        ? causasDirectas
+        : (clasificacionActual?.hijos ?? []).filter(
+            (c) => c.nivel === 'causa' && aplicaAlTipo(c, valores.tipo),
+          ),
+    [sinClasificacion, causasDirectas, clasificacionActual, valores.tipo],
   );
   const causaActual = causasHoja.find((c) => c.id === valores.causaId);
   const responsable = personas?.data.find((p) => p.id === valores.responsableId);
@@ -200,6 +223,14 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
   const requiereComentario = Boolean(causaActual?.requiereComentario);
   const requiereSolicitud = Boolean(causaActual?.requiereSolicitud);
   const requiereEvidencia = Boolean(causaActual?.requiereEvidencia);
+
+  /* Defensa en profundidad: el tablero ya oculta el botón (la API da 403). */
+  const permitido = puedeCapturar(user, 'merma', contexto.lineaId);
+  const bloqueo = !contexto.ordenId
+    ? 'Esta línea no tiene una orden en curso: inicia una orden para registrar mermas.'
+    : !permitido
+      ? 'Tu rol no permite registrar mermas en esta línea.'
+      : null;
 
   /** Cambiar de nivel invalida los inferiores: el par debe quedar consistente. */
   const elegirTipoCausa = (id: string) => {
@@ -212,17 +243,19 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
     setErrorEvidencia(undefined);
   };
 
+  /* Acepta `.` y `,` como separador decimal: antes `3.5` se convertía en 35 kg. */
   const escribirCantidad = (texto: string) => {
-    const limpio = texto.replace(/[^0-9,]/g, '').replace(/(,.*),/g, '$1').slice(0, 7);
+    const limpio = normalizarDecimal(texto, cantidadTexto);
     setCantidadTexto(limpio);
-    form.setValue('cantidadKg', Number(limpio.replace(',', '.')) || 0, { shouldValidate: true });
+    form.setValue('cantidadKg', numeroDesdeDecimal(limpio), { shouldValidate: true });
   };
 
   const siguiente = async () => {
+    if (bloqueo) return;
     const ok = await form.trigger(CAMPOS_PASO[paso] ?? []);
     if (!ok) return;
     if (paso === 1) {
-      if (clasificaciones.length > 0 && !valores.clasificacionId) {
+      if (!sinClasificacion && clasificaciones.length > 0 && !valores.clasificacionId) {
         form.setError('clasificacionId', {
           type: 'required',
           message: 'Selecciona la clasificación',
@@ -253,6 +286,8 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
   };
 
   const guardar = form.handleSubmit(async (values) => {
+    if (bloqueo || enviandoRef.current) return;
+    enviandoRef.current = true;
     const segundos = tri.detener();
     try {
       await crear.mutateAsync({
@@ -268,6 +303,9 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
     } catch (e) {
       /* 422: el backend detalla el campo (causa fuera del tipo, comentario o
          n.º de solicitud exigidos); se pinta bajo el campo y se vuelve al paso. */
+      if (e instanceof ApiClientError && typeof e.details?.evidenciaUrl === 'string') {
+        setErrorEvidencia(e.details.evidenciaUrl);
+      }
       const campos = aplicarErroresApi<CreateMermaInput>(e, form.setError);
       if (campos.length > 0) {
         setPaso(pasoDelCampo(campos[0] as string));
@@ -275,6 +313,8 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
       } else {
         toast.error(mensajeDeError(e, 'No se pudo registrar la merma'));
       }
+    } finally {
+      enviandoRef.current = false;
     }
   });
 
@@ -288,6 +328,7 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
           variant="primary"
           icon={<Icon name="check" size={20} />}
           loading={crear.isPending}
+          disabled={Boolean(bloqueo) || crear.isPending}
           onClick={() => void guardar()}
         >
           Registrar merma
@@ -305,6 +346,7 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
           variant="primary"
           icon={<Icon name="arrow-right" size={20} />}
           iconPosition="trailing"
+          disabled={Boolean(bloqueo)}
           onClick={() => void siguiente()}
         >
           Siguiente
@@ -334,6 +376,11 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
                   user ? `${user.nombre} (${user.cargo})` : '',
                 ]}
               />
+              {bloqueo && (
+                <p className="rounded-md bg-warning-subtle px-3 py-2 text-body-sm text-warning-text">
+                  {bloqueo}
+                </p>
+              )}
               <p className="text-h4 text-text-primary">¿Qué tipo de merma?</p>
               <div className="flex flex-wrap gap-2">
                 {TIPOS_MERMA.map((t) => (
@@ -437,8 +484,14 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
                     <Select
                       label="Clasificación"
                       hint={errores.clasificacionId?.message ?? 'Nivel intermedio del árbol'}
-                      placeholder={tipoActual ? 'Selecciona la clasificación' : 'Elige primero el tipo'}
-                      disabled={!tipoActual}
+                      placeholder={
+                        sinClasificacion
+                          ? 'Este tipo no tiene clasificación'
+                          : tipoActual
+                            ? 'Selecciona la clasificación'
+                            : 'Elige primero el tipo'
+                      }
+                      disabled={!tipoActual || sinClasificacion}
                       destructive={Boolean(errores.clasificacionId)}
                       options={clasificaciones.map((c) => ({
                         value: c.id,
@@ -461,9 +514,11 @@ export function MermaWizard({ contexto, abierto, onOpenChange }: MermaWizardProp
                       label="Causa"
                       hint={errores.causaId?.message ?? 'Catálogo codificado de mermas'}
                       placeholder={
-                        clasificacionActual ? 'Selecciona la causa' : 'Elige primero la clasificación'
+                        clasificacionActual || sinClasificacion
+                          ? 'Selecciona la causa'
+                          : 'Elige primero la clasificación'
                       }
-                      disabled={!clasificacionActual}
+                      disabled={!clasificacionActual && !sinClasificacion}
                       destructive={Boolean(errores.causaId)}
                       options={causasHoja.map((c) => ({ value: c.id, label: etiquetaCausa(c) }))}
                       value={field.value}

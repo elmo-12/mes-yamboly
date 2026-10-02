@@ -1,7 +1,8 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  Max,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -13,11 +14,16 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
-import { ORIGENES_PARADA, type OrigenParada } from '@mes/types';
+import { ORIGENES_PARADA, TIEMPO_REGISTRO_MAX_SEG, type OrigenParada } from '@mes/types';
+import { ISO_LOCAL_REGEX, MENSAJE_ISO_LOCAL } from '../../../common/utils/fechas';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 const BOOLEANO = ({ value }: { value: unknown }): unknown =>
   value === 'true' ? true : value === 'false' ? false : value;
+
+/** Recorta espacios: un texto solo de espacios cuenta como vacío. */
+const RECORTAR = ({ value }: { value: unknown }): unknown =>
+  typeof value === 'string' ? value.trim() : value;
 
 export class CreateParadaDto {
   @ApiProperty({ example: 'ORD-0815' })
@@ -40,25 +46,39 @@ export class CreateParadaDto {
   @IsNotEmpty({ message: 'Selecciona la causa específica' })
   causaId!: string;
 
-  @ApiProperty({ example: '2026-08-28T11:18:00' })
+  @ApiProperty({ example: '2026-08-28T11:18:00', description: 'ISO local de Lima, sin zona' })
   @IsString()
   @IsNotEmpty({ message: 'La hora de inicio es obligatoria' })
+  @Matches(ISO_LOCAL_REGEX, { message: MENSAJE_ISO_LOCAL })
   inicio!: string;
 
+  @ApiPropertyOptional({
+    example: '2026-08-28T11:30:00',
+    description: 'Parada retroactiva ya cerrada: se crea con su hora de fin',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(ISO_LOCAL_REGEX, { message: MENSAJE_ISO_LOCAL })
+  fin?: string;
+
   @ApiProperty({ example: 'Se reemplazó cadena y se reajustó tensión', minLength: 10 })
+  @Transform(RECORTAR)
   @IsString()
   @MinLength(10, { message: 'Describe la acción tomada (mínimo 10 caracteres)' })
   @MaxLength(300, { message: 'Máximo 300 caracteres' })
   accionTomada!: string;
 
-  @ApiPropertyOptional({ example: 'SM-2026-0421' })
+  @ApiPropertyOptional({ example: 'SM-2026-0421', maxLength: 50 })
   @IsOptional()
+  @Transform(RECORTAR)
   @IsString()
+  @MaxLength(50, { message: 'Máximo 50 caracteres' })
   numeroSolicitud?: string;
 
-  @ApiPropertyOptional({ example: '/mock/evidencias/par.jpg' })
+  @ApiPropertyOptional({ example: '/api/v1/evidencias/EV-20260911-a1b2c3d4.jpg' })
   @IsOptional()
   @IsString()
+  @MaxLength(200, { message: 'Máximo 200 caracteres' })
   evidenciaUrl?: string;
 
   @ApiPropertyOptional({ default: true })
@@ -82,15 +102,22 @@ export class CreateParadaDto {
   @IsString()
   deteccionId?: string;
 
-  @ApiPropertyOptional({ default: 0, description: 'Segundos de registro — KPI TRI' })
+  @ApiPropertyOptional({
+    default: 0,
+    maximum: TIEMPO_REGISTRO_MAX_SEG,
+    description: 'Segundos de registro — KPI TRI',
+  })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
+  @IsInt({ message: 'El tiempo de registro debe ser un número entero de segundos' })
+  @Min(0, { message: 'El tiempo de registro no puede ser negativo' })
+  @Max(TIEMPO_REGISTRO_MAX_SEG, {
+    message: `El tiempo de registro no puede superar ${TIEMPO_REGISTRO_MAX_SEG} s`,
+  })
   tiempoRegistroSeg?: number;
 }
 
-export class UpdateParadaDto extends PartialType(CreateParadaDto) {
+export class UpdateParadaDto extends PartialType(OmitType(CreateParadaDto, ['fin'] as const)) {
   @ApiPropertyOptional({
     example: '2026-08-28T11:27:00',
     nullable: true,
@@ -100,12 +127,14 @@ export class UpdateParadaDto extends PartialType(CreateParadaDto) {
   @ValidateIf((_objeto, valor) => valor !== null)
   @IsString()
   @IsNotEmpty({ message: 'La hora de fin no puede quedar vacía' })
+  @Matches(ISO_LOCAL_REGEX, { message: MENSAJE_ISO_LOCAL })
   fin?: string | null;
 
   @ApiPropertyOptional({ maxLength: 300, description: 'Se escribe en la bitácora' })
   @IsOptional()
+  @Transform(RECORTAR)
   @IsString()
-  @MaxLength(300)
+  @MaxLength(300, { message: 'Máximo 300 caracteres' })
   motivoEdicion?: string;
 }
 
@@ -113,10 +142,12 @@ export class FinalizeParadaDto {
   @ApiProperty({ example: '2026-08-28T11:27:00' })
   @IsString()
   @IsNotEmpty({ message: 'La hora de fin es obligatoria' })
+  @Matches(ISO_LOCAL_REGEX, { message: MENSAJE_ISO_LOCAL })
   fin!: string;
 
   @ApiPropertyOptional({ maxLength: 300 })
   @IsOptional()
+  @Transform(RECORTAR)
   @IsString()
   @MaxLength(300, { message: 'Máximo 300 caracteres' })
   comentarioCierre?: string;
@@ -160,15 +191,32 @@ export class ConfirmarDeteccionDto {
   causaId!: string;
 
   @ApiProperty({ minLength: 10, example: 'Se retiró el material atascado y se limpió la mordaza' })
+  @Transform(RECORTAR)
   @IsString()
-  @MinLength(10, { message: 'Describe la acción tomada' })
-  @MaxLength(300)
+  @MinLength(10, { message: 'Describe la acción tomada (mínimo 10 caracteres)' })
+  @MaxLength(300, { message: 'Máximo 300 caracteres' })
   accionTomada!: string;
 
-  @ApiPropertyOptional({ default: 0 })
+  @ApiPropertyOptional({ maxLength: 50 })
+  @IsOptional()
+  @Transform(RECORTAR)
+  @IsString()
+  @MaxLength(50, { message: 'Máximo 50 caracteres' })
+  numeroSolicitud?: string;
+
+  @ApiPropertyOptional({ description: 'URL devuelta por POST /evidencias' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200, { message: 'Máximo 200 caracteres' })
+  evidenciaUrl?: string;
+
+  @ApiPropertyOptional({ default: 0, maximum: TIEMPO_REGISTRO_MAX_SEG })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
+  @IsInt({ message: 'El tiempo de registro debe ser un número entero de segundos' })
+  @Min(0, { message: 'El tiempo de registro no puede ser negativo' })
+  @Max(TIEMPO_REGISTRO_MAX_SEG, {
+    message: `El tiempo de registro no puede superar ${TIEMPO_REGISTRO_MAX_SEG} s`,
+  })
   tiempoRegistroSeg?: number;
 }

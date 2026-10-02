@@ -1,3 +1,5 @@
+import { ahoraPlanta } from '@mes/shared';
+
 /**
  * Normaliza un filtro que puede llegar repetido (`?lineaId=A&lineaId=B`)
  * o separado por comas (`?lineaId=A,B`).
@@ -19,10 +21,14 @@ export function normalizar(texto: string): string {
     .toLowerCase();
 }
 
-/** ISO local `YYYY-MM-DDTHH:mm:ss` (sin desplazamiento UTC). */
+/**
+ * ISO local de **planta** (America/Lima) `YYYY-MM-DDTHH:mm:ss`, sin zona.
+ * Antes dependía de la TZ del proceso: con `TZ=UTC` las marcas quedaban +5 h
+ * respecto de las órdenes (que ya usan `ahoraPlanta`). Con el proceso en Lima
+ * el resultado es idéntico.
+ */
 export function ahoraIso(fecha: Date = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${fecha.getFullYear()}-${p(fecha.getMonth() + 1)}-${p(fecha.getDate())}T${p(fecha.getHours())}:${p(fecha.getMinutes())}:${p(fecha.getSeconds())}`;
+  return ahoraPlanta(fecha);
 }
 
 export function hoyIso(fecha: Date = new Date()): string {

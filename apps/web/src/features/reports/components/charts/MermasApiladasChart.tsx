@@ -60,7 +60,9 @@ export function MermasApiladasChart({ lineas }: MermasApiladasChartProps) {
         <BarChart data={datos} margin={{ ...chartMargin, top: 20, left: 0 }}>
           <CartesianGrid {...gridProps} />
           <XAxis dataKey="linea" {...axisProps} interval={0} />
-          <YAxis {...axisProps} width={44} tickFormatter={(v: number) => formatNumber(v)} />
+          {/* Con decenas de miles de kg el eje de 44 px recortaba la cifra
+              («18 000» se leía «8 000»): a partir de mil se abrevia en «k». */}
+          <YAxis {...axisProps} width={48} tickFormatter={ejeKg} />
           <Tooltip
             cursor={{ fill: chartColors.grid }}
             content={<ChartTooltip unit="kg" />}
@@ -96,4 +98,11 @@ export function MermasApiladasChart({ lineas }: MermasApiladasChartProps) {
       </ResponsiveContainer>
     </ChartFrame>
   );
+}
+
+/** `18 000` → `18 k`; `2 500` → `2,5 k`; por debajo de mil, la cifra entera. */
+function ejeKg(valor: number): string {
+  if (Math.abs(valor) < 1000) return formatNumber(valor);
+  const miles = valor / 1000;
+  return `${formatNumber(miles, Number.isInteger(miles) ? 0 : 1)} k`;
 }

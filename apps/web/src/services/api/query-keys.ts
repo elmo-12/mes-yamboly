@@ -1,4 +1,4 @@
-import type { AlertaListQuery, OrdenListQuery, ReporteQuery } from '@mes/types';
+import type { AlertaListQuery, OrdenListQuery, OrdenSapQuery, ReporteQuery } from '@mes/types';
 
 /**
  * Filtros serializables de una consulta de catálogo (`{ lineaId, estado, … }`).
@@ -45,6 +45,11 @@ export const queryKeys = {
     usuariosList: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.usuarios(), filtros] as const,
     personas: (filtros: CatalogoFiltros = {}) => [...queryKeys.catalogs.usuarios(), 'personas', filtros] as const,
     colaboradores: () => [...queryKeys.catalogs.all, 'colaboradores'] as const,
+  },
+  /** Órdenes SAP pendientes (paso 1 del wizard «Iniciar orden»). */
+  ordenesSap: {
+    all: ['ordenes-sap'] as const,
+    list: (query: OrdenSapQuery) => [...queryKeys.ordenesSap.all, 'list', query] as const,
   },
   orders: {
     all: ['orders'] as const,

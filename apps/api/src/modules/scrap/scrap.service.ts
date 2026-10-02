@@ -6,11 +6,14 @@ import type { MermaListItem, Paginated } from '@mes/types';
 import type { AuthUser } from '../../common/decorators/current-user';
 import { TRI_REGISTRO_EVENT, type TriRegistroEvent } from '../../common/events/tri.event';
 import { NoEncontradoException, ValidationException } from '../../common/exceptions/business.exception';
-import { cadenaCausaMerma, enriquecerMerma } from '../../common/mappers/enrich';
+import { assertCapturaEnOrden } from '../../common/auth/acceso-orden';
+import { insertarConIdSecuencial } from '../../common/utils/ids';
+import { ancestroInactivo, cadenaCausaMerma, enriquecerMerma } from '../../common/mappers/enrich';
 import { LookupsService, type Lookups } from '../../common/mappers/lookups.service';
 import { AuditService } from '../../common/services/audit.service';
 import { paginate } from '../../common/utils/paginate';
-import { ahoraIso, toList } from '../../common/utils/query';
+import { ahoraPlanta } from '@mes/shared';
+import { toList } from '../../common/utils/query';
 import { Merma } from '../../database/entities';
 import { OrdersService } from '../orders/orders.service';
 import { AdjuntosService } from '../attachments/adjuntos.service';
@@ -58,6 +61,7 @@ export class ScrapService {
   private validarCausa(
     lookups: Lookups,
     dto: CreateMermaDto,
+    exigirActiva = true,
   ): { causaId: string; tipoCausaId: string; clasificacionId: string | null } {
     const causa = lookups.causasMerma.get(dto.causaId);
     if (!causa) throw new ValidationException({ causaId: 'La causa seleccionada no existe' });
@@ -66,8 +70,20 @@ export class ScrapService {
         causaId: `${causa.codigo} es un nivel «${causa.nivel}»: elige una causa final del árbol`,
       });
     }
-    if (causa.estado !== 'activo') {
+    if (exigirActiva && causa.estado !== 'activo') {
       throw new ValidationException({ causaId: `La causa ${causa.codigo} está dada de baja` });
+    }
+    /* Toda la rama debe estar activa: una hija activa bajo un padre dado de baja
+     * (datos heredados) tampoco se puede elegir. */
+    const baja = exigirActiva ? ancestroInactivo(lookups.causasMerma, causa.id) : undefined;
+    if (baja) {
+      throw new ValidationException({
+        causaId: `La causa ${causa.codigo} cuelga de ${baja.codigo} ${baja.nombre}, que está dada de baja`,
+      });
+    }
+    const lineas = causa.lineasAplicables ?? [];
+    if (dto.lineaId && lineas.length > 0 && !lineas.includes(dto.lineaId)) {
+      throw new ValidationException({ causaId: `La causa ${causa.codigo} no aplica a esta línea` });
     }
     if (causa.aplicaA.length > 0 && !causa.aplicaA.includes(dto.tipo)) {
       throw new ValidationException({
@@ -105,9 +121,9 @@ export class ScrapService {
       });
     }
     /* La foto ya no es sólo una regla del asistente: si la causa la exige, la
-     * merma no se guarda sin ella, y la ruta tiene que apuntar a un archivo que
-     * `AdjuntosService` haya guardado de verdad. */
-    if (causa.requiereEvidencia && !this.adjuntos.existe(dto.evidenciaUrl)) {
+     * merma no se guarda sin ella (el vínculo se valida aparte con
+     * `AdjuntosService.validarVinculo`). */
+    if (causa.requiereEvidencia && !dto.evidenciaUrl) {
       throw new ValidationException({
         evidenciaUrl: `La causa ${causa.codigo} exige una foto de evidencia`,
       });
@@ -116,42 +132,59 @@ export class ScrapService {
     return { causaId: causa.id, tipoCausaId, clasificacionId };
   }
 
+  /** El sabor viaja como nombre: debe existir en el catálogo (sin distinguir mayúsculas). */
+  private validarSabor(lookups: Lookups, sabor: string): string {
+    const buscado = sabor.trim().toLowerCase();
+    const encontrado = [...lookups.sabores.values()].find(
+      (s) => s.nombre.trim().toLowerCase() === buscado,
+    );
+    if (!encontrado) {
+      throw new ValidationException({ sabor: 'El sabor no existe en el catálogo' });
+    }
+    return encontrado.nombre;
+  }
+
   async crear(dto: CreateMermaDto, usuario: AuthUser): Promise<MermaListItem> {
     const lookups = await this.lookups.load();
-    const jerarquia = this.validarCausa(lookups, dto);
     /* Las validaciones de negocio se adelantan a las FKs: 422 en vez de 500. */
     if (!lookups.lineas.has(dto.lineaId)) {
       throw new ValidationException({ lineaId: 'La línea seleccionada no existe' });
     }
+    const orden = await this.orders.buscar(dto.ordenId);
+    assertCapturaEnOrden(orden, usuario, dto.lineaId);
+    const jerarquia = this.validarCausa(lookups, dto);
     if (!lookups.usuarios.has(dto.responsableId)) {
       throw new ValidationException({ responsableId: 'El responsable indicado no existe' });
     }
+    const sabor = this.validarSabor(lookups, dto.sabor);
+    if (dto.evidenciaUrl) {
+      await this.adjuntos.validarVinculo(dto.evidenciaUrl, { usuarioId: usuario.id });
+    }
     const causa = lookups.causasMerma.get(jerarquia.causaId)!;
-    const orden = await this.orders.buscar(dto.ordenId);
 
-    const registradaEn = ahoraIso();
-    const total = await this.mermas.count();
+    /* Hora de planta (America/Lima) explícita, igual que las órdenes. */
+    const registradaEn = ahoraPlanta();
     const merma = this.mermas.create({
-      id: `MER-${orden.id.slice(4)}-N${total + 1}`,
+      id: '',
       ordenId: orden.id,
       lineaId: dto.lineaId,
       tipo: dto.tipo,
       cantidadKg: dto.cantidadKg,
-      sabor: dto.sabor,
+      sabor,
       tipoCausaId: jerarquia.tipoCausaId,
       clasificacionId: jerarquia.clasificacionId,
       causaId: jerarquia.causaId,
-      numeroSolicitud: dto.numeroSolicitud ?? null,
-      evidenciaUrl: dto.evidenciaUrl ?? null,
+      numeroSolicitud: dto.numeroSolicitud || null,
+      evidenciaUrl: dto.evidenciaUrl || null,
       responsableId: dto.responsableId,
-      codigoBalde: dto.codigoBalde ?? null,
+      codigoBalde: dto.codigoBalde || null,
       enviarPasteurizacion: dto.enviarPasteurizacion ?? false,
       registradaEn,
       tiempoRegistroSeg: dto.tiempoRegistroSeg ?? 0,
-      observacion: dto.observacion ?? null,
+      observacion: dto.observacion || null,
     });
-    await this.mermas.save(merma);
-    await this.actualizarOrden(orden.id);
+    await insertarConIdSecuencial(this.mermas, merma, (n) => `MER-${orden.id.slice(4)}-N${n}`);
+    await this.actualizarOrden(orden.id, usuario);
 
     await this.audit.registrar({
       ordenId: orden.id,
@@ -176,52 +209,100 @@ export class ScrapService {
   async actualizar(id: string, dto: UpdateMermaDto, usuario: AuthUser): Promise<MermaListItem> {
     const merma = await this.mermas.findOne({ where: { id } });
     if (!merma) throw new NoEncontradoException('Merma');
+    const orden = await this.orders.buscar(merma.ordenId);
+    assertCapturaEnOrden(orden, usuario);
     const lookups = await this.lookups.load();
 
+    /* Una merma no se mueve de orden ni de línea: el kg quedaría contado en la
+     * orden de origen (y una orden inexistente terminaba en 500). */
+    if (dto.ordenId !== undefined && dto.ordenId !== merma.ordenId) {
+      throw new ValidationException({ ordenId: 'Una merma no se puede mover a otra orden' });
+    }
+    if (dto.lineaId !== undefined && dto.lineaId !== merma.lineaId) {
+      throw new ValidationException({ lineaId: 'Una merma no se puede mover a otra línea' });
+    }
     if (dto.cantidadKg !== undefined && dto.cantidadKg <= 0) {
       throw new ValidationException({ cantidadKg: 'La cantidad debe ser mayor que 0' });
     }
+    if (dto.responsableId !== undefined && !lookups.usuarios.has(dto.responsableId)) {
+      throw new ValidationException({ responsableId: 'El responsable indicado no existe' });
+    }
+    const sabor = dto.sabor !== undefined ? this.validarSabor(lookups, dto.sabor) : merma.sabor;
 
-    /* Al reclasificar se revalida el árbol completo con los valores resultantes. */
-    const jerarquia = dto.causaId
-      ? this.validarCausa(lookups, {
-          ...dto,
-          tipo: dto.tipo ?? merma.tipo,
-          causaId: dto.causaId,
-          observacion: dto.observacion ?? merma.observacion ?? undefined,
-          numeroSolicitud: dto.numeroSolicitud ?? merma.numeroSolicitud ?? undefined,
-        } as CreateMermaDto)
+    const numeroSolicitud =
+      dto.numeroSolicitud !== undefined ? dto.numeroSolicitud || null : merma.numeroSolicitud;
+    const observacion = dto.observacion !== undefined ? dto.observacion || null : merma.observacion;
+    const evidenciaUrl =
+      dto.evidenciaUrl !== undefined ? dto.evidenciaUrl || null : merma.evidenciaUrl;
+    const tipo = dto.tipo ?? merma.tipo;
+
+    /* Cualquier cambio que afecte al árbol (tipo, causa, nivel o exigencias) se
+     * revalida con los valores resultantes; la causa dada de baja solo se
+     * rechaza si se elige ahora (no bloquea editar registros antiguos). */
+    const causaCambia = dto.causaId !== undefined && dto.causaId !== merma.causaId;
+    const tocaArbol =
+      causaCambia ||
+      dto.tipo !== undefined ||
+      dto.tipoCausaId !== undefined ||
+      dto.clasificacionId !== undefined ||
+      dto.numeroSolicitud !== undefined ||
+      dto.observacion !== undefined ||
+      dto.evidenciaUrl !== undefined;
+    const jerarquia = tocaArbol
+      ? this.validarCausa(
+          lookups,
+          {
+            ...dto,
+            lineaId: merma.lineaId,
+            tipo,
+            causaId: dto.causaId ?? merma.causaId,
+            observacion: observacion ?? undefined,
+            numeroSolicitud: numeroSolicitud ?? undefined,
+            evidenciaUrl: evidenciaUrl ?? undefined,
+          } as CreateMermaDto,
+          causaCambia,
+        )
       : null;
+    if (evidenciaUrl && evidenciaUrl !== merma.evidenciaUrl) {
+      await this.adjuntos.validarVinculo(evidenciaUrl, { usuarioId: usuario.id, mermaId: merma.id });
+    }
 
     const anterior = { tipo: merma.tipo, cantidadKg: merma.cantidadKg, causaId: merma.causaId };
-    Object.assign(merma, {
-      ...dto,
-      codigoBalde: dto.codigoBalde ?? merma.codigoBalde,
-      observacion: dto.observacion ?? merma.observacion,
-      numeroSolicitud: dto.numeroSolicitud ?? merma.numeroSolicitud,
-    });
+    merma.tipo = tipo;
+    if (dto.cantidadKg !== undefined) merma.cantidadKg = dto.cantidadKg;
+    merma.sabor = sabor;
+    merma.numeroSolicitud = numeroSolicitud;
+    merma.observacion = observacion;
+    merma.evidenciaUrl = evidenciaUrl;
+    if (dto.responsableId !== undefined) merma.responsableId = dto.responsableId;
+    if (dto.codigoBalde !== undefined) merma.codigoBalde = dto.codigoBalde || null;
+    if (dto.enviarPasteurizacion !== undefined) merma.enviarPasteurizacion = dto.enviarPasteurizacion;
     if (jerarquia) {
       merma.causaId = jerarquia.causaId;
       merma.tipoCausaId = jerarquia.tipoCausaId;
       merma.clasificacionId = jerarquia.clasificacionId;
     }
     await this.mermas.save(merma);
-    await this.actualizarOrden(merma.ordenId);
+    await this.actualizarOrden(merma.ordenId, usuario);
 
+    const causaTexto =
+      anterior.causaId !== merma.causaId
+        ? ` · causa: ${lookups.causasMerma.get(anterior.causaId)?.codigo ?? anterior.causaId} → ${lookups.causasMerma.get(merma.causaId)?.codigo ?? merma.causaId}`
+        : '';
     await this.audit.registrar({
       ordenId: merma.ordenId,
       tipo: 'edicion',
       usuario,
-      texto: `${usuario.nombre} editó la merma ${merma.id}: ${anterior.tipo} ${anterior.cantidadKg} kg → ${merma.tipo} ${merma.cantidadKg} kg`,
+      texto: `${usuario.nombre} editó la merma ${merma.id}: ${anterior.tipo} ${anterior.cantidadKg} kg → ${merma.tipo} ${merma.cantidadKg} kg${causaTexto}`,
     });
 
     return enriquecerMerma(merma, await this.lookups.load());
   }
 
-  private async actualizarOrden(ordenId: string): Promise<void> {
+  /** Recalcula la orden con el usuario: nunca una validada ni, sin permiso, una cerrada. */
+  private async actualizarOrden(ordenId: string, usuario: AuthUser): Promise<void> {
     const orden = await this.orders.buscar(ordenId);
-    await this.orders.recalcular(orden);
-    await this.orders.guardar(orden);
+    if (await this.orders.recalcular(orden, usuario)) await this.orders.guardar(orden);
   }
 
   private emitirTri(evento: TriRegistroEvent): void {

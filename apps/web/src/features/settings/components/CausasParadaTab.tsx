@@ -186,6 +186,8 @@ export function CausasParadaTab() {
             nombre: valores.nombre,
             nivel: valores.nivel as CausaParadaInput['nivel'],
             parentId: valores.parentId,
+            /* La API hereda la clasificación del tipo padre; sólo un tipo nuevo
+               nace «imprevista» (editable después en su detalle). */
             clasificacion: 'imprevista',
             afectaOee: true,
             requiereEvidencia: false,

@@ -7,6 +7,7 @@ import { AppPageHeader } from '@/components/AppPageHeader';
 import { Forbidden } from '@/components/Forbidden';
 import { PageSkeleton } from '@/components/PageSkeleton';
 import { useRequireRole } from '@/hooks/use-require-role';
+import { useSession } from '@/hooks/use-session';
 import { CausasMermaTab } from './CausasMermaTab';
 import { CausasParadaTab } from './CausasParadaTab';
 import { LineasTab } from './LineasTab';
@@ -41,13 +42,17 @@ const ROLES = ['jefe', 'supervisor'] as const;
 /** `MES / Configuración` (Figma 2163:18282 · 2165:11984 · 2165:13218). */
 export function ConfiguracionPage() {
   const { listo, permitido } = useRequireRole(ROLES);
+  const { user } = useSession();
+  /* El mantenedor de usuarios (`/usuarios` POST/PATCH) es sólo del jefe: al
+     supervisor no se le muestra una pestaña cuyas acciones acaban en 403. */
+  const tabs = TABS.filter((t) => t.id !== 'usuarios' || user?.rol === 'jefe');
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
 
   const tabParam = params.get('tab');
   const tabResuelto = tabParam ? (ALIAS_TAB[tabParam] ?? tabParam) : null;
-  const tab: TabId = TABS.some((t) => t.id === tabResuelto)
+  const tab: TabId = tabs.some((t) => t.id === tabResuelto)
     ? (tabResuelto as TabId)
     : 'causas-parada';
 
@@ -74,7 +79,7 @@ export function ConfiguracionPage() {
 
       <Tabs value={tab} onValueChange={cambiarTab}>
         <TabsList>
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <TabsTrigger key={t.id} value={t.id}>
               {t.label}
             </TabsTrigger>
@@ -96,9 +101,11 @@ export function ConfiguracionPage() {
         <TabsContent value="umbrales">
           <UmbralesTab />
         </TabsContent>
-        <TabsContent value="usuarios">
-          <UsuariosTab />
-        </TabsContent>
+        {tabs.some((t) => t.id === 'usuarios') && (
+          <TabsContent value="usuarios">
+            <UsuariosTab />
+          </TabsContent>
+        )}
       </Tabs>
     </>
   );

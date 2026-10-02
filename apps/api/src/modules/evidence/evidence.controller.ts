@@ -10,6 +10,7 @@ import {
   Res,
   StreamableFile,
   UploadedFile,
+  UseFilters,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -45,6 +46,7 @@ import { EvidenceService } from './evidence.service';
 import { EvidenceExportService } from './evidence-export.service';
 import { EvidenceImportService } from './evidence-import.service';
 import { EvidenceValidationService } from './evidence-validation.service';
+import { ArchivoDemasiadoGrandeFilter } from './archivo-grande.filter';
 import {
   CargarPretestDto,
   CrearInvitacionDto,
@@ -56,7 +58,14 @@ import {
   VerificacionCfsDto,
 } from './dto/evidence.dto';
 
+/**
+ * Toda la evidencia de tesis es de jefe e investigador (igual que la web):
+ * expone tokens de encuesta, comentarios y overrides. Sólo el resumen
+ * agregado (sin tokens) se abre a supervisor y calidad, que ven el KPI TRI en
+ * su Home (`useResumenJefe`).
+ */
 @ApiTags('evidence')
+@Roles('jefe', 'investigador')
 @Controller('evidencia')
 export class EvidenceController {
   constructor(
@@ -67,6 +76,7 @@ export class EvidenceController {
   ) {}
 
   @Get('resumen')
+  @Roles('jefe', 'investigador', 'supervisor', 'calidad')
   @ApiOperation({ summary: 'Los 5 KPI de la tesis con meta, estado y periodos pretest/postest (09.A)' })
   resumen(): Promise<EvidenciaResumen> {
     return this.evidencia.resumen();
@@ -121,6 +131,7 @@ export class EvidenceController {
   @HttpCode(201)
   @Roles('jefe', 'investigador')
   @UseInterceptors(FileInterceptor('archivo', OPCIONES_SUBIDA_TABLA))
+  @UseFilters(ArchivoDemasiadoGrandeFilter)
   @ApiConsumes('multipart/form-data')
   @ApiParam({ name: 'tipo', enum: TIPOS_FUENTE_EXTERNA })
   @ApiBody({
@@ -184,7 +195,7 @@ export class EvidenceController {
   }
 
   @Patch('tci/:id')
-  @Roles('jefe', 'investigador', 'calidad')
+  @Roles('jefe', 'investigador')
   @ApiOperation({ summary: 'Fuerza criterios de una evaluación y recalcula si el registro es válido' })
   overrideTci(@Param('id') id: string, @Body() dto: OverrideTciDto) {
     return this.validacion.override(id, dto);

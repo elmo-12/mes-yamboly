@@ -54,9 +54,13 @@ export function ventanaCerrada(alerta: Alerta): boolean {
   return new Date(alerta.ventanaFin).getTime() <= Date.now();
 }
 
-/** Una alerta espera confirmación de evento real (alimenta el KPI EP). */
+/**
+ * Una alerta espera confirmación de evento real (alimenta el KPI EP): atendida
+ * o vencida y sin acierto. Mismo criterio que `pendientesConfirmar` del API
+ * (M1); las descartadas no se confirman.
+ */
 export function esperaConfirmacion(alerta: Alerta): boolean {
-  return alerta.acierto === null && alerta.estado !== 'activa' && alerta.estado !== 'descartada';
+  return alerta.acierto === null && (alerta.estado === 'atendida' || alerta.estado === 'vencida');
 }
 
 /** Marca de acierto de la tabla: ✓ verde · ✗ rojo · — gris. */

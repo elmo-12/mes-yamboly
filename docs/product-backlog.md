@@ -176,6 +176,13 @@ Como **calidad**, quiero ver quién cambió qué y cuándo dentro de una orden, 
 - `GET /ordenes/:id/bitacora?tipo[]` con 7 tipos de evento, orden descendente por fecha.
 - Cambios de causa y de hora de fin de una parada se escriben automáticamente en la bitácora.
 
+**E3-05 — Iniciar la orden desde una orden SAP pendiente**
+`Prioridad: Must · Puntos: 8 · Estado: Hecho · Sprint: —`
+Como **maquinista o supervisor**, quiero elegir la orden SAP pendiente de mi línea al iniciar una orden, para no volver a teclear línea, producto, turno, número y planificado que SAP ya fijó (igual que el wizard del sistema legado).
+- `orden_sap` sincronizada en sólo lectura desde `orden_fabricacion_dbs` (cada 5 min si hay `ORIGEN_DATABASE_URL`, y en `pnpm sync:real`); `GET /ordenes-sap` y `POST /ordenes-sap/sincronizar`.
+- `POST /ordenes` recibe `ordenSapId`: código = número SAP (`-2`, `-3`… si se repite), planificado = cajas × unidades por caja, velocidad del par activo o del texto SAP; 404/409/422.
+- Wizard «Iniciar orden» y modal «Nueva orden» con el paso «Orden SAP» (buscador, tarjetas `# número · Turno · fecha · código - producto`, sincronizar). Las checklists de arranque del legado quedan fuera por decisión del usuario.
+
 ---
 
 ### E4 — Reportes

@@ -11,7 +11,7 @@ import type {
   TvResumen,
   TvRow,
 } from '@mes/types';
-import { ESTADO_LINEA_LABEL } from '@mes/types';
+import { ESTADO_LINEA_LABEL, TIPO_ALERTA_LABEL } from '@mes/types';
 import { turnoInfo, turnoPorFecha, turnoRango } from '@mes/shared';
 import { NoEncontradoException } from '../../common/exceptions/business.exception';
 import { LookupsService, type Lookups } from '../../common/mappers/lookups.service';
@@ -31,6 +31,8 @@ import {
   Parada,
   RegistroVelocidad,
 } from '../../database/entities';
+import { SensoresIotService } from './iot/sensores-iot.service';
+import type { LecturaIotLinea } from './iot/sensores-iot.util';
 
 interface ContextoLinea {
   orden: OrdenFabricacion | null;
@@ -52,6 +54,7 @@ export class RealtimeService {
     @InjectRepository(DeteccionIoT) private readonly detecciones: Repository<DeteccionIoT>,
     private readonly lookups: LookupsService,
     @Inject(ALERTS_LOOKUP) private readonly alerts: AlertsLookup,
+    private readonly sensoresIot: SensoresIotService,
   ) {}
 
   async resumen(
@@ -62,14 +65,36 @@ export class RealtimeService {
     const ahora = new Date();
     const turno = turnoPorFecha(ahora);
 
-    let lineas = [...lookups.lineas.values()].sort((a, b) => a.id.localeCompare(b.id));
+    /* Las líneas dadas de baja en Configuración no se muestran en planta. */
+    let lineas = [...lookups.lineas.values()]
+      .filter((l) => l.estado === 'activo')
+      .sort((a, b) => a.id.localeCompare(b.id));
     if (lineaIds.length > 0) lineas = lineas.filter((l) => lineaIds.includes(l.id));
 
     const dia = await this.diaOperativoActual();
     const ahoraOp = await this.ahoraOperativo(dia);
+    const contextos = new Map<string, ContextoLinea>();
+    for (const linea of lineas) {
+      contextos.set(linea.id, await this.contexto(linea.id, lookups, dia));
+    }
+    /* Una sola pasada al IoT para todas las líneas (vacía si no está configurado). */
+    const lecturasIot = await this.sensoresIot.lecturas(
+      lineas.map((linea) => {
+        const enCurso = contextos.get(linea.id)?.ordenEnCurso;
+        return {
+          id: linea.id,
+          nombre: linea.nombre,
+          ordenEnCurso: enCurso ? { id: enCurso.id, inicio: enCurso.inicio } : null,
+        };
+      }),
+    );
+
     const estadoLineas: LineaEstado[] = [];
     for (const linea of lineas) {
-      estadoLineas.push(await this.estadoDeLinea(linea.id, lookups, dia, ahoraOp));
+      const ctx = contextos.get(linea.id)!;
+      estadoLineas.push(
+        this.estadoDeLinea(linea.id, lookups, ctx, ahoraOp, lecturasIot.get(linea.id)),
+      );
     }
 
     return {
@@ -177,7 +202,7 @@ export class RealtimeService {
         id: `EV-${contexto.alerta.id}`,
         hora: contexto.alerta.generadaEn.slice(11, 16),
         tipo: 'alerta',
-        titulo: `Alerta · ${contexto.alerta.riesgo} %`,
+        titulo: `Alerta · ${TIPO_ALERTA_LABEL[contexto.alerta.tipo]} · ${contexto.alerta.riesgo} %`,
         detalle: contexto.alerta.texto,
       });
     }
@@ -232,11 +257,14 @@ export class RealtimeService {
 
   /** Reúne los registros vivos que determinan el estado de una línea. */
   private async contexto(lineaId: string, lookups: Lookups, dia: string): Promise<ContextoLinea> {
-    const delDia = (await this.ordenes.find({ where: { lineaId } }))
-      .filter((o) => o.fecha === dia)
-      .sort((a, b) => b.inicio.localeCompare(a.inicio));
-    const ordenEnCurso = delDia.find((o) => o.estado === 'en_curso') ?? null;
-    const orden = ordenEnCurso ?? delDia[0] ?? null;
+    const deLinea = (await this.ordenes.find({ where: { lineaId } })).sort((a, b) =>
+      b.inicio.localeCompare(a.inicio),
+    );
+    /* La orden en curso se elige por estado, no por fecha: una orden del turno
+     * Noche iniciada antes de medianoche sigue en curso al día siguiente aunque
+     * otra línea ya tenga órdenes del nuevo día operativo. */
+    const ordenEnCurso = deLinea.find((o) => o.estado === 'en_curso') ?? null;
+    const orden = ordenEnCurso ?? deLinea.find((o) => o.fecha === dia) ?? null;
 
     const paradasLinea = orden
       ? (await this.paradas.find({ where: { ordenId: orden.id } })).sort((a, b) =>
@@ -263,21 +291,23 @@ export class RealtimeService {
       orden,
       ordenEnCurso,
       paradaAbierta,
-      ultimaParada: paradasLinea[0] ?? null,
+      /* Con una parada abierta, la tarjeta ("Parada abierta · …") debe hablar de
+       * ella y no de la última por inicio, que puede estar ya cerrada (M6). */
+      ultimaParada: paradaAbierta ?? paradasLinea[0] ?? null,
       deteccion,
       alerta,
       ultimaVelocidad,
     };
   }
 
-  private async estadoDeLinea(
+  private estadoDeLinea(
     lineaId: string,
     lookups: Lookups,
-    dia: string,
+    ctx: ContextoLinea,
     ahora: string,
-  ): Promise<LineaEstado> {
+    iot?: LecturaIotLinea,
+  ): LineaEstado {
     const linea = lookups.lineas.get(lineaId)!;
-    const ctx = await this.contexto(lineaId, lookups, dia);
 
     /* Prioridad: parada abierta → detección sugerida → sin orden → alerta → produciendo. */
     let estado: EstadoLinea;
@@ -315,6 +345,13 @@ export class RealtimeService {
       ? lookups.usuarios.get(orden.maquinistaId)
       : [...lookups.usuarios.values()].find((u) => u.lineaId === lineaId);
 
+    /* Sensores IoT: el conteo y la velocidad medidos mandan sobre los registros
+     * manuales sólo cuando son de fiar (`null` = sin dato). La velocidad medida
+     * se publica también en parada: es lo que la máquina está haciendo. */
+    const producidoIot = ctx.ordenEnCurso && iot?.producido != null ? iot.producido : null;
+    const velocidadIot =
+      ctx.ordenEnCurso && iot?.velocidadUnidMin != null ? iot.velocidadUnidMin : null;
+
     const causaUltima = ctx.ultimaParada
       ? lookups.causasParada.get(ctx.ultimaParada.causaId)
       : undefined;
@@ -332,9 +369,10 @@ export class RealtimeService {
             turno: orden.turno,
           }
         : undefined,
-      producido: orden?.producido ?? 0,
+      producido: producidoIot ?? orden?.producido ?? 0,
       plan: orden?.planificado ?? 0,
-      velocidad: detenida ? 0 : (ctx.ultimaVelocidad?.velocidadReal ?? velocidadEstandar),
+      velocidad:
+        velocidadIot ?? (detenida ? 0 : (ctx.ultimaVelocidad?.velocidadReal ?? velocidadEstandar)),
       velocidadEstandar,
       tiempoEnEstadoMin: minutosEntreIso(desde, ahora),
       ultimaParada:
@@ -357,6 +395,13 @@ export class RealtimeService {
           }
         : undefined,
       maquinistaNombre: maquinista?.nombre,
+      ...(iot
+        ? {
+            sensores: iot.sensores,
+            fuenteProduccion: producidoIot !== null ? ('sensores' as const) : ('manual' as const),
+            fuenteVelocidad: velocidadIot !== null ? ('sensores' as const) : ('manual' as const),
+          }
+        : {}),
     };
   }
 

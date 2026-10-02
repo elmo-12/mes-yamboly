@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, IntersectionType, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsArray,
@@ -17,13 +17,13 @@ import {
   type NivelCausaMerma,
   type TipoMermaCodigo,
 } from '@mes/types';
+import { BOOLEANO, ConVersionDto, Recortar } from './comunes.dto';
 
-const BOOLEANO = ({ value }: { value: unknown }): unknown =>
-  value === 'true' ? true : value === 'false' ? false : value;
 
 /** Alta de causa de merma (`POST /causas-merma`) — espejo de `causaMermaSchema`. */
 export class CreateCausaMermaDto {
-  @ApiProperty({ example: 'MP-01-01', description: 'MP-01, MP-01-A o MP-01-01' })
+  @ApiProperty({ example: 'MP-01-01', description: 'MP-01, MP-01-A o MP-01-01. Inmutable.' })
+  @Recortar()
   @IsString()
   @Matches(/^M[A-Z]-\d{2}(-[A-Z0-9]{1,2})?$/, {
     message: 'Formato esperado MP-01, MP-01-A o MP-01-01',
@@ -31,6 +31,7 @@ export class CreateCausaMermaDto {
   codigo!: string;
 
   @ApiProperty({ example: 'Derrame de mezcla' })
+  @Recortar()
   @IsString()
   @MinLength(3, { message: 'El nombre es obligatorio' })
   nombre!: string;
@@ -80,8 +81,14 @@ export class CreateCausaMermaDto {
   estado?: EstadoCatalogo;
 }
 
-/** Edición parcial (`PATCH /causas-merma/:id`). */
-export class UpdateCausaMermaDto extends PartialType(CreateCausaMermaDto) {}
+/**
+ * Edición parcial (`PATCH /causas-merma/:id`). `codigo`, `nivel` y `parentId`
+ * se aceptan sólo si no cambian (422 si cambian).
+ */
+export class UpdateCausaMermaDto extends IntersectionType(
+  PartialType(CreateCausaMermaDto),
+  ConVersionDto,
+) {}
 
 export class CausaMermaQueryDto {
   @ApiPropertyOptional({ enum: ['arbol', 'plano'], default: 'arbol' })

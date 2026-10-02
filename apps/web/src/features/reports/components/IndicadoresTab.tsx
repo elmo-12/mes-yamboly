@@ -27,6 +27,8 @@ export function kpiFavorable(kpi: KpiValor): boolean | undefined {
 }
 
 export function valorKpi(kpi: KpiValor): string {
+  /* Ventana sin datos: «—», no un 0 % que parezca una medición (M7). */
+  if (kpi.sinDatos) return '—';
   const decimales = Number.isInteger(kpi.valor) ? 0 : 1;
   if (kpi.unidad === 'S/') return `S/ ${formatNumber(kpi.valor, decimales)}`;
   return kpi.unidad ? `${formatNumber(kpi.valor, decimales)} ${kpi.unidad}` : formatNumber(kpi.valor);

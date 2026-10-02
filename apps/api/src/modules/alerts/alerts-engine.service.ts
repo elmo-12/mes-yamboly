@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { calcDesvioVelocidad } from '@mes/shared';
 import type { Alerta as AlertaDto, SeveridadAlerta, TipoAlerta } from '@mes/types';
-import { ahoraIso } from '../../common/utils';
+import { ahoraIso, esClaveDuplicada, insertarCopia } from '../../common/utils';
 import { Alerta, Umbrales } from '../../database/entities';
 import { aAlertaDto } from './alerts.mapper';
 import {
@@ -62,7 +62,7 @@ export class AlertsEngineService {
       disparos.push({
         tipo: 'velocidad_baja',
         severidad: desvio <= -umbrales.velocidadBajoEstandarPct * 2 ? 'alta' : 'media',
-        texto: `Velocidad ${Math.abs(Math.round(desvio))} % bajo estándar en ${senal.lineaCodigo}`,
+        texto: `Velocidad ${Math.abs(Math.round(desvio))} % bajo estándar en ${senal.lineaCodigo} (turno anterior)`,
       });
     }
 
@@ -70,7 +70,7 @@ export class AlertsEngineService {
       disparos.push({
         tipo: 'oee_bajo',
         severidad: senal.oeeActual < umbrales.oeeMinimo - 10 ? 'alta' : 'media',
-        texto: `OEE del turno bajo ${umbrales.oeeMinimo} % en ${senal.lineaCodigo}`,
+        texto: `OEE del turno anterior bajo ${umbrales.oeeMinimo} % en ${senal.lineaCodigo}`,
       });
     }
 
@@ -100,24 +100,23 @@ export class AlertsEngineService {
 
       const ahora = new Date();
       const fin = new Date(ahora.getTime() + VENTANA_MIN[disparo.tipo] * 60000);
-      const alerta = await this.alertas.save(
-        this.alertas.create({
-          id: `ALE-${Date.now().toString(36).toUpperCase()}-${disparo.tipo.slice(0, 3)}`,
-          tipo: disparo.tipo,
-          severidad: disparo.severidad,
-          lineaId: senal.lineaId,
-          lineaCodigo: senal.lineaCodigo,
-          lineaNombre: senal.lineaNombre,
-          prediccion: disparo.texto,
-          probabilidad,
-          ventanaInicio: ahoraIso(ahora),
-          ventanaFin: ahoraIso(fin),
-          estado: 'activa',
-          acierto: null,
-          factores,
-          generadaEn: ahoraIso(ahora),
-        }),
-      );
+      const alerta = this.alertas.create({
+        id: '',
+        tipo: disparo.tipo,
+        severidad: disparo.severidad,
+        lineaId: senal.lineaId,
+        lineaCodigo: senal.lineaCodigo,
+        lineaNombre: senal.lineaNombre,
+        prediccion: disparo.texto,
+        probabilidad,
+        ventanaInicio: ahoraIso(ahora),
+        ventanaFin: ahoraIso(fin),
+        estado: 'activa',
+        acierto: null,
+        factores,
+        generadaEn: ahoraIso(ahora),
+      });
+      await this.insertarConIdUnico(alerta, disparo.tipo);
       creadas.push(aAlertaDto(alerta));
     }
 
@@ -129,13 +128,38 @@ export class AlertsEngineService {
     return creadas;
   }
 
-  /** Marca como `vencida` toda alerta activa cuya ventana ya pasó. */
+  /**
+   * Marca como `vencida` toda alerta activa cuya ventana ya pasó. Es un UPDATE
+   * condicionado a `estado = 'activa'`: antes se cargaban las entidades y se
+   * guardaban enteras, de modo que una alerta atendida entre la lectura y el
+   * guardado volvía a quedar `vencida` y perdía la acción registrada.
+   */
   async vencerCaducadas(): Promise<number> {
-    const ahora = ahoraIso();
-    const activas = await this.alertas.find({ where: { estado: 'activa' } });
-    const caducadas = activas.filter((a) => a.ventanaFin < ahora);
-    for (const alerta of caducadas) alerta.estado = 'vencida';
-    if (caducadas.length) await this.alertas.save(caducadas);
-    return caducadas.length;
+    const resultado = await this.alertas
+      .createQueryBuilder()
+      .update(Alerta)
+      .set({ estado: 'vencida' })
+      .where('estado = :activa', { activa: 'activa' })
+      .andWhere('ventanaFin < :ahora', { ahora: ahoraIso() })
+      .execute();
+    return resultado.affected ?? 0;
+  }
+
+  /**
+   * `ALE-<marca de tiempo><sufijo aleatorio>-<tipo>`. Se inserta (nunca
+   * `save()`, que con un id repetido hace UPDATE y pisa otra alerta) y, si el
+   * id ya existe, se reintenta con otro sufijo.
+   */
+  private async insertarConIdUnico(alerta: Alerta, tipo: string): Promise<void> {
+    for (let intento = 0; intento < 5; intento++) {
+      const sufijo = Math.random().toString(36).slice(2, 4).toUpperCase();
+      alerta.id = `ALE-${Date.now().toString(36).toUpperCase()}${sufijo}-${tipo.slice(0, 3)}`;
+      try {
+        await insertarCopia(this.alertas, alerta);
+        return;
+      } catch (error) {
+        if (!esClaveDuplicada(error) || intento === 4) throw error;
+      }
+    }
   }
 }

@@ -4,6 +4,8 @@ import * as React from 'react';
 import { Button, Icon } from '@mes/ui';
 import { AppPageHeader } from '@/components/AppPageHeader';
 import { formatNumber } from '@mes/shared';
+import { puedeIniciarOrden } from '@mes/types';
+import { useSession } from '@/hooks/use-session';
 
 export interface TiempoRealHeaderProps {
   /** ISO-8601 de la última respuesta del backend. */
@@ -39,6 +41,8 @@ export function TiempoRealHeader({
   onIniciarOrden,
 }: TiempoRealHeaderProps) {
   const segundos = useSegundosDesde(actualizadoEn);
+  const { user } = useSession();
+  const puedeIniciar = puedeIniciarOrden(user);
   const frescura =
     segundos === null ? 'Conectando con la planta…' : `Actualizado hace ${formatNumber(segundos)} s`;
   /* En móvil solo cabe la frescura; el turno aparece desde `sm`. El recuento de
@@ -66,14 +70,17 @@ export function TiempoRealHeader({
               <span className="max-sm:sr-only">Modo TV</span>
             </a>
           </Button>
-          <Button
-            variant="primary"
-            icon={<Icon name="play-circle" size={20} />}
-            disabled={overlayAbierto}
-            onClick={onIniciarOrden}
-          >
-            Iniciar orden
-          </Button>
+          {/* Sólo jefatura y supervisión inician órdenes (`POST /ordenes`). */}
+          {puedeIniciar && (
+            <Button
+              variant="primary"
+              icon={<Icon name="play-circle" size={20} />}
+              disabled={overlayAbierto}
+              onClick={onIniciarOrden}
+            >
+              Iniciar orden
+            </Button>
+          )}
         </>
       }
     />

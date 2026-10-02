@@ -41,7 +41,8 @@ export function toKpiVista(kpi: KpiValor, overrides: Partial<KpiVista> = {}): Kp
   return {
     id: kpi.id,
     label: kpi.label,
-    value: formatValor(kpi.valor, kpi.unidad),
+    /* Sin datos en la ventana: «—» en vez de un 0 % engañoso (M7). */
+    value: kpi.sinDatos ? '—' : formatValor(kpi.valor, kpi.unidad),
     delta: delta ? formatDelta(delta.valor, delta.unidad) : undefined,
     trend,
     favorable,

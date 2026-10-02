@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Alerta,
+  CausaMerma,
+  CausaParada,
   EvaluacionCalidad,
   ExportJob,
   IndicadorDiario,
@@ -16,6 +18,7 @@ import {
   Parada,
   ParadaAgregada,
   ParadaCategoria,
+  Producto,
   RegistroTiempo,
   RegistroVelocidad,
 } from '../../database/entities';
@@ -43,6 +46,9 @@ import { ReportsExportService } from './reports-export.service';
       Alerta,
       RegistroTiempo,
       EvaluacionCalidad,
+      CausaParada,
+      CausaMerma,
+      Producto,
     ]),
   ],
   controllers: [ReportsController],

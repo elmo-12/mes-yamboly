@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Drawer, DrawerContent, Input, Overline, Select, Switch, toast } from '@mes/ui';
 import { productoSchema } from '@mes/types';
 import type { Producto, ProductoInput } from '@mes/types';
+import { esConflictoVersion, TOAST_CONFLICTO_VERSION } from '@/features/catalogs/errores';
 import { useActualizarProducto, useCrearProducto, useSabores } from '@/features/catalogs/hooks';
 import { aplicarErroresApi, mensajeDeError } from '@/services/api/form-errors';
 
@@ -41,12 +42,21 @@ function valoresDesde(producto: Producto): ProductoInput {
     saborId: producto.saborId ?? null,
     sabor: producto.sabor,
     estado: producto.estado,
+    version: producto.version,
   };
 }
 
 /** `2.54` → `"2,54"`; vacío si aún no hay valor. */
 function textoPeso(valor: number): string {
   return valor ? String(valor).replace('.', ',') : '';
+}
+
+/** `'2.54'` o `'2,54'` → `'2,54'`; descarta lo que no sea dígito o separador. */
+export function normalizarPeso(texto: string): string {
+  return texto
+    .replace(/\./g, ',')
+    .replace(/[^0-9,]/g, '')
+    .replace(/(,.*),/g, '$1');
 }
 
 /** Vacía a `null`, para no mandar cadenas vacías donde el maestro usa `null`. */
@@ -108,7 +118,9 @@ export function ProductoDrawer({ open, onOpenChange, producto }: ProductoDrawerP
   }, [descripcionCorta, setValue]);
 
   const escribirPeso = (texto: string) => {
-    const limpio = texto.replace(/[^0-9,]/g, '').replace(/(,.*),/g, '$1');
+    /* Acepta punto o coma decimal: antes `2.54` perdía el punto y se guardaba
+       como 254 kg. Se muestra siempre con coma. */
+    const limpio = normalizarPeso(texto);
     setPesoTexto(limpio);
     setValue('pesoKg', Number(limpio.replace(',', '.')) || 0, { shouldValidate: true });
   };
@@ -126,6 +138,11 @@ export function ProductoDrawer({ open, onOpenChange, producto }: ProductoDrawerP
       }
       onOpenChange(false);
     } catch (error) {
+      if (esConflictoVersion(error)) {
+        toast.error(TOAST_CONFLICTO_VERSION.titulo, { description: TOAST_CONFLICTO_VERSION.descripcion });
+        onOpenChange(false);
+        return;
+      }
       const campos = aplicarErroresApi<ProductoInput>(error, setError);
       if (campos.length > 0) {
         toast.error('Revisa los campos marcados', { description: 'El producto no se guardó.' });
@@ -235,7 +252,12 @@ export function ProductoDrawer({ open, onOpenChange, producto }: ProductoDrawerP
                     })),
                   ]}
                   value={field.value ?? SIN_SABOR}
-                  onValueChange={(v) => field.onChange(v === SIN_SABOR ? null : v)}
+                  onValueChange={(v) => {
+                    field.onChange(v === SIN_SABOR ? null : v);
+                    /* El texto `sabor` (búsqueda y tabla) sigue al sabor elegido. */
+                    const elegido = (sabores?.data ?? []).find((s) => s.id === v);
+                    setValue('sabor', elegido?.nombre ?? '');
+                  }}
                 />
               )}
             />
@@ -245,7 +267,7 @@ export function ProductoDrawer({ open, onOpenChange, producto }: ProductoDrawerP
               render={({ field }) => (
                 <Switch
                   label="Producto activo"
-                  supporting="Los productos inactivos no aparecen para asignar velocidad ni al iniciar una orden."
+                  supporting="Los productos inactivos no aparecen para asignar velocidad ni al iniciar una orden; al desactivarlo se dan de baja sus velocidades estándar."
                   checked={field.value === 'activo'}
                   onCheckedChange={(checked) => field.onChange(checked ? 'activo' : 'inactivo')}
                 />

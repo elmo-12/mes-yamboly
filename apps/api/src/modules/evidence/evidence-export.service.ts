@@ -7,7 +7,7 @@ import * as ExcelJS from 'exceljs';
 import type { ClaveCriterioTci, KpiTesisId } from '@mes/types';
 import { FORMATOS_EXPORT_DISPONIBLES } from '@mes/types';
 import { ValidationException } from '../../common/exceptions';
-import { ahoraIso } from '../../common/utils';
+import { ahoraIso, esClaveDuplicada } from '../../common/utils';
 import { ExportJob } from '../../database/entities';
 import { EvidenceService } from './evidence.service';
 import { EvidenceValidationService } from './evidence-validation.service';
@@ -48,18 +48,28 @@ export class EvidenceExportService {
         formato: `Formato no disponible; usa ${FORMATOS_EXPORT_DISPONIBLES.join(', ')}`,
       });
     }
-    const id = await this.siguienteId();
-    await this.jobs.save(
-      this.jobs.create({
-        id,
-        nombre: `Evidencia ${dto.kpis.join(', ')} · ${dto.destino === 'spss' ? 'SPSS' : 'informe'}`,
-        datasets: ['evidencia'],
-        formato: dto.formato,
-        solicitadoEn: ahoraIso(),
-        solicitadoPor,
-        estado: 'generando',
-      }),
-    );
+    /* `insert` con reintento: dos exportaciones simultáneas calculaban el
+       mismo `EXP-NNN` y `save()` pisaba la otra (o daba 500). */
+    let id = '';
+    for (let intento = 1; ; intento += 1) {
+      id = await this.siguienteId();
+      try {
+        await this.jobs.insert(
+          this.jobs.create({
+            id,
+            nombre: `Evidencia ${dto.kpis.join(', ')} · ${dto.destino === 'spss' ? 'SPSS' : 'informe'}`,
+            datasets: ['evidencia'],
+            formato: dto.formato,
+            solicitadoEn: ahoraIso(),
+            solicitadoPor,
+            estado: 'generando',
+          }),
+        );
+        break;
+      } catch (error) {
+        if (!esClaveDuplicada(error) || intento >= 5) throw error;
+      }
+    }
 
     void this.generar(id, dto).catch((error: unknown) => {
       this.logger.error(`Fallo al generar ${id}`, error as Error);
@@ -162,9 +172,15 @@ export class EvidenceExportService {
         return {
           columnas: [
             { header: 'N', width: 6 }, { header: 'RF', width: 7 }, { header: 'Funcionalidad', width: 34 },
+            { header: 'Verificada', width: 11 }, { header: 'Verificada en', width: 20 },
             { header: 'Cumple', width: 10 }, { header: 'Observación', width: 60 }, { header: 'Ruta', width: 24 },
           ],
-          filas: cfs.items.map((i): Fila => [i.n, i.rf, i.funcionalidad, bool(i.cumple), i.observacion, i.ruta]),
+          /* «Verificada» distingue «verificada y no cumple» de «sin verificar»
+             (ambas con Cumple = No), igual que la ficha en pantalla. */
+          filas: cfs.items.map((i): Fila => [
+            i.n, i.rf, i.funcionalidad, bool(Boolean(i.verificadaEn)), i.verificadaEn ?? '',
+            bool(i.cumple), i.observacion, i.ruta,
+          ]),
         };
       }
       case 'EP': {

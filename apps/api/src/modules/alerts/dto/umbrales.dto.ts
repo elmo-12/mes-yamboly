@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsNumber, IsOptional, Max, Min, ValidateIf } from 'class-validator';
 
 export class UmbralesDto {
   @ApiProperty({ minimum: 1, maximum: 50, example: 5, description: '% bajo el estándar que dispara la alerta' })
@@ -40,7 +40,7 @@ export class UmbralesDto {
     example: 5,
     description: 'Tolerancia en minutos entre horas registradas y lecturas de sensor',
   })
-  @IsOptional()
+  @ValidateIf((_o, v) => v !== undefined)
   @Type(() => Number)
   @IsNumber({}, { message: 'tciToleranciaMin debe ser numérico' })
   @Min(0, { message: 'Mínimo 0 min' })
@@ -53,7 +53,7 @@ export class UmbralesDto {
     example: 5,
     description: 'Tolerancia porcentual en cantidades (kg vs SAP) y velocidades',
   })
-  @IsOptional()
+  @ValidateIf((_o, v) => v !== undefined)
   @Type(() => Number)
   @IsNumber({}, { message: 'tciToleranciaPct debe ser numérico' })
   @Min(0, { message: 'Mínimo 0 %' })
@@ -66,10 +66,16 @@ export class UmbralesDto {
     example: 1,
     description: 'Días de holgura entre la merma y su transferencia SAP',
   })
-  @IsOptional()
+  @ValidateIf((_o, v) => v !== undefined)
   @Type(() => Number)
   @IsInt({ message: 'tciToleranciaDiasSap debe ser un número entero de días' })
   @Min(0, { message: 'Mínimo 0 días' })
   @Max(15, { message: 'Máximo 15 días' })
   tciToleranciaDiasSap?: number;
+
+  @ApiPropertyOptional({ example: 3, description: 'Versión leída (409 si otra persona guardó después)' })
+  @IsOptional()
+  @IsInt({ message: 'version debe ser un entero' })
+  @Min(1, { message: 'version debe ser 1 o mayor' })
+  version?: number;
 }

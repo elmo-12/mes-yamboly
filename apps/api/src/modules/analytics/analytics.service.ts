@@ -17,7 +17,7 @@ import type {
 } from '@mes/types';
 import { TIPO_ALERTA_LABEL } from '@mes/types';
 import { ConflictoException, NoEncontradoException } from '../../common/exceptions';
-import { ahoraIso, hoyIso, redondear } from '../../common/utils';
+import { ahoraIso, redondear, sumarDiasLocal } from '../../common/utils';
 import {
   Alerta,
   IndicadorDiario,
@@ -141,6 +141,7 @@ export class AnalyticsService implements OnModuleDestroy {
       variablesModelo: vigente?.features ?? 0,
       kpis: {
         ep: await this.epActual(),
+        epConfirmadas: await this.registrosEp.count(),
         precision: vigente?.precision ?? 0,
         recall: vigente?.recall ?? 0,
         alertas30d,
@@ -612,9 +613,7 @@ export class AnalyticsService implements OnModuleDestroy {
   private async ritmoDiario(): Promise<number> {
     const ultima = await this.ordenes.findOne({ where: {}, order: { fecha: 'DESC' } });
     if (!ultima) return RITMO_DIARIO_EVENTOS;
-    const desde = new Date(`${ultima.fecha}T00:00:00`);
-    desde.setDate(desde.getDate() - 6);
-    const corte = hoyIso(desde);
+    const corte = sumarDiasLocal(ultima.fecha, -6);
     const [ordenes, paradas, mermas] = await Promise.all([
       this.ordenes.count({ where: { fecha: MoreThanOrEqual(corte) } }),
       this.paradas.count({ where: { inicio: MoreThanOrEqual(corte) } }),

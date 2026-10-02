@@ -1,14 +1,21 @@
 import { type INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { crearValidationPipe } from '../src/common/pipes/validation.pipe';
 
-/** Levanta la app con la misma configuración global que `main.ts`. */
-export async function crearApp(): Promise<INestApplication> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+/**
+ * Levanta la app con la misma configuración global que `main.ts`.
+ * `personalizar` permite sustituir proveedores (p. ej. el cliente IoT por uno falso).
+ */
+export async function crearApp(
+  personalizar: (builder: TestingModuleBuilder) => TestingModuleBuilder = (b) => b,
+): Promise<INestApplication> {
+  const moduleRef = await personalizar(
+    Test.createTestingModule({ imports: [AppModule] }),
+  ).compile();
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(crearValidationPipe());

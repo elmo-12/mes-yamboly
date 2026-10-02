@@ -10,6 +10,8 @@ import {
 } from '../../database/entities';
 import { AlertsLookupService } from '../alerts/alerts-lookup.service';
 import { AlertsModule } from '../alerts/alerts.module';
+import { IotApiClient } from './iot/iot-api.client';
+import { SensoresIotService } from './iot/sensores-iot.service';
 import { RealtimeController } from './realtime.controller';
 import { RealtimeService } from './realtime.service';
 
@@ -19,7 +21,12 @@ import { RealtimeService } from './realtime.service';
     AlertsModule,
   ],
   controllers: [RealtimeController],
-  providers: [RealtimeService, { provide: ALERTS_LOOKUP, useExisting: AlertsLookupService }],
+  providers: [
+    RealtimeService,
+    IotApiClient,
+    SensoresIotService,
+    { provide: ALERTS_LOOKUP, useExisting: AlertsLookupService },
+  ],
   exports: [RealtimeService],
 })
 export class RealtimeModule {}
