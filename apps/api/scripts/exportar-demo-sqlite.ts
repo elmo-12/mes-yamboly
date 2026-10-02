@@ -10,7 +10,9 @@
  * Las 11 cuentas de demostración (`USR-01`…`USR-11`, ficticias) se conservan;
  * los usuarios reales que creó la sincronización (`USR-R-<nombre>`) pasan a
  * `USR-A-NN` / «Maquinista NN» / «Supervisor NN» en todas las tablas que los
- * referencian, y sus nombres se borran de los textos libres.
+ * referencian, y sus nombres se borran de los textos libres. Los productos
+ * también (`anonimizarProductos`): sus nombres comerciales pasan a
+ * «Producto NNN · <Sabor>» en el catálogo, las órdenes SAP y los textos libres.
  *
  * Lo derivado del modelo (`muestra_analitica`, `modelo_version`, `prediccion`,
  * `entrenamiento_ejecucion`, `alerta`) no se copia: el contenedor entrena su
@@ -66,7 +68,32 @@ const TEXTOS_LIBRES: Array<[tabla: string, columna: string]> = [
   ['encuesta_respuesta', 'comentario'],
   ['audit_event', 'usuario'],
   ['audit_event', 'texto'],
+  ['registro_velocidad', 'motivo'],
 ];
+
+/**
+ * Marcas comerciales, líneas de producto y clientes que aparecen en los
+ * nombres de producto y de sabor (sacadas del maestro real). Las palabras
+ * genéricas (sabores, envases, unidades) y «Yamboly», que ya es el nombre
+ * visible de la aplicación, se conservan.
+ */
+const MARCAS = [
+  'AASS', 'BAKANAZO', 'BELL', 'BELLS', 'BOMB', 'BOMBOM', 'CHOCBBMIX', 'CHOCOBOMBOM',
+  'CHOCOMANI', 'CHOCOSANDWICH', 'COPAMIX', 'CORNELLO', 'CRUNCHY', 'FRO', 'FROZEN',
+  'FUSION', 'GELAT', 'GELATICO', 'GOLD', 'GOLDEN', 'KREM', 'MAGNETO', 'MAXI',
+  'MONSTER', 'PEKITAS', 'PRAIA', 'SIX', 'TEN', 'TOT', 'TOTTUS', 'TRUBU', 'TRUBULU',
+  'YAMB', 'YAMBITO', 'YAMBO',
+];
+const PATRON_MARCA = new RegExp(`(?<![\\p{L}])(?:${MARCAS.join('|')})(?![\\p{L}])`, 'giu');
+
+/** Quita las marcas de un nombre de sabor («Magneto Sauco» → «Sauco»). */
+function sinMarca(texto: string): string {
+  return texto
+    .replace(PATRON_MARCA, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s/·-]+|[\s/·-]+$/g, '')
+    .trim();
+}
 
 function escaparRegex(texto: string): string {
   return texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -127,6 +154,80 @@ async function anonimizarPersonas(db: DataSource): Promise<{ usuarios: number; t
   await db.query(`UPDATE orden_fabricacion SET colaboradores = '[]' WHERE colaboradores <> '[]'`);
 
   return { usuarios: reales.length, textos };
+}
+
+/**
+ * Sustituye los nombres comerciales de los productos (marcas y SKU reales) por
+ * `Producto NNN · <Sabor>` en el catálogo y en las órdenes SAP, y los borra de
+ * los textos libres. Se conservan el código, la presentación y el sabor, que
+ * no identifican la marca. Devuelve cuántos productos y textos tocó.
+ */
+async function anonimizarProductos(db: DataSource): Promise<{ productos: number; textos: number }> {
+  /* Sabores con prefijo de marca: el catálogo y las copias en texto. */
+  for (const [tabla, columna] of [
+    ['sabor', 'nombre'],
+    ['producto', 'sabor'],
+    ['merma', 'sabor'],
+  ] as const) {
+    const filas = (await db.query(
+      `SELECT rowid AS fila, "${columna}" AS texto FROM "${tabla}" WHERE "${columna}" IS NOT NULL AND "${columna}" <> ''`,
+    )) as Array<{ fila: number; texto: string }>;
+    for (const { fila, texto } of filas) {
+      const limpio = sinMarca(texto) || 'Sabor';
+      if (limpio !== texto) await db.query(`UPDATE "${tabla}" SET "${columna}" = ? WHERE rowid = ?`, [limpio, fila]);
+    }
+  }
+
+  const productos = (await db.query(
+    'SELECT id, nombre, descripcionLarga, descripcionCorta, alias, sabor FROM producto ORDER BY codigo',
+  )) as Array<{
+    id: string;
+    nombre: string | null;
+    descripcionLarga: string | null;
+    descripcionCorta: string | null;
+    alias: string | null;
+    sabor: string | null;
+  }>;
+
+  const reemplazos: Array<[RegExp, string]> = [];
+  for (const [i, producto] of productos.entries()) {
+    const sabor = producto.sabor?.trim();
+    const alias = `Producto ${String(i + 1).padStart(3, '0')}${sabor ? ` · ${sabor}` : ''}`;
+    await db.query(
+      'UPDATE producto SET nombre = ?, descripcionCorta = ?, descripcionLarga = ?, alias = NULL, marca = ? WHERE id = ?',
+      [alias, alias, alias, 'Demo', producto.id],
+    );
+    await db.query('UPDATE orden_sap SET productoNombre = ? WHERE productoId = ?', [alias, producto.id]);
+
+    /* Primero los textos más largos, para no dejar restos de un nombre parcial. */
+    const nombres = [producto.descripcionLarga, producto.nombre, producto.descripcionCorta, producto.alias]
+      .map((n) => n?.trim())
+      .filter((n): n is string => Boolean(n && n.length >= 4));
+    for (const nombre of [...new Set(nombres)].sort((a, b) => b.length - a.length)) {
+      reemplazos.push([new RegExp(escaparRegex(nombre), 'gi'), alias]);
+    }
+  }
+  /* Filas SAP cuyo producto no está en el maestro: también sin nombre comercial. */
+  await db.query(
+    "UPDATE orden_sap SET productoNombre = 'Producto ' || codigoProducto WHERE productoId IS NULL",
+  );
+
+  let textos = 0;
+  for (const [tabla, columna] of TEXTOS_LIBRES) {
+    const filas = (await db.query(
+      `SELECT rowid AS fila, "${columna}" AS texto FROM "${tabla}" WHERE "${columna}" IS NOT NULL AND "${columna}" <> ''`,
+    )) as Array<{ fila: number; texto: string }>;
+    for (const { fila, texto } of filas) {
+      const limpio = reemplazos
+        .reduce((t, [patron, alias]) => t.replace(patron, alias), texto)
+        .replace(PATRON_MARCA, '[marca]');
+      if (limpio === texto) continue;
+      await db.query(`UPDATE "${tabla}" SET "${columna}" = ? WHERE rowid = ?`, [limpio, fila]);
+      textos++;
+    }
+  }
+
+  return { productos: productos.length, textos };
 }
 
 /** Lector minimalista de `.env` (el script corre fuera del contexto Nest). */
@@ -210,6 +311,10 @@ async function main(): Promise<void> {
     const anonimizado = await anonimizarPersonas(destino);
     console.log(
       `\nAnonimizados: ${anonimizado.usuarios} usuarios reales · ${anonimizado.textos} textos libres con nombres`,
+    );
+    const productos = await anonimizarProductos(destino);
+    console.log(
+      `Anonimizados: ${productos.productos} productos · ${productos.textos} textos libres con nombres comerciales`,
     );
     await destino.query('PRAGMA foreign_keys = ON');
     await destino.query('VACUUM');

@@ -7,6 +7,7 @@ Se publica para `linux/amd64` y `linux/arm64`, así que funciona igual en Mac Ap
 | Etiqueta | Contenido |
 |---|---|
 | `latest` | Último build publicado |
+| `1.2.0` | Órdenes SAP, sensores IoT, correcciones de QA; semilla con personas y productos anonimizados |
 | `1.1.0` | Imagen aligerada (≈190 MB comprimida por arquitectura) |
 
 ---
@@ -101,7 +102,7 @@ pnpm --filter @mes/api exportar:demo                     # desde 2026-07-22 ≈ 
 pnpm --filter @mes/api exportar:demo -- --desde=2026-06-01 --url=postgres://…
 ```
 
-> **Atención:** ese recorte contiene órdenes reales y nombres de usuarios, y queda **dentro de la imagen**. No publicar una imagen construida con él en un registro público.
+> **Atención:** el script anonimiza personas (usuarios y nombres en textos libres) y productos (nombres comerciales, marcas en sabores y textos libres), pero el recorte sigue conteniendo órdenes reales y queda **dentro de la imagen**. No publicar una imagen construida con él en un registro público.
 
 ### 2.2 Compilar para la máquina local
 ```bash
@@ -145,7 +146,7 @@ gh auth token | docker login ghcr.io -u elmo-12 --password-stdin
 ```bash
 docker buildx create --name mes-builder --use 2>/dev/null || docker buildx use mes-builder
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ghcr.io/elmo-12/mes-yamboly:1.1.0 \
+  -t ghcr.io/elmo-12/mes-yamboly:1.2.0 \
   -t ghcr.io/elmo-12/mes-yamboly:latest \
   --push .
 ```
