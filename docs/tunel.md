@@ -6,7 +6,7 @@ El front se publica con un túnel de Cloudflare (`cloudflared`) sobre el dominio
 | Túnel | Hostname | Dónde corre | Config |
 |---|---|---|---|
 | `mes-yamboly` | `mes.yamboly.lat` | Servidor (82.197.65.136) | `~/.cloudflared/mes-yamboly.yml` |
-| `mes-yamboly-dev` | `mes-dev.yamboly.lat` | Mac de desarrollo | `~/.cloudflared/mes-yamboly-dev.yml` |
+| `mes-yamboly-dev` | `mes-dev.yamboly.lat` | Mac de desarrollo (build de producción en :3300) | `~/.cloudflared/mes-yamboly-dev.yml` |
 
 Si se arranca un túnel en dos máquinas a la vez, Cloudflare reparte el tráfico
 entre ambas y cada visita cae en una al azar.
@@ -15,9 +15,18 @@ entre ambas y cada visita cae en una al azar.
 
 ```bash
 DATABASE_URL=postgres://mes:mes_dev@localhost:5435/mes_yamboly \
-  pnpm exec turbo run dev --parallel --env-mode=loose   # web :3000 + API :4000
-pnpm tunel                                             # https://mes-dev.yamboly.lat → :3000
+  pnpm exec turbo run dev --parallel --env-mode=loose   # API :4000 (+ web dev :3000 para trabajar en local)
+pnpm tunel:web                                         # build de producción de la web en :3300
+pnpm tunel                                             # https://mes-dev.yamboly.lat → :3300
 ```
+
+**No exponer `next dev` por el túnel.** El servidor de desarrollo envía ~22 MB de
+JavaScript sin minificar en cada carga: en local tarda 0,7 s, pero por el túnel
+tarda 9 s o más y, si el túnel se reconecta a mitad de la descarga, la página se
+queda en el esqueleto de carga. El build de producción pesa ~1 MB y carga en ~2 s.
+`pnpm tunel:web` reconstruye y sirve ese build; hay que volver a lanzarlo para ver
+cambios de código. (`next build` con un `distDir` distinto de `.next` añade líneas
+a `apps/web/tsconfig.json`; el script lo restaura).
 
 `pnpm tunel` usa `~/.cloudflared/mes-yamboly-dev.yml`. Para otro túnel se puede
 pasar `TUNEL_CONFIG=/ruta/config.yml pnpm tunel`.

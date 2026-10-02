@@ -23,6 +23,7 @@
     "prediccion:up": "docker compose up -d prediccion",
     "prediccion:logs": "docker compose logs -f prediccion",
     "prediccion:build": "docker compose build prediccion",
+    "tunel:web": "cd apps/web && cp tsconfig.json /tmp/mes-tsconfig.bak && NEXT_DIST_DIR=.next-tunel API_PROXY_URL=http://localhost:4000 pnpm exec next build; cp /tmp/mes-tsconfig.bak tsconfig.json && NEXT_DIST_DIR=.next-tunel API_PROXY_URL=http://localhost:4000 WEB_TRUST_PROXY_HOPS=1 pnpm exec next start -p 3300",
     "tunel": "cloudflared --config \"${TUNEL_CONFIG:-$HOME/.cloudflared/mes-yamboly-dev.yml}\" tunnel run"
   },
   "devDependencies": {
