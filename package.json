@@ -22,7 +22,8 @@
     "py:dev": "cd services/prediccion-py && uv run uvicorn prediccion.main:app --reload --port 8001",
     "prediccion:up": "docker compose up -d prediccion",
     "prediccion:logs": "docker compose logs -f prediccion",
-    "prediccion:build": "docker compose build prediccion"
+    "prediccion:build": "docker compose build prediccion",
+    "tunel": "cloudflared --config \"${TUNEL_CONFIG:-$HOME/.cloudflared/mes-yamboly-dev.yml}\" tunnel run"
   },
   "devDependencies": {
     "turbo": "^2.5.0",

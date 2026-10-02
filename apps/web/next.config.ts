@@ -15,6 +15,14 @@ const nextConfig: NextConfig = {
      que se pisen el directorio de build (`NEXT_DIST_DIR=.next-qa next dev`). */
   distDir: process.env.NEXT_DIST_DIR || '.next',
 
+  /* `next dev` rechaza los recursos de desarrollo (`/_next/*`, HMR) pedidos
+     desde un host distinto de localhost. Detrás de un túnel con dominio propio
+     hay que declararlo: `NEXT_ALLOWED_DEV_ORIGINS=mes-dev.yamboly.lat,…`. */
+  allowedDevOrigins: (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? '')
+    .split(',')
+    .map((host) => host.trim())
+    .filter(Boolean),
+
   /* La imagen de Docker (`Dockerfile` en la raíz) construye con
      `NEXT_OUTPUT=standalone`: un `server.js` autónomo con sólo las dependencias
      que usa. La raíz del trazado es el monorepo para incluir `packages/*`. */
