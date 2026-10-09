@@ -428,7 +428,7 @@ Las causas de merma son un árbol de 3 niveles (**tipo de producción → clasif
 
 **Orden en curso y última parada.** La orden en curso de cada línea se elige **por estado** (`en_curso`), no por fecha: una orden del turno Noche iniciada antes de medianoche sigue en curso al día siguiente. Con una parada abierta, la tarjeta habla de **esa** parada y no de la última por inicio.
 
-**Riesgo de la tarjeta.** `LineaEstado.alerta` (`AlertaLinea`) incluye **`tipo: TipoAlerta`** (`parada_prevista` · `merma_prevista` · `velocidad_baja` · `oee_bajo`) además de la probabilidad 0–100: la web rotula el riesgo con el tipo real de la alerta/predicción (una alerta de velocidad baja ya no se pinta como «riesgo de parada»).
+**Riesgo de la tarjeta.** `LineaEstado.alerta` (`AlertaLinea`) incluye **`tipo: TipoAlerta`** (`parada_prevista` · `parada_larga` · `merma_prevista` · `velocidad_baja` · `oee_bajo`) además de la probabilidad 0–100: la web rotula el riesgo con el tipo real de la alerta/predicción (una alerta de velocidad baja ya no se pinta como «riesgo de parada»).
 
 ### Sensores IoT (sólo lectura, `src/modules/realtime/iot/`)
 
@@ -503,7 +503,7 @@ Datasets válidos: `ordenes`, `paradas`, `mermas`, `velocidades`, `indicadores`,
 | `/alertas/:id/confirmar` | POST · `ROLES_CONFIRMAR_EP` (200) | `ConfirmarEvento { ocurrio, observacion? (≤300) }` | `{ alerta, resumen, ep: number }` — `ep` es la EP acumulada en % | 403 · 404 · 409 transición inválida o confirmación simultánea · 422 |
 | `/alertas/confirmar-lote` | POST · `ROLES_CONFIRMAR_EP` (200) | `{ confirmaciones: [{ alertaId, ocurrio, observacion? }] }` (1–200) | `{ data: Alerta[], resumen, ep: number }` — **atómico**: o se confirman todas o ninguna | 403 · 404 alguna alerta inexistente · **409** alguna no admite confirmación (también el segundo de dos envíos simultáneos; nunca 500) · 422 lista vacía, > 200 o ids repetidos |
 | `/alertas/umbrales` | GET | — | `Umbrales` (incluye `version`) | 401 |
-| `/alertas/umbrales` | PUT · `jefe`, `supervisor` | `Umbrales { velocidadBajoEstandarPct, oeeMinimo, probabilidadMinima, notificarN8n, mostrarTv, tciToleranciaMin, tciToleranciaPct, tciToleranciaDiasSap, version? }` | `Umbrales` con `version` + 1 | 403 · **409 versión** (otra persona guardó después) · 422 (un campo vacío es error, no 0) |
+| `/alertas/umbrales` | PUT · `jefe`, `supervisor` | `Umbrales { velocidadBajoEstandarPct, oeeMinimo, probabilidadMinima, notificarN8n, mostrarTv, alertaParadaLarga?, probabilidadParadaLarga?, tciToleranciaMin, tciToleranciaPct, tciToleranciaDiasSap, version? }` | `Umbrales` con `version` + 1 | 403 · **409 versión** (otra persona guardó después) · 422 (un campo vacío es error, no 0) |
 
 **Máquina de estados** (validada en el servidor; transición inválida → 409 con `details.estado`):
 
@@ -516,7 +516,7 @@ Datasets válidos: `ordenes`, `paradas`, `mermas`, `velocidades`, `indicadores`,
 
 Desde la fase 3 (evidencia real), `Umbrales` suma 3 campos que sólo alimentan la validación de calidad (TCI, ver sección **evidence**): `tciToleranciaMin` (± minutos al comparar horas contra sensores, por defecto 5), `tciToleranciaPct` (± % en cantidades kg y velocidades u/min, por defecto 5) y `tciToleranciaDiasSap` (± días entre la merma y su transferencia SAP, por defecto 1). Se editan en Configuración › Umbrales de alerta › sección «Validación de calidad (TCI)» (`UmbralesTab.tsx`); el drawer de alertas (`UmbralesDrawer.tsx`) no expone estos 3 campos pero los reenvía tal cual en cada `PUT` para no perderlos.
 
-**Tipos:** `parada_prevista` · `merma_prevista` · `velocidad_baja` · `oee_bajo`.
+**Tipos:** `parada_prevista` · `parada_larga` · `merma_prevista` · `velocidad_baja` · `oee_bajo`. `parada_larga` (turno con ≥ 30 min de parada imprevista) sólo se emite si `umbrales.alertaParadaLarga` y la probabilidad supera `probabilidadParadaLarga`. El motor no duplica un tipo con alerta activa en la línea, pero una alerta viva de otro tipo no bloquea las demás.
 **Severidades:** `critica` · `alta` · `media`. **Estados:** `activa` · `atendida` · `vencida` · `confirmada` · `descartada`.
 
 ---

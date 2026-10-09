@@ -5,7 +5,8 @@ del contrato congelado en `docs/prediccion-python.md`, raíz del repo).
 
 Python **no escribe en PostgreSQL** y **no reconstruye features**: sólo
 recibe filas + catálogo + cortes temporales de Nest, entrena/pondera
-LightGBM · HistGradientBoosting · LogisticRegression/Ridge, calibra con
+LightGBM · HistGradientBoosting · LogisticRegression, eligiendo sus hiperparámetros con validación
+temporal dentro de cada tramo de entrenamiento (`dominio/ajuste.py`), calibra con
 Platt, explica con `pred_contrib`/sustitución a la mediana y persiste
 `.joblib` versionados.
 

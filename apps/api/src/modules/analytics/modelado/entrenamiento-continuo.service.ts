@@ -155,7 +155,7 @@ export function decidirClasificacion(
   };
 }
 
-/** Regresión (`minutos_imprevistos`): RMSE más bajo gana; sin AUC ni guardarraíl de clases. */
+/** Regresión: RMSE más bajo gana; sin AUC ni guardarraíl de clases. Hoy ningún objetivo la usa. */
 export function decidirRegresion(
   candidato: { mae: number; rmse: number; r2: number },
   incumbente: { mae: number; rmse: number; r2: number } | null,
@@ -244,7 +244,7 @@ function pliegueArraysIguales(propios: readonly PliegueEvaluacion[], recibidos: 
  *
  * Sólo `parada_imprevista` (`OBJETIVO_PERSISTIDO`) se escribe en
  * `modelo_version`: es el único objetivo que `/predict` consume. Los otros
- * tres (`merma_sobre_estandar`, `minutos_imprevistos`, `causa_dominante`) se
+ * tres (`merma_sobre_estandar`, `parada_larga`, `causa_dominante`) se
  * entrenan y se deciden igual, pero su versión activa vive sólo en el
  * registro propio de Python — Nest no tiene hoy una pantalla que la consuma.
  */
@@ -663,6 +663,7 @@ export class EntrenamientoContinuoService implements OnApplicationBootstrap {
       huboParadaImprevista: m.huboParadaImprevista,
       mermaSobreEstandar: m.mermaSobreEstandar,
       minutosImprevistos: m.minutosImprevistos,
+      paradaLarga: m.paradaLarga,
       tipoCausaDominante: m.tipoCausaDominante,
     }));
   }

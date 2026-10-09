@@ -24,7 +24,7 @@ def _construir_request(muestras: list[dict], version: str) -> dict:
     prueba_desde = dias[int(len(dias) * 0.8)] if dias else ""
     return {
         "version": version,
-        "objetivos": ["parada_imprevista", "merma_sobre_estandar", "minutos_imprevistos", "causa_dominante"],
+        "objetivos": ["parada_imprevista", "merma_sobre_estandar", "parada_larga", "causa_dominante"],
         "snapshot": {
             "sha256": calcular_sha256_muestras(muestras),
             "filas": len(muestras),
@@ -56,11 +56,11 @@ def test_multiclase_con_una_sola_clase_no_rompe_los_demas(cliente) -> None:
     assert "error" in resultados["causa_dominante"]
     assert "clase" in resultados["causa_dominante"]["error"]
 
-    for objetivo in ("parada_imprevista", "merma_sobre_estandar", "minutos_imprevistos"):
+    for objetivo in ("parada_imprevista", "merma_sobre_estandar", "parada_larga"):
         assert "error" not in resultados[objetivo], resultados[objetivo]
     assert "algoritmo" in resultados["parada_imprevista"]
     assert "algoritmo" in resultados["merma_sobre_estandar"]
-    assert "metricas" in resultados["minutos_imprevistos"]
+    assert "walkForward" in resultados["parada_larga"]
 
     # `/entrenar` persiste pero no activa: ningún objetivo queda sirviendo por
     # el mero hecho de haberse entrenado (la promoción la decide Nest).
@@ -112,7 +112,7 @@ def test_causa_dominante_mayoritariamente_nula_caso_real(cliente) -> None:
     else:
         assert "metricas" in resultados["causa_dominante"]
 
-    for objetivo in ("parada_imprevista", "merma_sobre_estandar", "minutos_imprevistos"):
+    for objetivo in ("parada_imprevista", "merma_sobre_estandar", "parada_larga"):
         assert "error" not in resultados[objetivo], resultados[objetivo]
 
 
@@ -135,7 +135,7 @@ def test_entrenar_todos_los_objetivos_fallan_da_500(cliente, monkeypatch) -> Non
     assert set(detail["resultados"].keys()) == {
         "parada_imprevista",
         "merma_sobre_estandar",
-        "minutos_imprevistos",
+        "parada_larga",
         "causa_dominante",
     }
     for objetivo, info in detail["resultados"].items():

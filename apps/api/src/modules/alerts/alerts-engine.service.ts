@@ -31,6 +31,8 @@ export interface SenalLinea {
 /** Minutos de la ventana de anticipación de cada tipo de alerta. */
 const VENTANA_MIN: Record<TipoAlerta, number> = {
   parada_prevista: 40,
+  /* La parada larga se estima para el turno completo (12 h). */
+  parada_larga: 720,
   merma_prevista: 240,
   velocidad_baja: 100,
   oee_bajo: 480,
@@ -49,9 +51,11 @@ export class AlertsEngineService {
   /**
    * Evalúa una señal contra los umbrales y, si alguna regla dispara, pide la
    * probabilidad al `PredictionProvider`. La alerta sólo se crea cuando la
-   * probabilidad supera `probabilidadMinima`.
+   * probabilidad supera `probabilidadMinima` (o `probabilidadParadaLarga` en
+   * la alerta de parada larga). `tiposVivos` son los tipos que ya tienen una
+   * alerta activa en la línea: no se duplican, pero no bloquean a los demás.
    */
-  async evaluar(senal: SenalLinea): Promise<AlertaDto[]> {
+  async evaluar(senal: SenalLinea, tiposVivos: ReadonlySet<TipoAlerta> = new Set()): Promise<AlertaDto[]> {
     const umbrales = await this.umbrales.findOne({ where: { id: 'UMB-01' } });
     if (!umbrales) return [];
 
@@ -82,8 +86,19 @@ export class AlertsEngineService {
       });
     }
 
+    /* Sin regla determinista previa: la decide sólo el modelo `parada_larga`,
+     * y únicamente si la jefatura activó la alerta en Configuración. */
+    if (umbrales.alertaParadaLarga) {
+      disparos.push({
+        tipo: 'parada_larga',
+        severidad: senal.eventos7d >= 3 ? 'alta' : 'media',
+        texto: `Parada de 30 min o más prevista en ${senal.lineaCodigo} durante el turno`,
+      });
+    }
+
     const creadas: AlertaDto[] = [];
     for (const disparo of disparos) {
+      if (tiposVivos.has(disparo.tipo)) continue;
       const ctx: PredictionContext = {
         tipo: disparo.tipo,
         lineaId: senal.lineaId,
@@ -96,7 +111,9 @@ export class AlertsEngineService {
         minutosDesdeCambio: senal.minutosDesdeCambio,
       };
       const { probabilidad, factores } = await this.prediccion.predict(ctx);
-      if (probabilidad < umbrales.probabilidadMinima) continue;
+      const minima =
+        disparo.tipo === 'parada_larga' ? umbrales.probabilidadParadaLarga : umbrales.probabilidadMinima;
+      if (probabilidad < minima) continue;
 
       const ahora = new Date();
       const fin = new Date(ahora.getTime() + VENTANA_MIN[disparo.tipo] * 60000);

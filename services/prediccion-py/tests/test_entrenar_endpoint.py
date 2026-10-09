@@ -16,7 +16,7 @@ def test_entrenar_happy_path_y_predict_después(cliente) -> None:
     assert set(cuerpo["resultados"].keys()) == {
         "parada_imprevista",
         "merma_sobre_estandar",
-        "minutos_imprevistos",
+        "parada_larga",
         "causa_dominante",
     }
 
@@ -32,8 +32,9 @@ def test_entrenar_happy_path_y_predict_después(cliente) -> None:
     for f in binario["fuera"]:
         assert f["p"] >= 0
 
-    regresion = cuerpo["resultados"]["minutos_imprevistos"]
-    assert set(regresion["metricas"].keys()) == {"mae", "rmse", "r2"}
+    larga = cuerpo["resultados"]["parada_larga"]
+    assert 0 <= larga["walkForward"]["prAuc"] <= 1
+    assert 0 < larga["tasaPositivos"] < 1
 
     multiclase = cuerpo["resultados"]["causa_dominante"]
     assert set(multiclase["metricas"].keys()) == {"f1Macro", "accuracy", "top2"}

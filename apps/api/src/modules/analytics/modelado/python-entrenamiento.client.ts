@@ -45,6 +45,7 @@ export interface MuestraEntrenamientoPy {
   huboParadaImprevista: number;
   mermaSobreEstandar: number;
   minutosImprevistos: number;
+  paradaLarga: number;
   tipoCausaDominante: string | null;
 }
 
@@ -98,7 +99,7 @@ export interface ArtefactoPy {
   bytes: number;
 }
 
-/** Bloque de resultado de un objetivo **binario** (`parada_imprevista`, `merma_sobre_estandar`). */
+/** Bloque de resultado de un objetivo **binario** (`parada_imprevista`, `merma_sobre_estandar`, `parada_larga`). */
 export interface ResultadoClasificacionPy {
   algoritmo: string;
   hiperparametros: Record<string, unknown>;
@@ -121,7 +122,7 @@ export interface ResultadoClasificacionPy {
   artefacto: ArtefactoPy;
 }
 
-/** Bloque de `minutos_imprevistos` (regresión). */
+/** Bloque de un objetivo de regresión (hoy ninguno: `minutos_imprevistos` se sustituyó por `parada_larga`). */
 export interface ResultadoRegresionPy {
   algoritmo?: string;
   hiperparametros?: Record<string, unknown>;

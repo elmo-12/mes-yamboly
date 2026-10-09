@@ -2,10 +2,10 @@
 y `POST /modelo/{objetivo}/desactivar` (§4 del contrato).
 
 El contrato no dice qué objetivo devuelve `/modelo/actual` cuando hay varios
-entrenados a la vez (sólo `/predict` está atado a `parada_imprevista`); se
-resuelve con un parámetro de consulta opcional `objetivo`, por defecto
-`parada_imprevista` — es el único que consume el motor de alertas y el caso
-de uso que documenta el ejemplo del contrato.
+entrenados a la vez; se resuelve con un parámetro de consulta opcional
+`objetivo`, por defecto `parada_imprevista` — el modelo de la alerta principal
+y el caso de uso que documenta el ejemplo del contrato. `/predict` también
+sirve `parada_larga` (ver `rutas_predict.py`).
 """
 
 from __future__ import annotations

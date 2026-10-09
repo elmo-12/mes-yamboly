@@ -56,6 +56,7 @@ export const BOTON_FILA = 'flex-1 basis-0';
  */
 const RIESGO_POR_TIPO: Record<TipoAlerta, string> = {
   parada_prevista: 'Riesgo de parada',
+  parada_larga: 'Riesgo de parada larga',
   merma_prevista: 'Riesgo de merma',
   velocidad_baja: 'Riesgo de velocidad baja',
   oee_bajo: 'Riesgo de OEE bajo',

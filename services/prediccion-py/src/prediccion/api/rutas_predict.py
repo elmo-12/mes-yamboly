@@ -1,6 +1,7 @@
-"""`POST /predict` (§2 del contrato). Sirve sólo `tipo == 'parada_prevista'`
-(el único objetivo que consume el motor de alertas: `parada_imprevista`).
-Sin modelo activo → 503. `tipo` distinto → 422. Sin autenticación: el
+"""`POST /predict` (§2 del contrato). Sirve los tipos de alerta que tienen
+modelo propio: `parada_prevista` (objetivo `parada_imprevista`) y
+`parada_larga` (objetivo `parada_larga`). Sin modelo activo para ese objetivo
+→ 503. Otro `tipo` → 422. Sin autenticación: el
 cliente TS no manda cabeceras (`python-http.provider.ts:41-52`).
 """
 
@@ -14,25 +15,24 @@ from fastapi import APIRouter, HTTPException
 from ..dominio.contexto import vector_desde_contexto
 from ..dominio.explicacion import calcular_factores, predecir_proba_binaria
 from ..dominio.modelo import Candidato
-from ..estado import obtener_estado
+from ..estado import OBJETIVO_POR_TIPO_ALERTA, obtener_estado
 from .esquemas import ContextoPrediccion, Factor, RespuestaPredict
 
 router = APIRouter()
-
-TIPO_SOPORTADO = "parada_prevista"
-
 
 @router.post("/predict", response_model=RespuestaPredict)
 async def predict(ctx: ContextoPrediccion) -> RespuestaPredict:
     inicio = time.perf_counter()
 
-    if ctx.tipo != TIPO_SOPORTADO:
-        raise HTTPException(status_code=422, detail=f"tipo debe ser '{TIPO_SOPORTADO}'")
+    objetivo = OBJETIVO_POR_TIPO_ALERTA.get(ctx.tipo)
+    if objetivo is None:
+        soportados = ", ".join(f"'{t}'" for t in OBJETIVO_POR_TIPO_ALERTA)
+        raise HTTPException(status_code=422, detail=f"tipo debe ser uno de {soportados}")
 
     estado = obtener_estado()
-    bundle = estado.modelo_para_predict()
+    bundle = estado.modelo_para_predict(objetivo)
     if bundle is None:
-        raise HTTPException(status_code=503, detail="Sin modelo activo para parada_imprevista")
+        raise HTTPException(status_code=503, detail=f"Sin modelo activo para {objetivo}")
 
     x = vector_desde_contexto(ctx.model_dump(), bundle.nombres)
     candidato = Candidato(algoritmo=bundle.algoritmo, estimador=bundle.estimador)

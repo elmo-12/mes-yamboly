@@ -32,6 +32,24 @@ export class UmbralesDto {
   @IsBoolean({ message: 'mostrarTv debe ser booleano' })
   mostrarTv!: boolean;
 
+  @ApiPropertyOptional({ example: false, description: 'Emitir la alerta de parada larga (30 min o más)' })
+  @IsOptional()
+  @IsBoolean({ message: 'alertaParadaLarga debe ser booleano' })
+  alertaParadaLarga?: boolean;
+
+  @ApiPropertyOptional({
+    minimum: 10,
+    maximum: 99,
+    example: 25,
+    description: 'Probabilidad mínima (%) del modelo de parada larga para emitir la alerta',
+  })
+  @ValidateIf((_o, v) => v !== undefined)
+  @Type(() => Number)
+  @IsNumber({}, { message: 'probabilidadParadaLarga debe ser numérico' })
+  @Min(10, { message: 'Mínimo 10 %' })
+  @Max(99, { message: 'Máximo 99 %' })
+  probabilidadParadaLarga?: number;
+
   /* --- Validación de calidad (TCI) · sección 10.C ------------------- */
 
   @ApiPropertyOptional({

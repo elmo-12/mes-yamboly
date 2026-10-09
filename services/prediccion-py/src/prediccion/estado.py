@@ -12,19 +12,28 @@ from dataclasses import dataclass, field
 
 from .dominio.entrenamiento import BundleModelo
 
-OBJETIVOS = ["parada_imprevista", "merma_sobre_estandar", "minutos_imprevistos", "causa_dominante"]
+OBJETIVOS = ["parada_imprevista", "merma_sobre_estandar", "parada_larga", "causa_dominante"]
 
 COLUMNA_TARGET = {
     "parada_imprevista": "huboParadaImprevista",
     "merma_sobre_estandar": "mermaSobreEstandar",
-    "minutos_imprevistos": "minutosImprevistos",
+    # Turno con 30 min o más de parada imprevista. Reemplaza a la regresión
+    # `minutos_imprevistos`: la duración no es predecible antes del turno
+    # (R² ≈ 0), pero que el turno acumule una parada larga sí lo es.
+    "parada_larga": "paradaLarga",
     "causa_dominante": "tipoCausaDominante",
+}
+
+# Tipo de alerta que pide `/predict` → objetivo cuyo modelo la responde.
+OBJETIVO_POR_TIPO_ALERTA = {
+    "parada_prevista": "parada_imprevista",
+    "parada_larga": "parada_larga",
 }
 
 TIPO_OBJETIVO = {
     "parada_imprevista": "binario",
     "merma_sobre_estandar": "binario",
-    "minutos_imprevistos": "regresion",
+    "parada_larga": "binario",
     "causa_dominante": "multiclase",
 }
 
@@ -40,8 +49,8 @@ class EstadoServicio:
     def uptime_s(self) -> float:
         return time.monotonic() - self.inicio
 
-    def modelo_para_predict(self) -> BundleModelo | None:
-        return self.modelos.get("parada_imprevista")
+    def modelo_para_predict(self, objetivo: str = "parada_imprevista") -> BundleModelo | None:
+        return self.modelos.get(objetivo)
 
 
 _estado: EstadoServicio | None = None

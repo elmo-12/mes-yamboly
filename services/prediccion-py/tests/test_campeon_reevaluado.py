@@ -64,12 +64,20 @@ def test_campeon_reevaluado_se_puebla_y_usa_los_mismos_pliegues() -> None:
     assert total_campeon == total_candidato
     assert total_campeon > 0
 
-    # Con `hiperparametros={}` (sin overrides), el campeón reconstruido es
-    # exactamente la familia LightGBM por defecto: si esa fue también la
-    # elegida como candidato, las métricas deben ser bit a bit idénticas
-    # (mismos datos, mismos pliegues, misma configuración, misma semilla).
-    if respuesta["algoritmo"] == "LightGBM":
-        assert campeon_reevaluado["walkForward"] == respuesta["walkForward"]
+    # El campeón se reevalúa con su configuración archivada, sin volver a
+    # elegir hiperparámetros: si se ajustara en cada pliegue, ya no sería el
+    # modelo que está en servicio. Por eso sus métricas pueden diferir de las
+    # del candidato LightGBM, que sí elige su regularización en cada tramo.
+
+
+def test_campeon_reconstruido_conserva_su_configuracion() -> None:
+    from prediccion.dominio.entrenamiento import _reconstruir_candidato_campeon
+
+    campeon = _reconstruir_candidato_campeon("LightGBM", {"num_leaves": 8, "min_child_samples": 40}, 42)
+    assert campeon is not None
+    assert campeon.rejilla is None
+    assert campeon.estimador.get_params()["num_leaves"] == 8
+    assert campeon.estimador.get_params()["min_child_samples"] == 40
 
 
 def test_campeon_none_no_reevalua_nada() -> None:
@@ -97,3 +105,23 @@ def test_campeon_hiperparametros_se_aplican_al_reconstruir() -> None:
     campeon_reevaluado = resultado.respuesta["campeonReevaluado"]
     assert campeon_reevaluado is not None
     assert campeon_reevaluado["algoritmo"] == "HistGradientBoosting"
+
+
+def test_cada_objetivo_se_compara_con_su_propio_campeon(cliente) -> None:
+    """El `campeon` del cuerpo es el de `parada_imprevista`; `parada_larga` usa
+    el suyo del registro de Python, o ninguno si nunca tuvo versión activa."""
+    from fixtures import generar_request
+
+    campeon_nest = {"version": "v2.1", "algoritmo": "LogisticRegression", "hiperparametros": {"C": 1.0}}
+    primera = cliente.post("/entrenar", json=generar_request(semilla=8, n_dias=60, version="v3.0", campeon=campeon_nest))
+    assert primera.status_code == 200, primera.text
+    resultados = primera.json()["resultados"]
+    assert resultados["parada_imprevista"]["campeonReevaluado"]["version"] == "v2.1"
+    assert resultados["parada_larga"]["campeonReevaluado"] is None
+
+    assert cliente.post("/modelo/parada_larga/v3.0/activar").status_code == 200
+    segunda = cliente.post("/entrenar", json=generar_request(semilla=8, n_dias=60, version="v3.1", campeon=campeon_nest))
+    assert segunda.status_code == 200, segunda.text
+    larga = segunda.json()["resultados"]["parada_larga"]["campeonReevaluado"]
+    assert larga["version"] == "v3.0"
+    assert larga["algoritmo"] == primera.json()["resultados"]["parada_larga"]["algoritmo"]

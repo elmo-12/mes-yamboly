@@ -29,6 +29,14 @@ import {
 export const UMBRAL_MIN_PARADA = 10;
 
 /**
+ * Objetivo `parada_larga`: el turno acumula al menos estos minutos de parada
+ * imprevista. Sustituye a la regresión de `minutosImprevistos`, cuya duración
+ * no es predecible antes del turno (R² ≈ 0 con las variables disponibles); que
+ * el turno sume una parada larga sí lo es (ROC-AUC ≈ 0.64 en el corpus v1.2).
+ */
+export const UMBRAL_PARADA_LARGA_MIN = 30;
+
+/**
  * Prefijo de los tipos de causa que cuentan como parada imprevista real.
  *
  * `causa_parada.clasificacion` marca como `imprevista` toda la rama
@@ -76,6 +84,8 @@ export interface MuestraCalculada {
   huboParadaImprevista: number;
   mermaSobreEstandar: number;
   minutosImprevistos: number;
+  /** 1 si el turno sumó al menos `UMBRAL_PARADA_LARGA_MIN` minutos de parada imprevista. */
+  paradaLarga: number;
   tipoCausaDominante: string | null;
   ordenes: number;
 }
@@ -208,6 +218,7 @@ export class DatasetBuilderService {
         huboParadaImprevista: m.huboParadaImprevista,
         mermaSobreEstandar: m.mermaSobreEstandar,
         minutosImprevistos: m.minutosImprevistos,
+        paradaLarga: m.paradaLarga,
         tipoCausaDominante: m.tipoCausaDominante,
         ordenes: m.ordenes,
         construidaEn: ahoraIso(),
@@ -685,6 +696,7 @@ export class DatasetBuilderService {
           huboParadaImprevista: 0,
           mermaSobreEstandar: mermaSobre,
           minutosImprevistos: g.minutosImprevistos,
+          paradaLarga: g.minutosImprevistos >= UMBRAL_PARADA_LARGA_MIN ? 1 : 0,
           tipoCausaDominante: g.tipoCausaDominante,
           ordenes: g.ordenes.length,
         };

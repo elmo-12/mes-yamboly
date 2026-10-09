@@ -2,11 +2,12 @@ import { z } from 'zod';
 import type { PaginationQuery } from './common';
 import { numeroRequerido } from './catalogs';
 
-export const TIPOS_ALERTA = ['parada_prevista', 'merma_prevista', 'velocidad_baja', 'oee_bajo'] as const;
+export const TIPOS_ALERTA = ['parada_prevista', 'parada_larga', 'merma_prevista', 'velocidad_baja', 'oee_bajo'] as const;
 export type TipoAlerta = (typeof TIPOS_ALERTA)[number];
 
 export const TIPO_ALERTA_LABEL: Record<TipoAlerta, string> = {
   parada_prevista: 'Parada prevista',
+  parada_larga: 'Parada larga prevista',
   merma_prevista: 'Merma prevista',
   velocidad_baja: 'Velocidad baja',
   oee_bajo: 'OEE bajo umbral',
@@ -136,6 +137,14 @@ export interface Umbrales {
   notificarN8n: boolean;
   mostrarTv: boolean;
   /**
+   * Alerta `parada_larga`: turno con 30 min o más de parada imprevista. Viene
+   * desactivada porque el modelo separa poco las clases (ROC-AUC ≈ 0.64): con
+   * su umbral óptimo alertaría en ~38 % de los turnos con ~38 % de precisión.
+   */
+  alertaParadaLarga: boolean;
+  /** Probabilidad mínima (%) del modelo `parada_larga` para emitir la alerta. */
+  probabilidadParadaLarga: number;
+  /**
    * Tolerancia en minutos al comparar horas registradas contra las lecturas de
    * sensor en la validación de calidad (TCI). Por defecto ±5 min.
    */
@@ -168,6 +177,10 @@ export const umbralesSchema = z.object({
   ),
   notificarN8n: z.boolean().default(false),
   mostrarTv: z.boolean().default(true),
+  alertaParadaLarga: z.boolean().default(false),
+  probabilidadParadaLarga: numeroRequerido('Ingresa la probabilidad')
+    .pipe(z.number().min(10, 'Mínimo 10 %').max(99, 'Máximo 99 %'))
+    .default(25),
   /* --- Validación de calidad (TCI) · sección de Configuración 10.C ---
    * Un campo vacío es un error, no 0: antes `z.coerce` guardaba 0 en silencio
    * (tolerancia nula ⇒ TCI estrictísimo). Sin el campo se conserva el valor. */

@@ -391,6 +391,7 @@ export class AnalyticsService implements OnModuleDestroy {
       'huboParadaImprevista',
       'mermaSobreEstandar',
       'minutosImprevistos',
+      'paradaLarga',
       ...nombres,
     ];
     const lineas = filas.map((f) =>
@@ -402,6 +403,7 @@ export class AnalyticsService implements OnModuleDestroy {
         f.huboParadaImprevista,
         f.mermaSobreEstandar,
         f.minutosImprevistos,
+        f.paradaLarga,
         ...nombres.map((n) => f.features[n] ?? ''),
       ].join(','),
     );

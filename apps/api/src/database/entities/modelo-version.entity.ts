@@ -4,15 +4,15 @@ export type EstadoModelo = 'vigente' | 'archivada' | 'entrenando';
 
 /**
  * Objetivo que predice la versión (§6.4 del plan de IA, §5 del contrato Python).
- * `parada_imprevista` y `merma_sobre_estandar` son binarios; `minutos_imprevistos`
- * es regresión; `causa_dominante` es multiclase. Sólo `parada_imprevista` se
+ * `parada_imprevista`, `merma_sobre_estandar` y `parada_larga` (turno con 30 min
+ * o más de parada imprevista) son binarios; `causa_dominante` es multiclase. Sólo `parada_imprevista` se
  * persiste en esta tabla (`OBJETIVO_PERSISTIDO`): es el único que consume
  * `/predict`.
  */
 export type ObjetivoModelo =
   | 'parada_imprevista'
   | 'merma_sobre_estandar'
-  | 'minutos_imprevistos'
+  | 'parada_larga'
   | 'causa_dominante';
 
 /** Nivel de la cascada que produjo los pesos (§5.2 del plan de IA). */
@@ -177,7 +177,7 @@ export class ModeloVersion {
   @Column('double precision', { nullable: true })
   prAuc!: number | null;
 
-  /** MAE del objetivo de regresión (`minutos_imprevistos`); `null` para los demás. */
+  /** MAE de un objetivo de regresión; `null` para los binarios y multiclase. */
   @Column('double precision', { nullable: true })
   mae!: number | null;
 

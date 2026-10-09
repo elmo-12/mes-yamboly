@@ -226,7 +226,7 @@ Como **jefe de producción**, quiero exportar también en CSV y PDF, para compar
 **E5-01 — Bandeja de alertas con filtros**
 `Prioridad: Must · Puntos: 5 · Estado: Hecho · Sprint: S3`
 Como **supervisor de turno**, quiero ver todas las alertas activas filtradas por tipo, severidad y línea, para priorizar cuál atender primero.
-- Tipos `parada_prevista|merma_prevista|velocidad_baja|oee_bajo`; severidades `critica|alta|media`.
+- Tipos `parada_prevista|parada_larga|merma_prevista|velocidad_baja|oee_bajo` (`parada_larga`: turno con ≥ 30 min de parada imprevista, desactivada por defecto); severidades `critica|alta|media`.
 - Popover de campana con las 3 más recientes; resumen (`activas`, `atendidasHoy`, `pendientesConfirmar`, `vencidas`, `epAcumulada`).
 
 **E5-02 — Atender o descartar alerta**

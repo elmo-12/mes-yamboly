@@ -251,6 +251,25 @@ describe('reportes · alertas · analítica · auth (regresiones QA)', () => {
       }
     });
 
+    it('la alerta de parada larga viene desactivada y su umbral propio se guarda y valida', async () => {
+      const actuales = (await get('/alertas/umbrales').expect(200)).body;
+      expect(actuales).toMatchObject({ alertaParadaLarga: false, probabilidadParadaLarga: 25 });
+
+      const put = (cuerpo: object) =>
+        http().put('/api/v1/alertas/umbrales').set('Authorization', `Bearer ${tokens.jefe}`).send(cuerpo);
+      await put({ ...actuales, probabilidadParadaLarga: 5 }).expect(422);
+      const guardados = await put({ ...actuales, alertaParadaLarga: true, probabilidadParadaLarga: 30 }).expect(200);
+      expect(guardados.body).toMatchObject({ alertaParadaLarga: true, probabilidadParadaLarga: 30 });
+
+      /* Sin los campos nuevos (clientes anteriores) se conservan los vigentes. */
+      const { alertaParadaLarga: _a, probabilidadParadaLarga: _p, ...sinCampos } = guardados.body;
+      const conservados = await put(sinCampos).expect(200);
+      expect(conservados.body).toMatchObject({ alertaParadaLarga: true, probabilidadParadaLarga: 30 });
+
+      const { version: _v, ...restaurar } = conservados.body;
+      await put({ ...restaurar, alertaParadaLarga: false, probabilidadParadaLarga: 25 }).expect(200);
+    });
+
     it('«Alerta no encontrada» en femenino', async () => {
       const r = await get('/alertas/ALE-NO-EXISTE').expect(404);
       expect(r.body.message).toBe('Alerta no encontrada');

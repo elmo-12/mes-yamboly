@@ -234,6 +234,7 @@ function generarVencidasAnteriores(): AlertaSemilla[] {
   const tipos: TipoAlerta[] = ['parada_prevista', 'merma_prevista', 'velocidad_baja', 'oee_bajo'];
   const textos: Record<TipoAlerta, string> = {
     parada_prevista: 'Parada PN-02 prevista',
+    parada_larga: 'Parada de 30 min o más prevista',
     merma_prevista: 'Merma EP por encima del umbral',
     velocidad_baja: 'Velocidad por debajo del estándar',
     oee_bajo: 'OEE del turno bajo el umbral',
@@ -297,6 +298,8 @@ export const umbralesIniciales: Umbrales = {
   probabilidadMinima: 70,
   notificarN8n: true,
   mostrarTv: true,
+  alertaParadaLarga: false,
+  probabilidadParadaLarga: 25,
   /* Validación de calidad (TCI): ±5 min · ±5 % · ±1 día en la fecha SAP. */
   tciToleranciaMin: 5,
   tciToleranciaPct: 5,

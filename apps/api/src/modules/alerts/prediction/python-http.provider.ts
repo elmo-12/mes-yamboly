@@ -19,8 +19,9 @@ class ErrorHttpPrediccion extends Error {
     super(message);
   }
 
-  /** 4xx: el servicio respondió, sólo rechazó la petición (p. ej. tipo distinto
-   * de `parada_prevista`). No indica que Python esté caído. */
+  /** 4xx: el servicio respondió, sólo rechazó la petición (p. ej. un tipo sin
+   * modelo propio: sólo `parada_prevista` y `parada_larga` lo tienen). No
+   * indica que Python esté caído. */
   get esRechazoDeNegocio(): boolean {
     return this.status >= 400 && this.status < 500;
   }

@@ -20,6 +20,11 @@ export class RuleBasedPredictionProvider implements PredictionProvider {
   readonly nombre = 'reglas';
 
   async predict(ctx: PredictionContext): Promise<PredictionResult> {
+    /* La parada larga no tiene una regla fiable: sin el modelo no se estima.
+     * Devolver la puntuación genérica (≥ 50 %) dispararía la alerta en todas
+     * las líneas cada vez que el servicio de predicción no responda. */
+    if (ctx.tipo === 'parada_larga') return { probabilidad: 0, factores: [] };
+
     const historico = acotar(ctx.eventos7d * 9 + ctx.eventos30d * 1.2, 0, 55);
     const velocidad = acotar(Math.abs(Math.min(0, ctx.desvioVelocidadPct)) * 4, 0, 35);
     const oee = acotar((85 - ctx.oeeActual) * 1.5, 0, 30);

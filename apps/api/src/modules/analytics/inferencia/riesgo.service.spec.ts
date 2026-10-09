@@ -83,23 +83,41 @@ describe('RiesgoService — coherencia de la probabilidad entre predict() y eval
 
     await service.ejecutarCiclo({ generarAlertas: true, persistir: false });
 
-    expect(proveedor.predict).toHaveBeenCalledTimes(1);
+    /* Dos puntuaciones por línea: la parada prevista y la parada larga, ambas
+     * con el vector completo de features. */
+    expect(proveedor.predict).toHaveBeenCalledTimes(2);
+    const tiposPedidos = proveedor.predict.mock.calls.map((c) => (c[0] as PredictionContext).tipo);
+    expect(tiposPedidos).toEqual(['parada_prevista', 'parada_larga']);
     const ctxUsado = proveedor.predict.mock.calls[0]![0] as PredictionContext;
-    expect(ctxUsado.tipo).toBe('parada_prevista');
     expect(ctxUsado.lineaId).toBe('LIN-1');
     expect(ctxUsado.features).toBeDefined();
+    expect((proveedor.predict.mock.calls[1]![0] as PredictionContext).features).toBe(ctxUsado.features);
 
-    expect(proveedor.precalcular).toHaveBeenCalledTimes(1);
+    expect(proveedor.precalcular).toHaveBeenCalledTimes(2);
     const [ctxPrecargado, resultadoPrecargado] = proveedor.precalcular.mock.calls[0]!;
     expect(ctxPrecargado.tipo).toBe('parada_prevista');
     expect(ctxPrecargado.lineaId).toBe('LIN-1');
     expect(ctxPrecargado.turno).toBe(ctxUsado.turno);
     expect(resultadoPrecargado).toBe(resultado);
+    expect(proveedor.precalcular.mock.calls[1]![0].tipo).toBe('parada_larga');
 
     /* El orden importa: hay que precargar antes de disparar el motor, si no la
      * llamada interna de `evaluar()` no encontraría nada que reutilizar. */
-    const ordenPrecalcular = proveedor.precalcular.mock.invocationCallOrder[0]!;
     const ordenEvaluar = motor.evaluar.mock.invocationCallOrder[0]!;
-    expect(ordenPrecalcular).toBeLessThan(ordenEvaluar);
+    for (const orden of proveedor.precalcular.mock.invocationCallOrder) {
+      expect(orden).toBeLessThan(ordenEvaluar);
+    }
+  });
+
+  it('pasa al motor los tipos con alerta viva de la línea en vez de saltarse la línea', async () => {
+    const { service, motor } = construirServicio();
+    const alertas = (service as unknown as { alertas: { find: jest.Mock } }).alertas;
+    alertas.find.mockResolvedValue([{ lineaId: 'LIN-1', tipo: 'velocidad_baja', estado: 'activa' }]);
+
+    await service.ejecutarCiclo({ generarAlertas: true, persistir: false });
+
+    expect(motor.evaluar).toHaveBeenCalledTimes(1);
+    const tiposVivos = motor.evaluar.mock.calls[0]![1] as Set<string>;
+    expect([...tiposVivos]).toEqual(['velocidad_baja']);
   });
 });

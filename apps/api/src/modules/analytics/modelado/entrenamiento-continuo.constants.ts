@@ -11,7 +11,7 @@ import type { ObjetivoModelo } from '../../../database/entities';
 export const OBJETIVOS_MODELO: readonly ObjetivoModelo[] = [
   'parada_imprevista',
   'merma_sobre_estandar',
-  'minutos_imprevistos',
+  'parada_larga',
   'causa_dominante',
 ] as const;
 
@@ -19,6 +19,7 @@ export const OBJETIVOS_MODELO: readonly ObjetivoModelo[] = [
 export const OBJETIVOS_CLASIFICACION: readonly ObjetivoModelo[] = [
   'parada_imprevista',
   'merma_sobre_estandar',
+  'parada_larga',
 ] as const;
 
 /**

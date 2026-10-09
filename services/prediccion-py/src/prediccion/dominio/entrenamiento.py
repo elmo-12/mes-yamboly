@@ -17,6 +17,7 @@ import numpy as np
 from sklearn.base import clone
 from sklearn.metrics import average_precision_score
 
+from .ajuste import ajustar
 from .dataset import PLIEGUES, dias_unicos_ordenados, repartir
 from .metricas import (
     accuracy,
@@ -32,6 +33,8 @@ from .metricas import (
 from .modelo import (
     Candidato,
     CalibradorPlatt,
+    RegresorAcotado,
+    RegresorDosPartes,
     ajustar_platt,
     candidatos_binario,
     candidatos_multiclase,
@@ -123,13 +126,30 @@ def _proba_positiva(estimador: Any, X: np.ndarray) -> np.ndarray:
 def _hiperparametros(estimador: Any) -> dict[str, Any]:
     from sklearn.pipeline import Pipeline
 
+    extra: dict[str, Any] = {}
+    if isinstance(estimador, RegresorAcotado):
+        extra = {"percentilRecorte": estimador.percentil}
+        if hasattr(estimador, "tope_"):
+            extra["topePrediccion"] = round(estimador.tope_, 4)
+        estimador = getattr(estimador, "estimador_", estimador.estimador)
+    if isinstance(estimador, RegresorDosPartes):
+        extra = {"percentilRecorte": estimador.percentil}
+        if hasattr(estimador, "duracion_media_"):
+            extra["duracionMediaMin"] = round(estimador.duracion_media_, 4)
+        estimador = getattr(estimador, "clasificador_", None) or estimador.clasificador
     base = estimador.named_steps["modelo"] if isinstance(estimador, Pipeline) else estimador
-    parametros = base.get_params()
+    parametros = {**base.get_params(), **extra}
     limpio = {}
     for k, v in parametros.items():
         if isinstance(v, (int, float, str, bool)) or v is None:
             limpio[k] = v
     return limpio
+
+
+def _orden_temporal(muestras: list[dict]) -> list[dict]:
+    """Fecha y luego turno (D antes que N). `ajuste.ajustar()` valida con
+    `TimeSeriesSplit`, que asume las filas en orden cronológico."""
+    return sorted(muestras, key=lambda m: (m["fecha"], m.get("turno", "")))
 
 
 def _generar_pliegues(dias: list[str]) -> tuple[list[list[str]], int]:
@@ -159,6 +179,7 @@ def _entrenar_walkforward(
     `algoritmo`) para no chocar si el campeón resulta ser de la misma familia
     que uno de los tres candidatos.
     """
+    muestras = _orden_temporal(muestras)
     dias = dias_unicos_ordenados([m["fecha"] for m in muestras])
     bloques, _n = _generar_pliegues(dias)
     pools: dict[str, dict[str, list]] = {c.algoritmo: {"y": [], "p": [], "filas": []} for c in candidatos}
@@ -210,8 +231,7 @@ def _entrenar_walkforward(
         )
 
         for clave, cand in [*((c.algoritmo, c) for c in candidatos), *extra.items()]:
-            modelo = clone(cand.estimador)
-            modelo.fit(X_train, y_train)
+            modelo = ajustar(cand, X_train, y_train, tipo)
             if tipo == "binario":
                 p = _proba_positiva(modelo, X_val).tolist()
             elif tipo == "multiclase":
@@ -427,8 +447,7 @@ def entrenar_binario(
 
     entrenamiento, prueba, corte_entrenamiento, corte_prueba = _split_prueba(muestras_anticipado, prueba_desde)
     candidato_final = next(c for c in candidatos_binario(semilla) if c.algoritmo == mejor_algoritmo)
-    modelo_final = clone(candidato_final.estimador)
-    base_final = entrenamiento or muestras_anticipado
+    base_final = _orden_temporal(entrenamiento or muestras_anticipado)
     y_train_full = [m[columna_target] for m in base_final]
     X_train_full = _vectorizar_matriz(base_final, nombres)
     # Igual que en cada pliegue: el refit final que se persiste como
@@ -441,7 +460,7 @@ def entrenar_binario(
         raise ObjetivoNoEntrenable(
             f"el conjunto de entrenamiento final (hasta `pruebaDesde`) tiene una sola clase en `{columna_target}`"
         )
-    modelo_final.fit(X_train_full, y_train_full)
+    modelo_final = ajustar(candidato_final, X_train_full, y_train_full, "binario")
 
     if prueba:
         X_prueba = _vectorizar_matriz(prueba, nombres)
@@ -458,12 +477,17 @@ def entrenar_binario(
         entrenamiento_r = [m for m in muestras_retro if m["fecha"] < prueba_desde]
         prueba_r = [m for m in muestras_retro if m["fecha"] >= prueba_desde]
         if entrenamiento_r and prueba_r and len({m[columna_target] for m in entrenamiento_r}) > 1:
-            modelo_retro = clone(candidato_final.estimador)
-            modelo_retro.fit(_vectorizar_matriz(entrenamiento_r, nombres_retro), [m[columna_target] for m in entrenamiento_r])
+            entrenamiento_r = _orden_temporal(entrenamiento_r)
+            modelo_retro = ajustar(
+                candidato_final,
+                _vectorizar_matriz(entrenamiento_r, nombres_retro),
+                [m[columna_target] for m in entrenamiento_r],
+                "binario",
+            )
             p_retro = _proba_positiva(modelo_retro, _vectorizar_matriz(prueba_r, nombres_retro)).tolist()
             auc_retro = _auc_simple([m[columna_target] for m in prueba_r], p_retro)
 
-    pares_importancia = importancias(Candidato(algoritmo=mejor_algoritmo, estimador=modelo_final), nombres)
+    pares_importancia = importancias(Candidato(algoritmo=mejor_algoritmo, estimador=modelo_final), nombres, X_train_full, y_train_full, semilla)
     importancias_norm = normalizar_importancias(pares_importancia)
 
     alternativas = [
@@ -476,7 +500,7 @@ def entrenar_binario(
 
     respuesta = {
         "algoritmo": mejor_algoritmo,
-        "hiperparametros": _hiperparametros(candidato_final.estimador),
+        "hiperparametros": _hiperparametros(modelo_final),
         "muestras": len(muestras_anticipado),
         "features": len(nombres),
         "tasaPositivos": round(sum(1 for m in muestras_anticipado if m[columna_target] == 1) / len(muestras_anticipado), 4)
@@ -532,17 +556,23 @@ def entrenar_regresion(
             f"varianza distinta de cero en `{columna_target}`"
         )
 
+    # Se elige por RMSE, el mismo criterio con el que la API decide la
+    # promoción. El MAE favorecía al modelo que predice 0 en un objetivo con
+    # mayoría de ceros, y ese modelo no sirve para estimar minutos esperados.
     mejor_algoritmo = None
-    mejor_mae = float("inf")
+    mejor_rmse = float("inf")
     metricas_por_candidato: dict[str, float] = {}
+    mae_por_candidato: dict[str, float] = {}
     for algoritmo, pool in pools.items():
         if not pool["y"]:
             metricas_por_candidato[algoritmo] = float("inf")
+            mae_por_candidato[algoritmo] = float("inf")
             continue
-        valor = mae(np.array(pool["y"]), np.array(pool["p"]))
+        valor = rmse(np.array(pool["y"]), np.array(pool["p"]))
         metricas_por_candidato[algoritmo] = valor
-        if valor < mejor_mae:
-            mejor_mae = valor
+        mae_por_candidato[algoritmo] = mae(np.array(pool["y"]), np.array(pool["p"]))
+        if valor < mejor_rmse:
+            mejor_rmse = valor
             mejor_algoritmo = algoritmo
 
     if mejor_algoritmo is None:
@@ -554,8 +584,7 @@ def entrenar_regresion(
 
     entrenamiento, prueba, corte_entrenamiento, corte_prueba = _split_prueba(muestras_anticipado, prueba_desde)
     candidato_final = next(c for c in candidatos_regresion(semilla) if c.algoritmo == mejor_algoritmo)
-    modelo_final = clone(candidato_final.estimador)
-    base = entrenamiento or muestras_anticipado
+    base = _orden_temporal(entrenamiento or muestras_anticipado)
     X_train_full = _vectorizar_matriz(base, nombres)
     y_train_full = [m[columna_target] for m in base]
     valores_full = [v for v in y_train_full if v is not None]
@@ -563,12 +592,12 @@ def entrenar_regresion(
         raise ObjetivoNoEntrenable(
             f"el conjunto de entrenamiento final (hasta `pruebaDesde`) tiene varianza cero en `{columna_target}`"
         )
-    modelo_final.fit(X_train_full, y_train_full)
+    modelo_final = ajustar(candidato_final, X_train_full, y_train_full, "regresion")
 
-    pares_importancia = importancias(Candidato(algoritmo=mejor_algoritmo, estimador=modelo_final), nombres)
+    pares_importancia = importancias(Candidato(algoritmo=mejor_algoritmo, estimador=modelo_final), nombres, X_train_full, y_train_full, semilla)
     importancias_norm = normalizar_importancias(pares_importancia)
     alternativas = [
-        {"algoritmo": alg, "mae": round(valor, 4)}
+        {"algoritmo": alg, "rmse": round(valor, 4), "mae": round(mae_por_candidato[alg], 4)}
         for alg, valor in sorted(metricas_por_candidato.items(), key=lambda kv: kv[1])
         if alg != mejor_algoritmo
     ]
@@ -576,7 +605,7 @@ def entrenar_regresion(
 
     respuesta = {
         "algoritmo": mejor_algoritmo,
-        "hiperparametros": _hiperparametros(candidato_final.estimador),
+        "hiperparametros": _hiperparametros(modelo_final),
         "muestras": len(muestras_anticipado),
         "features": len(nombres),
         "metricas": {
@@ -660,15 +689,14 @@ def entrenar_multiclase(
 
     entrenamiento, prueba, corte_entrenamiento, corte_prueba = _split_prueba(muestras_validas, prueba_desde)
     candidato_final = next(c for c in candidatos_multiclase(semilla) if c.algoritmo == mejor_algoritmo)
-    modelo_final = clone(candidato_final.estimador)
-    base = entrenamiento or muestras_validas
+    base = _orden_temporal(entrenamiento or muestras_validas)
     X_train_full = _vectorizar_matriz(base, nombres)
     y_train_full = [m[columna_target] for m in base]
     if len({v for v in y_train_full if v is not None}) < 2:
         raise ObjetivoNoEntrenable(
             f"el conjunto de entrenamiento final (hasta `pruebaDesde`) tiene una sola clase en `{columna_target}`"
         )
-    modelo_final.fit(X_train_full, y_train_full)
+    modelo_final = ajustar(candidato_final, X_train_full, y_train_full, "multiclase")
 
     top2 = 0.0
     if prueba:
@@ -679,7 +707,7 @@ def entrenar_multiclase(
             clases_modelo = list(modelo_final.classes_)
             top2 = top_k_accuracy(y_prueba, proba_prueba, clases_modelo, 2)
 
-    pares_importancia = importancias(Candidato(algoritmo=mejor_algoritmo, estimador=modelo_final), nombres)
+    pares_importancia = importancias(Candidato(algoritmo=mejor_algoritmo, estimador=modelo_final), nombres, X_train_full, y_train_full, semilla)
     importancias_norm = normalizar_importancias(pares_importancia)
     alternativas = [
         {"algoritmo": alg, "f1Macro": round(valor, 4)}
@@ -690,7 +718,7 @@ def entrenar_multiclase(
 
     respuesta = {
         "algoritmo": mejor_algoritmo,
-        "hiperparametros": _hiperparametros(candidato_final.estimador),
+        "hiperparametros": _hiperparametros(modelo_final),
         "muestras": len(muestras_validas),
         "features": len(nombres),
         "metricas": {

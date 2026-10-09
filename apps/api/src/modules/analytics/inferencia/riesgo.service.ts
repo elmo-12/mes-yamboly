@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import type { RiesgoLinea, Turno } from '@mes/types';
+import type { RiesgoLinea, TipoAlerta, Turno } from '@mes/types';
 import { ahoraIso, sumarDiasLocal } from '../../../common/utils';
 import {
   Alerta,
@@ -103,7 +103,14 @@ export class RiesgoService {
     );
     const causas = await this.tablaDeCausas(objetivo.turno);
     const activas = await this.alertas.find({ where: { estado: 'activa' } });
-    const conAlertaViva = new Set(activas.map((a) => a.lineaId));
+    /* Tipos con alerta viva por línea: el motor no duplica un tipo, pero una
+     * alerta de velocidad no debe impedir que se anticipe una parada. */
+    const tiposVivos = new Map<string, Set<TipoAlerta>>();
+    for (const a of activas) {
+      const tipos = tiposVivos.get(a.lineaId) ?? new Set<TipoAlerta>();
+      tipos.add(a.tipo);
+      tiposVivos.set(a.lineaId, tipos);
+    }
 
     const riesgos: RiesgoLinea[] = [];
     const filas: Prediccion[] = [];
@@ -182,8 +189,15 @@ export class RiesgoService {
         }),
       );
 
-      if (!generarAlertas || conAlertaViva.has(linea.id)) continue;
-      const creadas = await this.motor.evaluar(this.senal(linea, objetivo.turno, features));
+      if (!generarAlertas) continue;
+      /* La alerta de parada larga también se puntúa con el vector completo; se
+       * precarga igual que la de parada prevista para que el motor la reutilice. */
+      const ctxLarga: PredictionContext = { ...ctxPrediccion, tipo: 'parada_larga' };
+      this.proveedor.precalcular?.(ctxLarga, await this.proveedor.predict(ctxLarga));
+      const creadas = await this.motor.evaluar(
+        this.senal(linea, objetivo.turno, features),
+        tiposVivos.get(linea.id),
+      );
       if (creadas.length) {
         alertasCreadas += creadas.length;
         const ultima = filas[filas.length - 1]!;

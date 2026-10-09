@@ -41,6 +41,7 @@ function fabricarMuestras(dias = 35, porDia = 7): MuestraCalculada[] {
         huboParadaImprevista: positivo,
         mermaSobreEstandar: 0,
         minutosImprevistos: positivo ? 25 : 0,
+        paradaLarga: 0,
         tipoCausaDominante: positivo ? 'PN-02' : null,
         ordenes: 1,
       });

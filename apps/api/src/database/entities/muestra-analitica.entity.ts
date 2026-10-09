@@ -63,6 +63,10 @@ export class MuestraAnalitica {
   @Column('double precision', { default: 0 })
   minutosImprevistos!: number;
 
+  /** Target `parada_larga`: 1 si `minutosImprevistos` alcanzó `UMBRAL_PARADA_LARGA_MIN`. */
+  @Column('integer', { default: 0 })
+  paradaLarga!: number;
+
   /** Causa raíz que más minutos aportó al turno; `null` si no hubo paradas. */
   @Column('text', { nullable: true })
   tipoCausaDominante!: string | null;

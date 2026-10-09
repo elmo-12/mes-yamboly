@@ -22,6 +22,18 @@ export class Umbrales {
   @Column('boolean', { default: true })
   mostrarTv!: boolean;
 
+  /**
+   * Alerta `parada_larga` (turno con 30 min o más de parada imprevista).
+   * Desactivada por defecto: con el modelo actual (ROC-AUC ≈ 0.64) alertaría
+   * en muchos turnos con baja precisión y arrastraría el indicador EP.
+   */
+  @Column('boolean', { default: false })
+  alertaParadaLarga!: boolean;
+
+  /** Probabilidad mínima (%) del modelo `parada_larga`; ~25 % es su umbral F1. */
+  @Column('double precision', { default: 25 })
+  probabilidadParadaLarga!: number;
+
   /* --- Validación de calidad (TCI) · Configuración 10.C -------------- */
 
   /** Tolerancia en minutos entre horas registradas y lecturas de sensor. */

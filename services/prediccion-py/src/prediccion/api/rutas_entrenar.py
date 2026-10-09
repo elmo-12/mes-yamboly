@@ -123,7 +123,7 @@ def _entrenar_todos(datos: EntrenarRequest, muestras_dict: list[dict], catalogo_
                 nombres=nombres,
                 nombres_retro=nombres_retro,
                 etiquetas=etiquetas,
-                campeon=campeon,
+                campeon=_campeon_del_objetivo(objetivo, campeon, config),
             )
             exitosos += 1
         except ObjetivoNoEntrenable as error:
@@ -137,6 +137,33 @@ def _entrenar_todos(datos: EntrenarRequest, muestras_dict: list[dict], catalogo_
         raise TodosLosObjetivosFallaron(resultados)
 
     return resultados
+
+
+OBJETIVO_DEL_CAMPEON_DE_NEST = "parada_imprevista"
+
+
+def _campeon_del_objetivo(objetivo: str, campeon_nest: dict | None, config) -> dict | None:
+    """Campeón con el que se compara el retador de `objetivo`.
+
+    Nest sólo conoce el campeón de `parada_imprevista` (lo guarda en
+    `modelo_version`), así que el `campeon` del cuerpo vale únicamente para ese
+    objetivo. Antes se reutilizaba para todos los binarios: `parada_larga`, que
+    nunca había tenido versión, se comparaba contra la configuración del modelo
+    de parada imprevista reentrenada sobre su target y se rechazaba con «No
+    mejora a v1.2». Para los demás objetivos el campeón es la versión activa en
+    el registro propio de Python; sin versión activa no hay campeón y Nest
+    decide `sin_incumbente`.
+    """
+    if objetivo == OBJETIVO_DEL_CAMPEON_DE_NEST:
+        return campeon_nest
+    version, meta = registro.version_activa(config.modelos_dir, objetivo)
+    if version is None or not meta:
+        return None
+    return {
+        "version": version,
+        "algoritmo": meta.get("algoritmo", ""),
+        "hiperparametros": meta.get("hiperparametros") or {},
+    }
 
 
 def _entrenar_un_objetivo(

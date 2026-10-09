@@ -84,6 +84,7 @@ class MuestraEntrenamiento(BaseModel):
     huboParadaImprevista: int | None = None
     mermaSobreEstandar: int | None = None
     minutosImprevistos: float | None = None
+    paradaLarga: int | None = None
     tipoCausaDominante: str | None = None
 
 

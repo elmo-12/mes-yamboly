@@ -25,9 +25,9 @@ export interface UmbralesDrawerProps {
 }
 
 /**
- * El drawer solo edita las reglas operativas; las tolerancias del TCI viven en
- * Configuración › Umbrales, así que se arrastran tal cual para no perderlas en
- * el `PUT`.
+ * El drawer solo edita las reglas operativas; las tolerancias del TCI y la
+ * alerta de parada larga viven en Configuración › Umbrales, así que se
+ * arrastran tal cual para no perderlas en el `PUT`.
  */
 const VACIO: UmbralesInput = {
   velocidadBajoEstandarPct: 5,
@@ -35,6 +35,8 @@ const VACIO: UmbralesInput = {
   probabilidadMinima: 70,
   notificarN8n: true,
   mostrarTv: true,
+  alertaParadaLarga: false,
+  probabilidadParadaLarga: 25,
   tciToleranciaMin: 5,
   tciToleranciaPct: 5,
   tciToleranciaDiasSap: 1,
@@ -63,6 +65,8 @@ export function UmbralesDrawer({ open, onOpenChange }: UmbralesDrawerProps) {
       probabilidadMinima: data.probabilidadMinima,
       notificarN8n: data.notificarN8n,
       mostrarTv: data.mostrarTv,
+      alertaParadaLarga: data.alertaParadaLarga,
+      probabilidadParadaLarga: data.probabilidadParadaLarga,
       tciToleranciaMin: data.tciToleranciaMin,
       tciToleranciaPct: data.tciToleranciaPct,
       tciToleranciaDiasSap: data.tciToleranciaDiasSap,

@@ -353,7 +353,8 @@ export class AlertsService {
         versionEnviada: versionLeida,
       });
     }
-    /* Las tolerancias TCI son opcionales: si no vienen, se conservan las vigentes. */
+    /* Las tolerancias TCI y la alerta de parada larga son opcionales: si no
+     * vienen, se conservan las vigentes. */
     const cambios = Object.fromEntries(
       Object.entries(resto).filter(([, valor]) => valor !== undefined),
     );
@@ -382,6 +383,8 @@ export class AlertsService {
       probabilidadMinima: fila.probabilidadMinima,
       notificarN8n: fila.notificarN8n,
       mostrarTv: fila.mostrarTv,
+      alertaParadaLarga: fila.alertaParadaLarga ?? false,
+      probabilidadParadaLarga: fila.probabilidadParadaLarga ?? 25,
       tciToleranciaMin: fila.tciToleranciaMin,
       tciToleranciaPct: fila.tciToleranciaPct,
       tciToleranciaDiasSap: fila.tciToleranciaDiasSap,

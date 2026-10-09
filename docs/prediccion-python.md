@@ -43,7 +43,7 @@ Lo consume `apps/api/src/modules/alerts/prediction/python-http.provider.ts:41-52
 
 ```jsonc
 {
-  "tipo": "parada_prevista",        // parada_prevista | merma_prevista | velocidad_baja | oee_bajo
+  "tipo": "parada_prevista",        // parada_prevista | parada_larga | merma_prevista | velocidad_baja | oee_bajo
   "lineaId": "LIN-LLEN-M2",
   "lineaCodigo": "LLEN-M2",
   "turno": "D",                     // D | N  (el JSDoc dice M·T·N: está obsoleto)
@@ -89,7 +89,7 @@ Pydantic con `extra='ignore'`.
   | `lineaCodigo` | `linea_<codigo>` = 1 (misma regex que `nombreFeatureLinea`) |
 
   El resto, `NaN`.
-- `tipo != 'parada_prevista'` → **422**. Sin modelo activo → **503**. En ambos casos el
+- `tipo` sin modelo propio (todo lo que no sea `parada_prevista` → objetivo `parada_imprevista`, o `parada_larga` → objetivo `parada_larga`) → **422**. Sin modelo activo → **503**. En ambos casos el
   provider devuelve `null` y la cascada baja a reglas.
 - Presupuesto **p95 < 500 ms** (el cliente corta a `PREDICTION_TIMEOUT_MS`, 1 500 ms).
 - Sin autenticación: el provider no manda cabeceras. Se protege publicando el puerto
@@ -311,10 +311,22 @@ Las mutaciones exigen `X-Internal-Token` cuando `PREDICCION_TOKEN` está definid
 | --- | --- | --- | --- |
 | `parada_imprevista` | binario | `huboParadaImprevista` | PR-AUC, ROC-AUC, F1, Brier, matriz, lift@3 |
 | `merma_sobre_estandar` | binario | `mermaSobreEstandar` | ídem |
-| `minutos_imprevistos` | regresión | `minutosImprevistos` | MAE, RMSE, R² |
+| `parada_larga` | binario | `paradaLarga` (turno con `minutosImprevistos` ≥ 30, `UMBRAL_PARADA_LARGA_MIN`) | ídem que `parada_imprevista` |
 | `causa_dominante` | multiclase | `tipoCausaDominante` | F1-macro, accuracy, top-2 |
 
-`/predict` sirve **sólo** `parada_imprevista`: es el único que consume el motor de alertas.
+`/predict` sirve `parada_imprevista` (alerta `parada_prevista`) y `parada_larga` (alerta `parada_larga`, desactivada por defecto en `umbrales.alertaParadaLarga`, con su propio `probabilidadParadaLarga`, 25 % por defecto). Sin modelo de `parada_larga` el respaldo por reglas devuelve 0 y no se alerta.
+
+Candidatos: LightGBM, HistGradientBoosting y regresión logística. Cada uno elige
+su regularización con `TimeSeriesSplit` dentro del tramo de entrenamiento
+(`dominio/ajuste.py`), sin ver los pliegues de evaluación.
+
+`parada_larga` sustituye a la regresión `minutos_imprevistos` (oct-2026): con
+las variables anticipadas la duración no era predecible (R² ≈ 0 incluso con
+objetivo recortado, pérdidas robustas y modelo en dos partes), mientras que
+«¿acumulará el turno 30 min o más?» sí lo es (ROC-AUC 0.64, PR-AUC 0.34 frente a
+una tasa base de 0.25 en el corpus v1.2). El soporte de regresión
+(`entrenar_regresion`, `RegresorAcotado`, `RegresorDosPartes`) se conserva para
+objetivos futuros.
 
 ## 6. Definición del target (fijada en F0)
 

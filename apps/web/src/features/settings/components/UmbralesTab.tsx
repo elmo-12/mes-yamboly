@@ -46,6 +46,8 @@ export function UmbralesTab() {
           probabilidadMinima: data.probabilidadMinima,
           notificarN8n: data.notificarN8n,
           mostrarTv: data.mostrarTv,
+          alertaParadaLarga: data.alertaParadaLarga,
+          probabilidadParadaLarga: data.probabilidadParadaLarga,
           tciToleranciaMin: data.tciToleranciaMin,
           tciToleranciaPct: data.tciToleranciaPct,
           tciToleranciaDiasSap: data.tciToleranciaDiasSap,
@@ -63,6 +65,8 @@ export function UmbralesTab() {
         probabilidadMinima: guardados.probabilidadMinima,
         notificarN8n: guardados.notificarN8n,
         mostrarTv: guardados.mostrarTv,
+        alertaParadaLarga: guardados.alertaParadaLarga,
+        probabilidadParadaLarga: guardados.probabilidadParadaLarga,
         tciToleranciaMin: guardados.tciToleranciaMin,
         tciToleranciaPct: guardados.tciToleranciaPct,
         tciToleranciaDiasSap: guardados.tciToleranciaDiasSap,
@@ -190,6 +194,50 @@ export function UmbralesTab() {
                   {...register('probabilidadMinima')}
                   destructive={Boolean(errors.probabilidadMinima)}
                   hint={errors.probabilidadMinima?.message}
+                />
+              ),
+            },
+            {
+              label: (
+                <Etiqueta
+                  titulo="Alerta de parada larga"
+                  apoyo="Turno con 30 min o más de parada imprevista. El modelo distingue poco estos turnos: activarla genera más alertas y baja la EP"
+                />
+              ),
+              value: (
+                <Controller
+                  control={control}
+                  name="alertaParadaLarga"
+                  render={({ field }) => (
+                    <Switch
+                      checked={field.value ?? false}
+                      onCheckedChange={field.onChange}
+                      label={field.value ? 'Activada' : 'Desactivada'}
+                    />
+                  )}
+                />
+              ),
+            },
+            {
+              label: (
+                <Etiqueta
+                  titulo="Probabilidad mínima para parada larga"
+                  apoyo="Propia de esta alerta: el modelo rara vez supera el 30 %, por eso no usa la probabilidad general"
+                />
+              ),
+              value: (
+                <Input
+                  aria-label="Probabilidad mínima para parada larga"
+                  type="number"
+                  inputMode="numeric"
+                  min={10}
+                  max={99}
+                  suffix="%"
+                  className="max-w-[180px]"
+                  wrapperClassName="max-w-[180px]"
+                  {...register('probabilidadParadaLarga')}
+                  destructive={Boolean(errors.probabilidadParadaLarga)}
+                  hint={errors.probabilidadParadaLarga?.message}
                 />
               ),
             },

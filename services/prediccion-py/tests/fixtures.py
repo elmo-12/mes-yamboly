@@ -89,6 +89,7 @@ def generar_muestras(semilla: int = 42, n_dias: int = 90) -> list[dict]:
                     "huboParadaImprevista": hubo_parada,
                     "mermaSobreEstandar": merma,
                     "minutosImprevistos": minutos,
+                    "paradaLarga": 1 if minutos >= 30 else 0,
                     "tipoCausaDominante": causa,
                 }
 
@@ -118,7 +119,7 @@ def generar_request(
 
     return {
         "version": version,
-        "objetivos": ["parada_imprevista", "merma_sobre_estandar", "minutos_imprevistos", "causa_dominante"],
+        "objetivos": ["parada_imprevista", "merma_sobre_estandar", "parada_larga", "causa_dominante"],
         "snapshot": {
             "sha256": calcular_sha256_muestras(muestras),
             "filas": len(muestras),

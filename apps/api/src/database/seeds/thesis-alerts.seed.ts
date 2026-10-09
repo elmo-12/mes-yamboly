@@ -236,6 +236,7 @@ function vencidasAnteriores(): SemillaAlerta[] {
   const tipos: TipoAlerta[] = ['parada_prevista', 'merma_prevista', 'velocidad_baja', 'oee_bajo'];
   const textos: Record<TipoAlerta, string> = {
     parada_prevista: 'Parada PN-02 prevista',
+    parada_larga: 'Parada de 30 min o más prevista',
     merma_prevista: 'Merma EP por encima del umbral',
     velocidad_baja: 'Velocidad por debajo del estándar',
     oee_bajo: 'OEE del turno bajo el umbral',
@@ -308,6 +309,8 @@ export class ThesisAlertsSeeder implements Seeder {
           probabilidadMinima: 70,
           notificarN8n: true,
           mostrarTv: true,
+          alertaParadaLarga: false,
+          probabilidadParadaLarga: 25,
           /* Tolerancias de la validación de calidad (TCI): ±5 min, ±5 %, ±1 día. */
           tciToleranciaMin: 5,
           tciToleranciaPct: 5,

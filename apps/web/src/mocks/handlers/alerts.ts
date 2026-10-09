@@ -89,6 +89,7 @@ function validarUmbrales(body: Record<string, unknown>): Record<string, string> 
   rango('velocidadBajoEstandarPct', 1, 50, ['Mínimo 1 %', 'Máximo 50 %']);
   rango('oeeMinimo', 1, 100, ['Mínimo 1 %', 'Máximo 100 %']);
   rango('probabilidadMinima', 50, 99, ['Mínimo 50 %', 'Máximo 99 %']);
+  rango('probabilidadParadaLarga', 10, 99, ['Mínimo 10 %', 'Máximo 99 %'], true);
   rango('tciToleranciaMin', 0, 60, ['Mínimo 0 min', 'Máximo 60 min'], true);
   rango('tciToleranciaPct', 0, 50, ['Mínimo 0 %', 'Máximo 50 %'], true);
   rango('tciToleranciaDiasSap', 0, 15, ['Mínimo 0 días', 'Máximo 15 días'], true, true);
@@ -148,6 +149,9 @@ export const alertsHandlers = [
       notificarN8n:
         typeof body.notificarN8n === 'boolean' ? body.notificarN8n : store.umbrales.notificarN8n,
       mostrarTv: typeof body.mostrarTv === 'boolean' ? body.mostrarTv : store.umbrales.mostrarTv,
+      alertaParadaLarga:
+        typeof body.alertaParadaLarga === 'boolean' ? body.alertaParadaLarga : store.umbrales.alertaParadaLarga,
+      probabilidadParadaLarga: numeroO(body.probabilidadParadaLarga, store.umbrales.probabilidadParadaLarga),
       /* Las tolerancias TCI son opcionales: si no vienen, se conservan las vigentes. */
       tciToleranciaMin: numeroO(body.tciToleranciaMin, store.umbrales.tciToleranciaMin),
       tciToleranciaPct: numeroO(body.tciToleranciaPct, store.umbrales.tciToleranciaPct),
